@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true,
+    "incremental": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/components/*": ["src/components/*"],
+      "@/lib/*": ["src/lib/*"],
+      "@/app/*": ["src/app/*"]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
+    "src/components/**/*.ts",
+    "src/components/**/*.tsx",
+    "src/lib/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/server.ts",
+    "src/controllers",
+    "src/routes",
+    "src/middleware",
+    "src/config",
+    "src/services"
+  ]
+}

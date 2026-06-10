@@ -1,0 +1,8 @@
+{"level":"error","message":"Error querying overstaying visitors: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 00:00:07.926"}
+{"level":"error","message":"Error querying scheduled bus maintenance logs: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 00:30:07.318"}
+{"level":"error","message":"Failed calling refresh_director_materialized_views RPC: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 01:00:00.264"}
+{"level":"error","message":"Error querying overstaying visitors: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 01:00:07.321"}
+{"level":"error","message":"Error querying overstaying visitors in database: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 01:00:07.323"}
+{"level":"error","message":"Failed calling refresh_director_materialized_views RPC: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 10:00:00.606"}
+{"level":"error","message":"Error querying overstaying visitors: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 10:00:07.648"}
+{"level":"error","message":"Error querying overstaying visitors in database: TypeError: fetch failed","metadata":{},"timestamp":"2026-06-10 10:00:07.649"}
