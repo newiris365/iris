@@ -41,92 +41,24 @@ export async function login(req: Request, res: Response) {
 
     const { email, password } = parseResult.data;
 
-    let userProfile = null;
+    const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    // 1. Direct local sandbox fallback: check email and allow bypass for testing credentials
-    const isLocalSandboxEmail = email === 'khushal@gmail.com' || email === 'director@siet.edu.in' || email === 'admin@siet.edu.in' || email === 'guard@siet.edu.in';
-    
-    if (isLocalSandboxEmail) {
-      // Attempt to load profile from Database
-      const { data: dbProfile, error: dbError } = await supabaseAdmin
-        .from('users')
-        .select('*, institutions(name, plan_tier)')
-        .eq('email', email)
-        .single();
-      
-      if (!dbError && dbProfile) {
-        userProfile = dbProfile;
-      } else {
-        // Ultimate code-fallback if database connection is empty or offline
-        if (email === 'khushal@gmail.com') {
-          userProfile = {
-            id: 'b0000000-0000-0000-0000-000000000006',
-            institution_id: 'a0000000-0000-0000-0000-000000000001',
-            role: 'Student',
-            name: 'Khushal Gehlot (Mock Sandbox)',
-            email: 'khushal@gmail.com',
-            phone: '+919999988888',
-            is_active: true,
-            institutions: {
-              name: 'SIN Institute of Engineering & Technology (SIET)',
-              plan_tier: 'University'
-            }
-          };
-        } else if (email === 'guard@siet.edu.in') {
-          userProfile = {
-            id: 'b0000000-0000-0000-0000-000000000015',
-            institution_id: 'a0000000-0000-0000-0000-000000000001',
-            role: 'Security',
-            name: 'Vikram Singh (Security Guard Mock)',
-            email: 'guard@siet.edu.in',
-            phone: '+919876543299',
-            is_active: true,
-            institutions: {
-              name: 'SIN Institute of Engineering & Technology (SIET)',
-              plan_tier: 'University'
-            }
-          };
-        } else {
-          userProfile = {
-            id: 'b0000000-0000-0000-0000-000000000002',
-            institution_id: 'a0000000-0000-0000-0000-000000000001',
-            role: 'Director',
-            name: 'Dr. K. R. Sharma (Mock Sandbox)',
-            email: 'director@siet.edu.in',
-            phone: '+919876543211',
-            is_active: true,
-            institutions: {
-              name: 'SIN Institute of Engineering & Technology (SIET)',
-              plan_tier: 'University'
-            }
-          };
-        }
-      }
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: authError?.message || 'Authentication failed' });
     }
 
-    // 2. If no bypass match, execute standard Supabase Auth verify
-    if (!userProfile) {
-      const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
-        email,
-        password
-      });
+    // Fetch profile records from DB
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('*, institutions(name, plan_tier)')
+      .eq('email', email)
+      .single();
 
-      if (authError || !authData.user) {
-        return res.status(401).json({ success: false, error: authError?.message || 'Authentication failed' });
-      }
-
-      // Fetch profile records from DB
-      const { data: profileRecord, error: profileError } = await supabaseAdmin
-        .from('users')
-        .select('*, institutions(name, plan_tier)')
-        .eq('email', email)
-        .single();
-
-      if (profileError || !profileRecord) {
-        return res.status(404).json({ success: false, error: 'Corresponding platform profile record not found.' });
-      }
-
-      userProfile = profileRecord;
+    if (profileError || !userProfile) {
+      return res.status(404).json({ success: false, error: 'Corresponding platform profile record not found.' });
     }
 
     if (!userProfile.is_active) {
