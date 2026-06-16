@@ -15,15 +15,27 @@ export default function StudentFeesPage() {
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [selectedMethod, setSelectedMethod] = useState('razorpay');
   const [showMethodSelect, setShowMethodSelect] = useState<string | null>(null);
+  const [studentId, setStudentId] = useState('');
 
   useEffect(() => {
-    loadData();
+    const profile = JSON.parse(localStorage.getItem('iris_user_profile') || '{}');
+    if (profile.id) setStudentId(profile.id);
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => { document.body.removeChild(script); };
   }, []);
+
+  useEffect(() => {
+    if (studentId) loadData();
+  }, [studentId]);
 
   const loadData = async () => {
     try {
       const [feesRes, walletRes] = await Promise.all([
-        apiGet('/core/fees/student/b0000000-0000-0000-0000-000000000006'),
+        apiGet(`/core/fees/student/${studentId}`),
         apiGet('/core/wallet/balance'),
       ]);
 
@@ -120,7 +132,7 @@ export default function StudentFeesPage() {
       } else if (method === 'razorpay') {
         // Razorpay checkout
         const initRes = await apiPost('/core/fees/payment/initiate', {
-          student_id: 'b0000000-0000-0000-0000-000000000006',
+          student_id: studentId,
           fee_structure_id: structure.id,
           amount: structure.amount,
         });
@@ -140,7 +152,7 @@ export default function StudentFeesPage() {
                   razorpay_order_id: response.razorpay_order_id,
                   razorpay_payment_id: response.razorpay_payment_id,
                   razorpay_signature: response.razorpay_signature,
-                  student_id: 'b0000000-0000-0000-0000-000000000006',
+                  student_id: studentId,
                   fee_structure_id: structure.id,
                   amount_paid: structure.amount,
                 });
@@ -162,9 +174,9 @@ export default function StudentFeesPage() {
           alert(`Razorpay Simulator:\nOrder ID: ${initRes.order_id}\nAmount: ₹${initRes.amount / 100}\nClick OK to confirm payment.`);
           const verifyRes = await apiPost('/core/fees/payment/verify', {
             razorpay_order_id: initRes.order_id,
-            razorpay_payment_id: 'pay_rzp_' + Math.random().toString(36).substring(2, 12),
+            razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 12),
             razorpay_signature: 'sig_mock_verification_hash',
-            student_id: 'b0000000-0000-0000-0000-000000000006',
+            student_id: studentId,
             fee_structure_id: structure.id,
             amount_paid: structure.amount,
           });

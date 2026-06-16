@@ -66,7 +66,6 @@ export default function WalletPage() {
     setTopping(true);
     try {
       if (topMethod === 'razorpay') {
-        // Load Razorpay SDK dynamically
         if (typeof window !== 'undefined' && !(window as any).Razorpay) {
           const script = document.createElement('script');
           script.src = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -74,16 +73,16 @@ export default function WalletPage() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        const orderId = 'order_' + Math.random().toString(36).substring(2, 12);
+        const orderRes = await apiPost('/core/wallet/topup/initiate', { amount });
 
-        if (typeof window !== 'undefined' && (window as any).Razorpay && paymentConfig?.razorpay_key_id) {
+        if (orderRes.success && orderRes.order_id && !orderRes.order_id.startsWith('order_mock_') && orderRes.key_id && typeof window !== 'undefined' && (window as any).Razorpay) {
           const options = {
-            key: paymentConfig.razorpay_key_id,
-            amount: amount * 100,
-            currency: 'INR',
+            key: orderRes.key_id,
+            amount: orderRes.amount,
+            currency: orderRes.currency || 'INR',
             name: 'IRIS 365',
             description: 'IRIS Balance Top-Up',
-            order_id: orderId,
+            order_id: orderRes.order_id,
             handler: async (response: any) => {
               const res = await apiPost('/core/wallet/credit', {
                 amount,
@@ -101,11 +100,10 @@ export default function WalletPage() {
           const rzp = new (window as any).Razorpay(options);
           rzp.open();
         } else {
-          // Mock mode
           const res = await apiPost('/core/wallet/credit', {
             amount,
-            razorpay_order_id: orderId,
-            razorpay_payment_id: 'pay_rzp_' + Math.random().toString(36).substring(2, 12),
+            razorpay_order_id: orderRes.order_id || 'order_mock_' + Math.random().toString(36).substring(2, 12),
+            razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 12),
           });
           if (res.success) {
             setBalance(res.new_balance || balance + amount);

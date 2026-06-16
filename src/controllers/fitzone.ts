@@ -523,7 +523,7 @@ export async function initiateMembershipPurchase(req: Request, res: Response) {
     }
 
     // Fallback: mock order for testing
-    const orderId = `rzp_order_${Math.random().toString(36).substring(2, 15)}`;
+    const orderId = `order_mock_${Math.random().toString(36).substring(2, 15)}`;
     return res.status(200).json({
       success: true,
       order_id: orderId,
@@ -548,7 +548,7 @@ export async function verifyMembershipPurchase(req: Request, res: Response) {
 
     // Verify Razorpay payment signature if not a mock order
     const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (secret && razorpay_order_id && !razorpay_order_id.startsWith('rzp_order_') && razorpay_signature) {
+    if (secret && razorpay_order_id && !razorpay_order_id.startsWith('order_mock_') && razorpay_signature) {
       const generatedSignature = crypto
         .createHmac('sha256', secret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)

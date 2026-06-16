@@ -5,9 +5,13 @@ import jwt from 'jsonwebtoken';
 import PDFDocument from 'pdfkit';
 import { supabaseAdmin } from '../config/supabase';
 import { sendBulkReminders, FeeReminderEntry } from '../services/whatsapp';
+import { getRazorpayClient, isMockOrderId } from '../lib/razorpay';
 import logger from '../config/logger';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'iris-365-super-secret-key-for-jwt-signing';
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL SECURITY: JWT_SECRET must be set and >= 32 chars');
+}
 
 // Default campus coordinates (overridden per institution from attendance_methods config)
 const DEFAULT_CAMPUS_LAT = 26.2389;
@@ -95,7 +99,7 @@ async function generateRotatingQrToken(sessionId: string, institutionId: string,
 // Validate a QR token against the qr_tokens table
 async function validateQrToken(token: string, sessionId: string): Promise<{ valid: boolean; reason?: string }> {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { session_id: string; type: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as unknown as { session_id: string; type: string };
     if (decoded.type !== 'ATTENDANCE_QR') return { valid: false, reason: 'Invalid token type.' };
     if (decoded.session_id !== sessionId) return { valid: false, reason: 'Token does not match session.' };
 
@@ -360,7 +364,7 @@ export async function markAttendanceQr(req: Request, res: Response) {
     // Decode JWT first to get session_id
     let decoded: any;
     try {
-      decoded = jwt.verify(token, JWT_SECRET) as { session_id: string; type: string };
+      decoded = jwt.verify(token, JWT_SECRET) as unknown as { session_id: string; type: string };
     } catch {
       return res.status(401).json({ success: false, error: 'QR token expired or invalid.' });
     }
@@ -1576,16 +1580,34 @@ export async function initiatePayment(req: Request, res: Response) {
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     const { amount } = parse.data;
 
-    // Simulate Razorpay SDK Order Creation
-    const order_id = 'order_rzp_' + Math.random().toString(36).substring(2, 12);
+    const razorpay = getRazorpayClient();
+
+    if (!razorpay) {
+      const order_id = 'order_mock_' + Math.random().toString(36).substring(2, 12);
+      return res.status(200).json({
+        success: true,
+        order_id,
+        amount: amount * 100,
+        currency: 'INR'
+      });
+    }
+
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
+      currency: 'INR',
+      receipt: `fee_${Date.now()}`,
+    });
+
     return res.status(200).json({
       success: true,
-      order_id,
-      amount: amount * 100, // Razorpay works in paise
-      currency: 'INR'
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: process.env.RAZORPAY_KEY_ID,
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Razorpay SDK handshake failed.' });
+    logger.error('initiatePayment error:', err);
+    return res.status(500).json({ success: false, error: 'Payment initiation failed.' });
   }
 }
 
@@ -1595,19 +1617,17 @@ export async function verifyPayment(req: Request, res: Response) {
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, fee_structure_id, amount_paid } = parse.data;
 
-    // Verify payment signature
     const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (secret && !razorpay_order_id.startsWith('order_mock_')) {
+    if (secret && !isMockOrderId(razorpay_order_id)) {
       const generatedSignature = crypto
         .createHmac('sha256', secret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
       if (generatedSignature !== razorpay_signature) {
-        return res.status(400).json({ success: false, error: 'Razorpay payment signature validation failed.' });
+        return res.status(400).json({ success: false, error: 'Payment signature verification failed.' });
       }
     }
 
-    // Create payment entry in DB
     const { data, error } = await supabaseAdmin
       .from('fee_payments')
       .insert({
@@ -1623,11 +1643,12 @@ export async function verifyPayment(req: Request, res: Response) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ success: false, error: error.message });
+    if (error) return res.status(500).json({ success: false, error: 'Failed to record payment.' });
 
     return res.status(200).json({ success: true, message: 'Fee paid successfully', payment: data });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Payment validation verification failed.' });
+    logger.error('verifyPayment error:', err);
+    return res.status(500).json({ success: false, error: 'Payment verification failed.' });
   }
 }
 
@@ -4828,5 +4849,108 @@ export async function deductWallet(req: Request, res: Response) {
     return res.status(200).json(data);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// WALLET TOP-UP: INITIATE RAZORPAY ORDER
+// =========================================================================
+export async function initiateWalletTopUp(req: Request, res: Response) {
+  try {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid amount required.' });
+    }
+
+    const razorpay = getRazorpayClient();
+
+    if (!razorpay) {
+      const order_id = 'order_mock_' + Math.random().toString(36).substring(2, 12);
+      return res.status(200).json({
+        success: true,
+        order_id,
+        amount: amount * 100,
+        currency: 'INR',
+      });
+    }
+
+    const order = await razorpay.orders.create({
+      amount: amount * 100,
+      currency: 'INR',
+      receipt: `wallet_topup_${Date.now()}`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: process.env.RAZORPAY_KEY_ID,
+    });
+  } catch (err) {
+    logger.error('initiateWalletTopUp error:', err);
+    return res.status(500).json({ success: false, error: 'Wallet top-up initiation failed.' });
+  }
+}
+
+// =========================================================================
+// WALLET TOP-UP: CREDIT AFTER RAZORPAY PAYMENT
+// =========================================================================
+export async function creditWallet(req: Request, res: Response) {
+  try {
+    const { amount, razorpay_order_id, razorpay_payment_id } = req.body;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid amount required.' });
+    }
+
+    const razorpay = getRazorpayClient();
+    if (razorpay && razorpay_order_id && !isMockOrderId(razorpay_order_id)) {
+      try {
+        const payment = await razorpay.payments.fetch(razorpay_payment_id);
+        if (payment.status !== 'captured') {
+          return res.status(400).json({ success: false, error: 'Payment not captured.' });
+        }
+      } catch {
+        return res.status(400).json({ success: false, error: 'Payment verification failed.' });
+      }
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    }
+
+    const { data: student, error: studentErr } = await supabaseAdmin
+      .from('students')
+      .select('id, wallet_balance')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (studentErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student record not found.' });
+    }
+
+    const newBalance = (student.wallet_balance || 0) + amount;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('students')
+      .update({ wallet_balance: newBalance })
+      .eq('id', student.id);
+
+    if (updateErr) throw updateErr;
+
+    await supabaseAdmin.from('wallet_transactions').insert({
+      student_id: student.id,
+      type: 'credit',
+      amount,
+      payment_method: 'razorpay',
+      status: 'completed',
+      description: 'IRIS Balance Top-up via Razorpay',
+    });
+
+    return res.status(200).json({ success: true, new_balance: newBalance });
+  } catch (err) {
+    logger.error('creditWallet error:', err);
+    return res.status(500).json({ success: false, error: 'Wallet credit failed.' });
   }
 }

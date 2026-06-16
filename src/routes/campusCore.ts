@@ -165,6 +165,8 @@ import {
   getVendorDailySales,
   getPrepList,
   deductWallet,
+  creditWallet,
+  initiateWalletTopUp,
   exportCiaMarks,
 } from '../controllers/campusCore';
 import { authMiddleware, requireRole } from '../middleware/auth';
@@ -506,6 +508,8 @@ router.post('/users/:userId/reset-password', requireRole(['Admin', 'SuperAdmin']
 // 27. GENERAL WALLET DEDUCTION
 // =========================================================================
 router.post('/wallet/deduct', requireRole(['Admin', 'SuperAdmin', 'Student']), deductWallet);
+router.post('/wallet/credit', requireRole(['Student']), creditWallet);
+router.post('/wallet/topup/initiate', requireRole(['Student']), initiateWalletTopUp);
 
 // =========================================================================
 // 28. CIA UNIVERSITY PORTAL EXPORT
