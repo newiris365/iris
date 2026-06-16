@@ -43,6 +43,34 @@ function decodeJWT(token: string): Record<string, any> | null {
   return null;
 }
 
+async function resolveUserContext(userPayload: Record<string, any>): Promise<{ institutionId: string; role: string }> {
+  if (userPayload.institution_id) {
+    return { institutionId: userPayload.institution_id, role: userPayload.role || 'Student' };
+  }
+
+  const identifier = userPayload.sub || userPayload.email;
+  if (!identifier) {
+    return { institutionId: '', role: '' };
+  }
+
+  try {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    let query = supabase.from('users').select('institution_id, role, email, id').limit(1);
+    if (isUUID) {
+      query = query.or(`id.eq.${identifier},email.eq.${userPayload.email || ''}`);
+    } else {
+      query = query.eq('email', identifier);
+    }
+    const { data, error } = await query.single();
+    if (error || !data) {
+      return { institutionId: '', role: '' };
+    }
+    return { institutionId: data.institution_id, role: data.role || userPayload.role || 'Student' };
+  } catch {
+    return { institutionId: '', role: '' };
+  }
+}
+
 async function handleSettings(req: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
@@ -66,12 +94,17 @@ async function handleSettings(req: NextRequest): Promise<NextResponse> {
     const token = authHeader.replace('Bearer ', '');
     const userPayload = decodeJWT(token);
 
-    if (!userPayload || !userPayload.institution_id) {
+    if (!userPayload) {
+      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
+    }
+
+    const ctx = await resolveUserContext(userPayload);
+    if (!ctx.institutionId) {
       return NextResponse.json({ success: false, error: 'Missing institution context' }, { status: 400 });
     }
 
-    const institutionId = userPayload.institution_id;
-    const role = userPayload.role;
+    const institutionId = ctx.institutionId;
+    const role = ctx.role;
 
     // Determine target institution for SuperAdmin
     const targetInstitutionId =
