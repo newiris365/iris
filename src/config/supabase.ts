@@ -70,6 +70,27 @@ export function getDynamicSupabaseClient(): SupabaseClient {
   return _supabaseAdminInternal;
 }
 
+// Define Mock course registrations in-memory store for student courses view
+export let mockCourseRegistrations: any[] = [
+  {
+    id: 'reg-wt',
+    student_id: 'test-student-id',
+    course_id: 'c-wt',
+    status: 'active',
+    registered_at: new Date().toISOString(),
+    dropped_at: null,
+    academic_year: new Date().getFullYear().toString(),
+    course: {
+      id: 'c-wt',
+      course_code: 'CS-302',
+      course_name: 'Web Technologies',
+      credits: 4,
+      course_type: 'core',
+      semester: 5
+    }
+  }
+];
+
 // Define Mock client details for offline simulation mode
 const mockAuth = {
   signInWithPassword: async ({ email }: { email: string }) => {
@@ -379,6 +400,59 @@ function getMockDataForTable(tableName: string) {
           bus_status: 'On time'
         }
       ];
+    case 'courses':
+      return [
+        {
+          id: 'c-dbms',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          course_code: 'CS-301',
+          course_name: 'Database Management Systems',
+          credits: 4,
+          course_type: 'core',
+          semester: 5,
+          academic_year: new Date().getFullYear().toString(),
+          is_active: true,
+          department: { id: 'd1', name: 'Computer Science' }
+        },
+        {
+          id: 'c-wt',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          course_code: 'CS-302',
+          course_name: 'Web Technologies',
+          credits: 4,
+          course_type: 'core',
+          semester: 5,
+          academic_year: new Date().getFullYear().toString(),
+          is_active: true,
+          department: { id: 'd1', name: 'Computer Science' }
+        },
+        {
+          id: 'c-ai',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          course_code: 'CS-305',
+          course_name: 'Introduction to Artificial Intelligence',
+          credits: 3,
+          course_type: 'elective',
+          semester: 5,
+          academic_year: new Date().getFullYear().toString(),
+          is_active: true,
+          department: { id: 'd1', name: 'Computer Science' }
+        },
+        {
+          id: 'c-os-lab',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          course_code: 'CS-308',
+          course_name: 'Operating Systems Lab',
+          credits: 2,
+          course_type: 'lab',
+          semester: 5,
+          academic_year: new Date().getFullYear().toString(),
+          is_active: true,
+          department: { id: 'd1', name: 'Computer Science' }
+        }
+      ];
+    case 'course_registrations':
+      return mockCourseRegistrations;
     case 'parent_topup_child_wallet':
       return [
         {
@@ -395,14 +469,61 @@ function createMockBuilder(tableName: string) {
   const mockBuilder: any = {
     tableName,
     chain: [] as string[],
+    insertedData: null as any,
+    updatedData: null as any,
+    eqFilters: {} as Record<string, any>,
     then(onfulfilled: any, onrejected: any) {
       const isSingle = this.chain.includes('single') || this.chain.includes('maybeSingle');
-      const mockData = getMockDataForTable(this.tableName);
-      let resolvedData: any = mockData;
-      if (isSingle) {
-        resolvedData = mockData.length > 0 ? mockData[0] : null;
+      
+      // Perform simulated write operations
+      if (this.chain.includes('insert') && this.insertedData) {
+        const records = Array.isArray(this.insertedData) ? this.insertedData : [this.insertedData];
+        records.forEach((rec: any) => {
+          const newRec = {
+            id: rec.id || `mock-id-${Math.random().toString(36).substr(2, 9)}`,
+            ...rec,
+            registered_at: rec.registered_at || new Date().toISOString()
+          };
+          if (tableName === 'course_registrations') {
+            // Enrich with mock course info
+            const mockCourses = getMockDataForTable('courses');
+            const courseObj = mockCourses.find((c: any) => c.id === rec.course_id);
+            newRec.course = courseObj ? {
+              id: courseObj.id,
+              course_code: courseObj.course_code,
+              course_name: courseObj.course_name,
+              credits: courseObj.credits,
+              course_type: courseObj.course_type,
+              semester: courseObj.semester
+            } : null;
+            mockCourseRegistrations.push(newRec);
+          }
+        });
       }
-      const count = mockData.length;
+      
+      if (this.chain.includes('update') && this.updatedData) {
+        if (tableName === 'course_registrations') {
+          const targetId = this.eqFilters.id || this.eqFilters.course_id;
+          mockCourseRegistrations = mockCourseRegistrations.map(r => {
+            if (r.id === targetId || r.course_id === targetId) {
+              return { ...r, ...this.updatedData, status: this.updatedData.status || r.status };
+            }
+            return r;
+          });
+        }
+      }
+
+      let resolvedData: any;
+      if (tableName === 'course_registrations') {
+        resolvedData = mockCourseRegistrations;
+      } else {
+        resolvedData = getMockDataForTable(this.tableName);
+      }
+
+      if (isSingle) {
+        resolvedData = resolvedData.length > 0 ? resolvedData[0] : null;
+      }
+      const count = resolvedData.length;
       return Promise.resolve({
         data: resolvedData,
         error: null,
@@ -416,10 +537,21 @@ function createMockBuilder(tableName: string) {
       if (prop === 'then') {
         return target.then.bind(target);
       }
-      if (typeof prop === 'string') {
-        target.chain.push(prop);
-      }
-      return () => proxy;
+      return (...args: any[]) => {
+        if (typeof prop === 'string') {
+          target.chain.push(prop);
+          if (prop === 'insert' && args[0]) {
+            target.insertedData = args[0];
+          }
+          if (prop === 'update' && args[0]) {
+            target.updatedData = args[0];
+          }
+          if (prop === 'eq' && args[0] && args[1] !== undefined) {
+            target.eqFilters[args[0]] = args[1];
+          }
+        }
+        return proxy;
+      };
     }
   });
   return proxy;
