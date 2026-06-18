@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   UtensilsCrossed, Search, Leaf, Flame, Star, Clock, ShoppingCart,
-  Plus, Minus, X, Tag, ChevronRight, Sparkles, ArrowRight, AlertTriangle
+  Plus, Minus, X, Tag, ChevronRight, Sparkles, ArrowRight, AlertTriangle, Wallet
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 
@@ -67,7 +67,12 @@ export default function StudentCanteenMenu() {
     const matchCat = activeCategory === 'all' || item.category === activeCategory;
     const matchSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchVeg = !vegOnly || item.is_veg;
-    const matchAllergens = excludeAllergens.length === 0 || !item.allergens?.some((a: string) => excludeAllergens.includes(a));
+    const allergensList = Array.isArray(item.allergens)
+      ? item.allergens
+      : (typeof item.allergens === 'string'
+          ? item.allergens.split(',').map(x => x.trim()).filter(Boolean)
+          : []);
+    const matchAllergens = excludeAllergens.length === 0 || !allergensList.some((a: string) => excludeAllergens.includes(a.toLowerCase()));
     return matchCat && matchSearch && matchVeg && matchAllergens && item.is_available;
   });
 
@@ -136,13 +141,36 @@ export default function StudentCanteenMenu() {
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#6C2BD9]/30 via-[#0D0A1A] to-[#0D0A1A]" />
         <div className="relative max-w-7xl mx-auto px-6 pt-8 pb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#6C2BD9] to-[#8B5CF6] flex items-center justify-center shadow-lg shadow-[#6C2BD9]/25">
-              <UtensilsCrossed className="w-6 h-6 text-white" />
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#6C2BD9] to-[#8B5CF6] flex items-center justify-center shadow-lg shadow-[#6C2BD9]/25">
+                <UtensilsCrossed className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="font-extrabold text-2xl lg:text-3xl text-white">Campus Canteen</h1>
+                <p className="text-xs text-[#C4B5FD]/70">Fresh & delicious • Order ahead, skip the line</p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-extrabold text-2xl lg:text-3xl text-white">Campus Canteen</h1>
-              <p className="text-xs text-[#C4B5FD]/70">Fresh & delicious • Order ahead, skip the line</p>
+
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/student/canteen/orders"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-[#6C2BD9]/50 text-xs font-semibold text-[#C4B5FD] hover:text-white transition-all shadow-md"
+              >
+                <Clock className="w-3.5 h-3.5" /> My Orders
+              </a>
+              <a
+                href="/student/canteen/wallet"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-[#6C2BD9]/50 text-xs font-semibold text-[#C4B5FD] hover:text-white transition-all shadow-md"
+              >
+                <Wallet className="w-3.5 h-3.5" /> Canteen Wallet
+              </a>
+              <a
+                href="/student/canteen/subscriptions"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:border-[#6C2BD9]/50 text-xs font-semibold text-[#C4B5FD] hover:text-white transition-all shadow-md"
+              >
+                <Tag className="w-3.5 h-3.5" /> Meal Plans
+              </a>
             </div>
           </div>
 
@@ -275,15 +303,23 @@ export default function StudentCanteenMenu() {
                   </div>
 
                   {/* Allergen badges */}
-                  {item.allergens && item.allergens.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {item.allergens.map((a: string) => (
-                        <span key={a} className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-orange-500/10 border border-orange-500/20 text-orange-400/70">
-                          {a}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const allergensList = Array.isArray(item.allergens)
+                      ? item.allergens
+                      : (typeof item.allergens === 'string'
+                          ? item.allergens.split(',').map(x => x.trim()).filter(Boolean)
+                          : []);
+                    if (allergensList.length === 0) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1">
+                        {allergensList.map((a: string) => (
+                          <span key={a} className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-orange-500/10 border border-orange-500/20 text-orange-400/70">
+                            {a}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Add to Cart */}
                   <div className="mt-1">

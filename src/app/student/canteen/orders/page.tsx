@@ -71,10 +71,19 @@ export default function StudentOrdersPage() {
   }, []);
 
   const loadOrders = async () => {
+    let studentId = '00000000-0000-0000-0000-000000000000';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
-      const mockStudentId = 's0000000-0000-0000-0000-000000000001';
-      const res = await apiGet(`/canteen/orders/${mockStudentId}`);
-      if (res.success && res.orders?.length > 0) setOrders(res.orders);
+      const res = await apiGet(`/canteen/orders/${studentId}`);
+      if (res.success && res.orders) setOrders(res.orders);
     } catch (err) { console.log('Using mock orders'); }
   };
 
@@ -82,10 +91,20 @@ export default function StudentOrdersPage() {
   const pastOrders = orders.filter(o => o.status === 'Delivered' || o.status === 'Cancelled');
 
   const submitFeedback = async (orderId: string) => {
+    let studentId = '00000000-0000-0000-0000-000000000000';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
       await apiPost('/canteen/feedback', {
         order_id: orderId,
-        student_id: 's0000000-0000-0000-0000-000000000001',
+        student_id: studentId,
         rating,
         comment: comment || undefined
       });

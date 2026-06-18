@@ -36,18 +36,37 @@ export default function StudentSubscriptionsPage() {
   }, []);
 
   const loadSubscriptions = async () => {
+    let studentId = '00000000-0000-0000-0000-000000000000';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
-      const mockStudentId = 's0000000-0000-0000-0000-000000000001';
-      const res = await apiGet(`/canteen/subscriptions/${mockStudentId}`);
-      if (res.success && res.subscriptions?.length > 0) setSubscriptions(res.subscriptions);
+      const res = await apiGet(`/canteen/subscriptions/${studentId}`);
+      if (res.success && res.subscriptions) setSubscriptions(res.subscriptions);
     } catch (err) { console.log('Using mock subscriptions'); }
   };
 
   const handleCreate = async (form: any) => {
+    let studentId = '00000000-0000-0000-0000-000000000000';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
       await apiPost('/canteen/subscriptions', {
         ...form,
-        student_id: 's0000000-0000-0000-0000-000000000001'
+        student_id: studentId
       });
     } catch (err) {}
 

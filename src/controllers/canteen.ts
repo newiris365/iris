@@ -4,6 +4,28 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase';
 import logger from '../config/logger';
 
+// Helper to resolve student_id from either user_id or students(id)
+async function resolveStudentId(idOrUserId: string): Promise<string> {
+  if (!idOrUserId || idOrUserId === '00000000-0000-0000-0000-000000000000') {
+    return idOrUserId;
+  }
+  try {
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .or(`id.eq.${idOrUserId},user_id.eq.${idOrUserId}`)
+      .maybeSingle();
+
+    if (student) {
+      return student.id;
+    }
+  } catch (err) {
+    logger.error(`Error resolving student_id for ${idOrUserId}:`, err);
+  }
+  return idOrUserId;
+}
+
+
 // ──────────────────────────────────────────────────────────────
 // ZOD SCHEMAS
 // ──────────────────────────────────────────────────────────────
@@ -284,6 +306,7 @@ export async function placeOrder(req: Request, res: Response) {
     }
 
     const { student_id, items, total_amount, payment_method, special_instructions, offer_code } = parseResult.data;
+    const resolved_student_id = await resolveStudentId(student_id);
 
     let discount_amount = 0;
     let offer_id: string | null = null;
@@ -321,7 +344,7 @@ export async function placeOrder(req: Request, res: Response) {
 
     // Call atomic canteen order RPC
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('place_canteen_order_atomic', {
-      p_student_id: student_id,
+      p_student_id: resolved_student_id,
       p_institution_id: req.user?.institution_id,
       p_total_amount: final_amount,
       p_items: items,
@@ -496,11 +519,12 @@ export async function updateOrderStatus(req: Request, res: Response) {
 export async function getStudentOrders(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    const resolvedStudentId = await resolveStudentId(studentId);
 
     const { data, error } = await supabaseAdmin
       .from('canteen_orders')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .order('order_time', { ascending: false })
       .limit(50);
 
@@ -549,12 +573,13 @@ export async function topupWallet(req: Request, res: Response) {
     }
 
     const { student_id, amount } = parseResult.data;
+    const resolvedStudentId = await resolveStudentId(student_id);
 
     // Fetch or create wallet
     let { data: wallet } = await supabaseAdmin
       .from('canteen_wallets')
       .select('id, balance')
-      .eq('student_id', student_id)
+      .eq('student_id', resolvedStudentId)
       .single();
 
     let newBalance = amount;
@@ -562,26 +587,43 @@ export async function topupWallet(req: Request, res: Response) {
       newBalance += Number(wallet.balance);
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('canteen_wallets')
-      .upsert({
-        institution_id: req.user?.institution_id,
-        student_id,
-        balance: newBalance,
-        last_updated: new Date()
-      })
-      .select()
-      .single();
+    let walletResult;
+    const instId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
 
-    if (error) return res.status(500).json({ success: false, error: error.message });
+    if (wallet) {
+      walletResult = await supabaseAdmin
+        .from('canteen_wallets')
+        .update({
+          balance: newBalance,
+          last_updated: new Date()
+        })
+        .eq('id', wallet.id)
+        .select()
+        .single();
+    } else {
+      walletResult = await supabaseAdmin
+        .from('canteen_wallets')
+        .insert({
+          institution_id: instId,
+          student_id: resolvedStudentId,
+          balance: newBalance,
+          last_updated: new Date()
+        })
+        .select()
+        .single();
+    }
+
+    const { data, error } = walletResult;
+
+    if (error || !data) return res.status(500).json({ success: false, error: error?.message || 'Failed to update wallet balance.' });
 
     // Record transaction
     await supabaseAdmin
       .from('wallet_transactions')
       .insert({
-        institution_id: req.user?.institution_id,
+        institution_id: instId,
         wallet_id: data.id,
-        student_id,
+        student_id: resolvedStudentId,
         type: 'credit',
         amount,
         reference_type: 'topup',
@@ -599,15 +641,16 @@ export async function topupWallet(req: Request, res: Response) {
 export async function getWalletBalance(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    const resolvedStudentId = await resolveStudentId(studentId);
 
     const { data, error } = await supabaseAdmin
       .from('canteen_wallets')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .single();
 
     if (error || !data) {
-      return res.status(200).json({ success: true, wallet: { balance: 0, student_id: studentId } });
+      return res.status(200).json({ success: true, wallet: { balance: 0, student_id: resolvedStudentId } });
     }
 
     return res.status(200).json({ success: true, wallet: data });
@@ -620,11 +663,12 @@ export async function getWalletBalance(req: Request, res: Response) {
 export async function getWalletTransactions(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    const resolvedStudentId = await resolveStudentId(studentId);
 
     const { data, error } = await supabaseAdmin
       .from('wallet_transactions')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -646,10 +690,11 @@ export async function adjustWallet(req: Request, res: Response) {
     if (!student_id || amount === undefined || amount === null) {
       return res.status(400).json({ success: false, error: 'student_id and amount required.' });
     }
+    const resolvedStudentId = await resolveStudentId(student_id);
     const { data: wallet, error: wErr } = await supabaseAdmin
       .from('canteen_wallets')
       .select('id, balance')
-      .eq('student_id', student_id)
+      .eq('student_id', resolvedStudentId)
       .single();
     if (wErr || !wallet) {
       return res.status(404).json({ success: false, error: 'Wallet not found.' });
@@ -664,7 +709,7 @@ export async function adjustWallet(req: Request, res: Response) {
       .eq('id', wallet.id);
     if (uErr) throw uErr;
     await supabaseAdmin.from('wallet_transactions').insert({
-      student_id,
+      student_id: resolvedStudentId,
       amount: Number(amount),
       type: Number(amount) > 0 ? 'credit' : 'debit',
       reason: reason || 'Admin adjustment',
@@ -789,9 +834,11 @@ export async function createPreorder(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
     }
 
+    const resolvedStudentId = await resolveStudentId(parseResult.data.student_id);
+
     const { data, error } = await supabaseAdmin
       .from('canteen_preorders')
-      .insert({ ...parseResult.data, institution_id: req.user?.institution_id })
+      .insert({ ...parseResult.data, student_id: resolvedStudentId, institution_id: req.user?.institution_id })
       .select()
       .single();
 
@@ -806,11 +853,12 @@ export async function createPreorder(req: Request, res: Response) {
 export async function getStudentPreorders(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    const resolvedStudentId = await resolveStudentId(studentId);
 
     const { data, error } = await supabaseAdmin
       .from('canteen_preorders')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .order('scheduled_date', { ascending: true });
 
     if (error) return res.status(500).json({ success: false, error: error.message });
@@ -832,6 +880,8 @@ export async function createSubscription(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
     }
 
+    const resolvedStudentId = await resolveStudentId(parseResult.data.student_id);
+
     // Calculate meals based on date range
     const start = new Date(parseResult.data.start_date);
     const end = new Date(parseResult.data.end_date);
@@ -842,6 +892,7 @@ export async function createSubscription(req: Request, res: Response) {
       .from('meal_subscriptions')
       .insert({
         ...parseResult.data,
+        student_id: resolvedStudentId,
         institution_id: req.user?.institution_id,
         meals_remaining
       })
@@ -859,11 +910,12 @@ export async function createSubscription(req: Request, res: Response) {
 export async function getStudentSubscriptions(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    const resolvedStudentId = await resolveStudentId(studentId);
 
     const { data, error } = await supabaseAdmin
       .from('meal_subscriptions')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .order('start_date', { ascending: false });
 
     if (error) return res.status(500).json({ success: false, error: error.message });
@@ -1109,6 +1161,7 @@ export async function initiateWalletTopup(req: Request, res: Response) {
 export async function verifyWalletTopup(req: Request, res: Response) {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, amount } = req.body;
+    const resolvedStudentId = await resolveStudentId(student_id);
     
     // Verify payment signature
     const secret = process.env.RAZORPAY_KEY_SECRET;
@@ -1125,7 +1178,7 @@ export async function verifyWalletTopup(req: Request, res: Response) {
     let { data: wallet } = await supabaseAdmin
       .from('canteen_wallets')
       .select('id, balance')
-      .eq('student_id', student_id)
+      .eq('student_id', resolvedStudentId)
       .single();
 
     let newBalance = Number(amount);
@@ -1137,7 +1190,7 @@ export async function verifyWalletTopup(req: Request, res: Response) {
       .from('canteen_wallets')
       .upsert({
         institution_id: req.user?.institution_id,
-        student_id,
+        student_id: resolvedStudentId,
         balance: newBalance,
         last_updated: new Date()
       })
@@ -1151,7 +1204,7 @@ export async function verifyWalletTopup(req: Request, res: Response) {
       .insert({
         institution_id: req.user?.institution_id,
         wallet_id: updatedWallet.id,
-        student_id,
+        student_id: resolvedStudentId,
         type: 'credit',
         amount: Number(amount),
         reference_type: 'topup',
@@ -1209,6 +1262,7 @@ export async function subscribeMealPlan(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const { student_id } = req.body;
+    const resolvedStudentId = await resolveStudentId(student_id);
 
     const { data: plan } = await supabaseAdmin
       .from('meal_plans')
@@ -1221,7 +1275,7 @@ export async function subscribeMealPlan(req: Request, res: Response) {
     const { data: wallet } = await supabaseAdmin
       .from('canteen_wallets')
       .select('id, balance')
-      .eq('student_id', student_id)
+      .eq('student_id', resolvedStudentId)
       .single();
 
     if (!wallet || Number(wallet.balance) < Number(plan.price)) {
@@ -1237,7 +1291,7 @@ export async function subscribeMealPlan(req: Request, res: Response) {
     const { data, error } = await supabaseAdmin
       .from('meal_subscriptions')
       .insert({
-        student_id,
+        student_id: resolvedStudentId,
         plan_id: plan.id,
         start_date: startDate,
         end_date: endDate,
@@ -1254,7 +1308,7 @@ export async function subscribeMealPlan(req: Request, res: Response) {
     await supabaseAdmin.from('wallet_transactions').insert({
       institution_id: req.user?.institution_id,
       wallet_id: wallet.id,
-      student_id,
+      student_id: resolvedStudentId,
       type: 'debit',
       amount: plan.price,
       reference_type: 'subscription',
@@ -1265,11 +1319,12 @@ export async function subscribeMealPlan(req: Request, res: Response) {
 
     return res.status(201).json({ success: true, subscription: data });
   } catch (err: any) {
+    const fallbackId = await resolveStudentId(req.body.student_id).catch(() => req.body.student_id);
     return res.status(201).json({
       success: true,
       subscription: {
         id: 'sub_mock_' + Math.random().toString(36).substring(2, 9),
-        student_id: req.body.student_id,
+        student_id: fallbackId,
         plan_id: req.params.id,
         start_date: new Date().toISOString().split('T')[0],
         end_date: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
@@ -1285,11 +1340,12 @@ export async function subscribeMealPlan(req: Request, res: Response) {
 export async function selectDailyMeal(req: Request, res: Response) {
   try {
     const { subscription_id, student_id, date, meal_type, items, is_opted_out } = req.body;
+    const resolvedStudentId = await resolveStudentId(student_id);
     const { data, error } = await supabaseAdmin
       .from('daily_meal_selections')
       .insert({
         subscription_id,
-        student_id,
+        student_id: resolvedStudentId,
         date,
         meal_type,
         items,
@@ -1300,12 +1356,13 @@ export async function selectDailyMeal(req: Request, res: Response) {
     if (error) throw error;
     return res.status(201).json({ success: true, selection: data });
   } catch (err: any) {
+    const fallbackId = await resolveStudentId(req.body.student_id).catch(() => req.body.student_id);
     return res.status(201).json({
       success: true,
       selection: {
         id: 'sel_mock_' + Math.random().toString(36).substring(2, 9),
         subscription_id: req.body.subscription_id,
-        student_id: req.body.student_id,
+        student_id: fallbackId,
         date: req.body.date,
         meal_type: req.body.meal_type,
         items: req.body.items,
@@ -1553,10 +1610,11 @@ export async function getAnalyticsForecast(req: Request, res: Response) {
 export async function getNutritionSummary(req: Request, res: Response) {
   try {
     const { studentId } = req.params;
+    const resolvedStudentId = await resolveStudentId(studentId);
     const { data: log, error } = await supabaseAdmin
       .from('nutrition_logs')
       .select('*')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .order('date', { ascending: false })
       .limit(7);
 

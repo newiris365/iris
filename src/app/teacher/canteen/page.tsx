@@ -62,9 +62,14 @@ export default function TeacherCanteenPage() {
       const matchCat = activeCategory === 'all' || item.category === activeCategory;
       const matchSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchVeg = !vegOnly || item.is_veg;
+      const allergensList = Array.isArray(item.allergens)
+        ? item.allergens
+        : (typeof item.allergens === 'string'
+            ? item.allergens.split(',').map(x => x.trim()).filter(Boolean)
+            : []);
       const matchAllergens =
         excludeAllergens.length === 0 ||
-        !item.allergens?.some((a: string) => excludeAllergens.includes(a));
+        !allergensList.some((a: string) => excludeAllergens.includes(a.toLowerCase()));
       return matchCat && matchSearch && matchVeg && matchAllergens && item.is_available;
     });
   }, [menu, activeCategory, searchTerm, vegOnly, excludeAllergens]);
@@ -323,18 +328,26 @@ export default function TeacherCanteenPage() {
                         </p>
 
                         {/* Allergen badges */}
-                        {item.allergens && item.allergens.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {item.allergens.map((a: string) => (
-                              <span
-                                key={a}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-orange-500/10 border border-orange-500/20 text-orange-400/70"
-                              >
-                                {a}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {(() => {
+                          const allergensList = Array.isArray(item.allergens)
+                            ? item.allergens
+                            : (typeof item.allergens === 'string'
+                                ? item.allergens.split(',').map(x => x.trim()).filter(Boolean)
+                                : []);
+                          if (allergensList.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {allergensList.map((a: string) => (
+                                <span
+                                  key={a}
+                                  className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-orange-500/10 border border-orange-500/20 text-orange-400/70"
+                                >
+                                  {a}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
 
                         {/* Add to Cart */}
                         <div className="mt-1">

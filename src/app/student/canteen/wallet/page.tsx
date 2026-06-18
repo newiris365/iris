@@ -48,12 +48,21 @@ export default function StudentWalletPage() {
   }, []);
 
   const loadWallet = async () => {
-    const mockStudentId = 's0000000-0000-0000-0000-000000000001';
+    let studentId = '00000000-0000-0000-0000-000000000000';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
     try {
-      const res = await apiGet(`/canteen/wallet/${mockStudentId}`);
+      const res = await apiGet(`/canteen/wallet/${studentId}`);
       if (res.success && res.wallet) setWallet(res.wallet);
-      const txRes = await apiGet(`/canteen/wallet/${mockStudentId}/transactions`);
-      if (txRes.success && txRes.transactions?.length > 0) setTransactions(txRes.transactions);
+      const txRes = await apiGet(`/canteen/wallet/transactions/${studentId}`);
+      if (txRes.success && txRes.transactions) setTransactions(txRes.transactions);
     } catch (err) { console.log('Using mock wallet data'); }
   };
 
@@ -61,24 +70,41 @@ export default function StudentWalletPage() {
     const amount = customAmount ? Number(customAmount) : topupAmount;
     if (!amount || amount <= 0) return;
 
+    let studentId = '00000000-0000-0000-0000-000000000000';
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('iris_user_profile');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user && user.id) studentId = user.id;
+        } catch (e) {}
+      }
+    }
+
     try {
-      await apiPost('/canteen/wallet/topup', {
-        student_id: 's0000000-0000-0000-0000-000000000001',
+      const res = await apiPost('/canteen/wallet/topup', {
+        student_id: studentId,
         amount
       });
-    } catch (err) {}
-
-    // Update locally
-    const newBalance = wallet.balance + amount;
-    setWallet(prev => ({ ...prev, balance: newBalance }));
-    setTransactions(prev => [{
-      id: `t-${Date.now()}`, type: 'credit', amount,
-      description: `Wallet top-up of ₹${amount.toFixed(2)}`,
-      reference_type: 'topup', balance_after: newBalance,
-      created_at: new Date().toISOString()
-    }, ...prev]);
-    setShowTopup(false);
-    setCustomAmount('');
+      
+      if (res && res.success) {
+        // Update locally
+        const newBalance = wallet.balance + amount;
+        setWallet(prev => ({ ...prev, balance: newBalance }));
+        setTransactions(prev => [{
+          id: `t-${Date.now()}`, type: 'credit', amount,
+          description: `Wallet top-up of ₹${amount.toFixed(2)}`,
+          reference_type: 'topup', balance_after: newBalance,
+          created_at: new Date().toISOString()
+        }, ...prev]);
+        setShowTopup(false);
+        setCustomAmount('');
+      } else {
+        alert('Top-up failed: ' + (res?.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('An error occurred during wallet top-up.');
+    }
   };
 
   const totalSpent = transactions.filter(t => t.type === 'debit').reduce((s, t) => s + t.amount, 0);
