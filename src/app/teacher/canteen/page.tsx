@@ -62,10 +62,11 @@ export default function TeacherCanteenPage() {
       const matchCat = activeCategory === 'all' || item.category === activeCategory;
       const matchSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchVeg = !vegOnly || item.is_veg;
-      const allergensList = Array.isArray(item.allergens)
-        ? item.allergens
-        : (typeof item.allergens === 'string'
-            ? item.allergens.split(',').map(x => x.trim()).filter(Boolean)
+      const rawAllergens = item.allergens as any;
+      const allergensList = Array.isArray(rawAllergens)
+        ? rawAllergens
+        : (typeof rawAllergens === 'string'
+            ? rawAllergens.split(',').map((x: string) => x.trim()).filter(Boolean)
             : []);
       const matchAllergens =
         excludeAllergens.length === 0 ||
@@ -329,10 +330,11 @@ export default function TeacherCanteenPage() {
 
                         {/* Allergen badges */}
                         {(() => {
-                          const allergensList = Array.isArray(item.allergens)
-                            ? item.allergens
-                            : (typeof item.allergens === 'string'
-                                ? item.allergens.split(',').map(x => x.trim()).filter(Boolean)
+                          const rawAllergens = item.allergens as any;
+                          const allergensList = Array.isArray(rawAllergens)
+                            ? rawAllergens
+                            : (typeof rawAllergens === 'string'
+                                ? rawAllergens.split(',').map((x: string) => x.trim()).filter(Boolean)
                                 : []);
                           if (allergensList.length === 0) return null;
                           return (
