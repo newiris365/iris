@@ -27,7 +27,7 @@ const getRedirectPath = (role: string): string => {
     case 'Parent': return '/parent/dashboard';
     case 'Teacher': return '/teacher/timetable';
     case 'HOD': return '/hod/dashboard';
-    case 'Vendor': return '/admin/canteen';
+    case 'Vendor': return '/vendor/dashboard';
     default: return '/dashboard';
   }
 };

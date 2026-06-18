@@ -55,9 +55,28 @@ const adminLinks: SidebarLink[] = [
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
+const ROLE_DASHBOARD_MAP: Record<string, string> = {
+  SuperAdmin: '/admin/global',
+  Admin: '/admin/dashboard',
+  Director: '/director/dashboard',
+  HOD: '/hod/dashboard',
+  Teacher: '/teacher/timetable',
+  Staff: '/faculty/dashboard',
+  Student: '/student/dashboard',
+  Parent: '/parent/dashboard',
+  Warden: '/warden/hostel',
+  Security: '/gate',
+  Vendor: '/vendor/dashboard',
+  Driver: '/driver/dashboard',
+  Librarian: '/librarian/library',
+};
+
+const ALLOWED_ADMIN_ROLES = new Set(['SuperAdmin', 'Admin']);
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [links, setLinks] = useState<SidebarLink[]>(adminLinks);
   const [userRole, setUserRole] = useState<string>('');
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
@@ -66,20 +85,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const parsed = JSON.parse(savedProfile);
         const role = parsed.role || '';
         setUserRole(role);
+
+        if (!ALLOWED_ADMIN_ROLES.has(role)) {
+          const redirect = ROLE_DASHBOARD_MAP[role] || '/dashboard';
+          window.location.href = redirect;
+          return;
+        }
+
+        setAuthorized(true);
         if (role === 'SuperAdmin') {
           setLinks([
             { label: 'Global Console', href: '/admin/global', icon: Shield },
             { label: 'Profile', href: '/profile', icon: UserCircle },
           ]);
         } else {
-          // Admin cannot see Settings
           setLinks(adminLinks.filter(l => l.href !== '/admin/settings'));
         }
       } catch (e) {
-        console.error('Failed parsing profile for SuperAdmin nav check:', e);
+        console.error('Failed parsing profile for admin auth check:', e);
+        setAuthorized(false);
       }
+    } else {
+      window.location.href = '/login';
     }
   }, []);
+
+  if (authorized === null || authorized === false) {
+    return (
+      <div className="min-h-screen bg-[#0D0A1A] flex items-center justify-center">
+        <p className="text-slate-400 text-sm">Checking access...</p>
+      </div>
+    );
+  }
 
   return (
     <PortalShell
