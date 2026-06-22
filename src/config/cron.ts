@@ -1,5 +1,13 @@
 import cron from 'node-cron';
 import { supabaseAdmin, isSupabaseOffline } from './supabase';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required and must be at least 32 characters in length to prevent brute-force signature forgery!');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
+
 import logger from './logger';
 import { generatePDFKitFallback, uploadReportToSupabase } from '../services/pdfGenerator';
 
@@ -1682,6 +1690,155 @@ cron.schedule('0 */2 * * *', async () => {
     }
   } catch (err: any) {
     logger.error('Error running exam result parent notification: ' + err.message);
+  }
+});
+
+/**
+ * MODULE: QR Token Auto-Rotation Cron Job
+ * Runs every minute to auto-rotate tokens for active attendance sessions
+ */
+cron.schedule('* * * * *', async () => {
+  logger.info('Running QR Token Auto-Rotation cron job...');
+  try {
+    // Fetch all active sessions
+    const { data: activeSessions } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('id, institution_id, qr_rotate_interval')
+      .eq('is_active', true);
+      
+    if (!activeSessions || activeSessions.length === 0) return;
+    
+    for (const session of activeSessions) {
+      // Fetch active token for this session
+      const { data: activeToken } = await supabaseAdmin
+        .from('qr_tokens')
+        .select('*')
+        .eq('session_id', session.id)
+        .eq('is_active', true)
+        .maybeSingle();
+        
+      // If there is no active token or it has expired, rotate it!
+      if (!activeToken || new Date(activeToken.expires_at).getTime() <= Date.now()) {
+        logger.info(`Rotating QR token for session ${session.id}...`);
+        
+        const rotateInterval = session.qr_rotate_interval || 5;
+        const expiresAt = new Date(Date.now() + rotateInterval * 60 * 1000).toISOString();
+        
+        const token = jwt.sign(
+          { session_id: session.id, type: 'ATTENDANCE_QR', iat: Math.floor(Date.now() / 1000) },
+          JWT_SECRET,
+          { expiresIn: `${rotateInterval}m` }
+        );
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        
+        // Deactivate old tokens
+        await supabaseAdmin
+          .from('qr_tokens')
+          .update({ is_active: false })
+          .eq('session_id', session.id)
+          .eq('is_active', true);
+          
+        // Insert new token
+        await supabaseAdmin
+          .from('qr_tokens')
+          .insert({
+            institution_id: session.institution_id,
+            session_id: session.id,
+            token_hash: tokenHash,
+            expires_at: expiresAt,
+            is_active: true,
+            rotated_count: activeToken ? activeToken.rotated_count + 1 : 1
+          });
+          
+        // Broadcast new token to Socket.io session room
+        try {
+          const { io } = require('../server');
+          if (io) {
+            io.of('/notifications').to(`session_${session.id}`).emit('qr_rotated', {
+              session_id: session.id,
+              qrToken: token,
+              expires_at: expiresAt
+            });
+            logger.debug(`Broadcasted rotated QR token for session ${session.id} to Socket.io`);
+          }
+        } catch (ioErr) {
+          // Socket.io not available (e.g. in tests)
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error running QR Token Auto-Rotation cron: ' + err.message);
+  }
+});
+
+/**
+ * MODULE: Fees & Finance late fee calculation
+ * Runs daily at 2:00 AM to calculate late fees for overdue student fees
+ */
+cron.schedule('0 2 * * *', async () => {
+  logger.info('Running Daily Late Fee Auto-Calculation cron job...');
+  try {
+    const { data: institutions } = await supabaseAdmin
+      .from('institutions')
+      .select('id')
+      .eq('is_active', true);
+
+    if (!institutions || institutions.length === 0) return;
+
+    for (const inst of institutions) {
+      // Fetch all student fees that are overdue and unpaid/partially paid
+      const { data: studentFees, error: fetchError } = await supabaseAdmin
+        .from('student_fees')
+        .select(`
+          id,
+          amount,
+          paid_amount,
+          due_date,
+          fee_structures(late_fee_per_day, grace_period_days, max_penalty)
+        `)
+        .eq('institution_id', inst.id)
+        .in('payment_status', ['pending', 'partial'])
+        .lt('due_date', new Date().toISOString().split('T')[0]);
+
+      if (fetchError || !studentFees || studentFees.length === 0) continue;
+
+      let updatedCount = 0;
+      for (const sf of studentFees) {
+        const dueDate = new Date(sf.due_date);
+        const now = new Date();
+        const daysDiff = Math.floor((now.getTime() - dueDate.getTime()) / 86400000);
+        const fs = (sf as any).fee_structures;
+
+        if (!fs) continue;
+
+        const gracePeriod = fs.grace_period_days || 0;
+        const daysAfterGrace = Math.max(0, daysDiff - gracePeriod);
+        
+        if (daysAfterGrace <= 0) continue;
+
+        const lateFeePerDay = Number(fs.late_fee_per_day || 0);
+        let lateFee = daysAfterGrace * lateFeePerDay;
+
+        if (Number(fs.max_penalty || 0) > 0 && lateFee > Number(fs.max_penalty)) {
+          lateFee = Number(fs.max_penalty);
+        }
+
+        const { error: updateError } = await supabaseAdmin
+          .from('student_fees')
+          .update({ 
+            late_fee: lateFee,
+            total_amount: sf.amount + lateFee
+          })
+          .eq('id', sf.id);
+
+        if (!updateError) {
+          updatedCount++;
+        }
+      }
+      logger.info(`Updated late fees for ${updatedCount} student fees in institution ${inst.id}.`);
+    }
+  } catch (err: any) {
+    logger.error('Error running daily late fee auto-calculation: ' + err.message);
   }
 });
 

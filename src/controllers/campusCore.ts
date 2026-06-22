@@ -6,6 +6,7 @@ import PDFDocument from 'pdfkit';
 import { supabaseAdmin } from '../config/supabase';
 import { sendBulkReminders, FeeReminderEntry } from '../services/whatsapp';
 import { getRazorpayClient, isMockOrderId } from '../lib/razorpay';
+import { generateFeeReceiptPDF, uploadReportToSupabase } from '../services/pdfGenerator';
 import logger from '../config/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -1501,6 +1502,52 @@ export async function addTimetableBlock(req: Request, res: Response) {
 export async function updateTimetableBlock(req: Request, res: Response) {
   try {
     const { id } = req.params;
+    
+    // Fetch existing block to merge details for clash detection
+    const { data: existingBlock, error: fetchErr } = await supabaseAdmin
+      .from('timetable')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (fetchErr || !existingBlock) {
+      return res.status(404).json({ success: false, error: 'Timetable block not found.' });
+    }
+    
+    const merged = { ...existingBlock, ...req.body };
+    
+    // Clash Detection 1: Room conflict
+    if (merged.room) {
+      const { data: roomConflict } = await supabaseAdmin
+        .from('timetable')
+        .select('id, subject')
+        .eq('day_of_week', merged.day_of_week)
+        .eq('time_slot', merged.time_slot)
+        .eq('room', merged.room)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (roomConflict) {
+        return res.status(409).json({ success: false, error: `Clash: Room ${merged.room} is already booked for ${roomConflict.subject}.` });
+      }
+    }
+
+    // Clash Detection 2: Teacher conflict
+    if (merged.teacher_id) {
+      const { data: teacherConflict } = await supabaseAdmin
+        .from('timetable')
+        .select('id, subject')
+        .eq('day_of_week', merged.day_of_week)
+        .eq('time_slot', merged.time_slot)
+        .eq('teacher_id', merged.teacher_id)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (teacherConflict) {
+        return res.status(409).json({ success: false, error: `Clash: Lecturer is already assigned to ${teacherConflict.subject} during this time.` });
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('timetable')
       .update(req.body)
@@ -1594,7 +1641,7 @@ export async function initiatePayment(req: Request, res: Response) {
   try {
     const parse = feePaymentInitSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
-    const { amount } = parse.data;
+    const { amount, student_id, fee_structure_id } = parse.data;
 
     const razorpay = getRazorpayClient();
 
@@ -1612,6 +1659,11 @@ export async function initiatePayment(req: Request, res: Response) {
       amount: amount * 100,
       currency: 'INR',
       receipt: `fee_${Date.now()}`,
+      notes: {
+        student_id,
+        fee_structure_id,
+        institution_id: req.user?.institution_id || ''
+      }
     });
 
     return res.status(200).json({
@@ -1660,6 +1712,21 @@ export async function verifyPayment(req: Request, res: Response) {
       .single();
 
     if (error) return res.status(500).json({ success: false, error: 'Failed to record payment.' });
+
+    // Asynchronously generate receipt PDF, upload it, and update receipt_url
+    (async () => {
+      try {
+        const pdfBuffer = await generateFeeReceiptPDF(data);
+        const fileName = `receipts/${razorpay_payment_id}.pdf`;
+        const receiptUrl = await uploadReportToSupabase(pdfBuffer, fileName);
+        await supabaseAdmin
+          .from('fee_payments')
+          .update({ receipt_url: receiptUrl })
+          .eq('id', data.id);
+      } catch (pdfErr) {
+        logger.error('Failed generating payment receipt:', pdfErr);
+      }
+    })();
 
     return res.status(200).json({ success: true, message: 'Fee paid successfully', payment: data });
   } catch (err) {
@@ -5522,6 +5589,1034 @@ export async function downloadHallTicketPdf(req: Request, res: Response) {
 
     doc.end();
   } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// RAZORPAY WEBHOOK HANDLER
+// =========================================================================
+export async function razorpayWebhook(req: Request, res: Response) {
+  try {
+    const signature = req.headers['x-razorpay-signature'] as string;
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+
+    if (!signature) {
+      return res.status(400).json({ success: false, error: 'Signature header missing.' });
+    }
+
+    if (secret) {
+      const shasum = crypto.createHmac('sha256', secret);
+      shasum.update(req.rawBody);
+      const digest = shasum.digest('hex');
+      if (digest !== signature) {
+        return res.status(400).json({ success: false, error: 'Invalid webhook signature.' });
+      }
+    }
+
+    const event = req.body.event;
+    if (event === 'payment.captured' || event === 'order.paid') {
+      const entity = event === 'payment.captured' 
+        ? req.body.payload.payment.entity 
+        : req.body.payload.order.entity;
+
+      const notes = entity.notes || {};
+      const { student_id, fee_structure_id, institution_id } = notes;
+      
+      if (!student_id || !fee_structure_id) {
+        logger.warn('Webhook payment captured but missing notes metadata:', notes);
+        return res.status(200).json({ success: true, message: 'Ignored: missing metadata notes.' });
+      }
+
+      const transaction_id = event === 'payment.captured' ? entity.id : (entity.payment_id || entity.id);
+      
+      // Check if payment already exists
+      const { data: existing } = await supabaseAdmin
+        .from('fee_payments')
+        .select('id')
+        .eq('transaction_id', transaction_id)
+        .maybeSingle();
+
+      if (existing) {
+        return res.status(200).json({ success: true, message: 'Payment already processed.' });
+      }
+
+      const amount_paid = entity.amount / 100; // in INR
+
+      const { data: paymentRecord, error: insertError } = await supabaseAdmin
+        .from('fee_payments')
+        .insert({
+          institution_id: institution_id || null,
+          student_id,
+          fee_structure_id,
+          amount_paid,
+          method: entity.method || 'UPI/Card',
+          transaction_id,
+          status: 'Completed',
+          receipt_url: `https://invoices.iris365.in/receipts/${transaction_id}.pdf`
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        logger.error('Failed to insert fee payment from webhook:', insertError);
+        return res.status(500).json({ success: false, error: 'Database error recording payment.' });
+      }
+
+      // Asynchronously compile receipt PDF and upload it
+      (async () => {
+        try {
+          const pdfBuffer = await generateFeeReceiptPDF(paymentRecord);
+          const fileName = `receipts/${transaction_id}.pdf`;
+          const receiptUrl = await uploadReportToSupabase(pdfBuffer, fileName);
+          await supabaseAdmin
+            .from('fee_payments')
+            .update({ receipt_url: receiptUrl })
+            .eq('id', paymentRecord.id);
+        } catch (pdfErr) {
+          logger.error('Failed generating webhook payment receipt:', pdfErr);
+        }
+      })();
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    logger.error('razorpayWebhook error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error processing webhook.' });
+  }
+}
+
+// =========================================================================
+// FEE STRUCTURE TEMPLATE CLONING
+// =========================================================================
+const feeStructureCloneSchema = z.object({
+  fee_structure_ids: z.array(z.string().uuid()).optional(),
+  due_date_shift_days: z.number().optional(),
+  new_due_date: z.string().optional(),
+  amount_multiplier: z.number().positive().optional()
+});
+
+export async function cloneFeeStructures(req: Request, res: Response) {
+  try {
+    const parse = feeStructureCloneSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    }
+    const { fee_structure_ids, due_date_shift_days, new_due_date, amount_multiplier } = parse.data;
+    const instId = req.user?.institution_id;
+
+    let query = supabaseAdmin
+      .from('fee_structures')
+      .select('*')
+      .eq('institution_id', instId);
+
+    if (fee_structure_ids && fee_structure_ids.length > 0) {
+      query = query.in('id', fee_structure_ids);
+    }
+
+    const { data: structures, error: fetchError } = await query;
+    if (fetchError || !structures) {
+      logger.error('Failed to fetch fee structures for cloning:', fetchError);
+      return res.status(500).json({ success: false, error: 'Failed to fetch source fee structures.' });
+    }
+
+    if (structures.length === 0) {
+      return res.status(404).json({ success: false, error: 'No matching fee structures found to clone.' });
+    }
+
+    const clonedInserts = structures.map(sf => {
+      let calculatedDueDate = sf.due_date;
+      if (new_due_date) {
+        calculatedDueDate = new_due_date;
+      } else if (due_date_shift_days) {
+        const d = new Date(sf.due_date);
+        d.setDate(d.getDate() + due_date_shift_days);
+        calculatedDueDate = d.toISOString().split('T')[0];
+      } else {
+        const d = new Date(sf.due_date);
+        d.setFullYear(d.getFullYear() + 1);
+        calculatedDueDate = d.toISOString().split('T')[0];
+      }
+
+      const calculatedAmount = amount_multiplier 
+        ? Number((sf.amount * amount_multiplier).toFixed(2)) 
+        : sf.amount;
+
+      return {
+        institution_id: instId,
+        name: `${sf.name} (Cloned)`,
+        amount: calculatedAmount,
+        due_date: calculatedDueDate,
+        applicable_to: sf.applicable_to,
+        late_fee_per_day: sf.late_fee_per_day,
+        grace_period_days: sf.grace_period_days,
+        max_penalty: sf.max_penalty
+      };
+    });
+
+    const { data: clonedData, error: insertError } = await supabaseAdmin
+      .from('fee_structures')
+      .insert(clonedInserts)
+      .select();
+
+    if (insertError) {
+      logger.error('Failed to insert cloned fee structures:', insertError);
+      return res.status(500).json({ success: false, error: 'Failed to save cloned fee structures.' });
+    }
+
+    return res.status(201).json({ success: true, message: `Successfully cloned ${clonedData.length} fee structures.`, structures: clonedData });
+  } catch (err) {
+    logger.error('cloneFeeStructures error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  }
+}
+
+// =========================================================================
+// FEE REFUND PROCESSING
+// =========================================================================
+const feeRefundSchema = z.object({
+  payment_id: z.string().uuid(),
+  reason: z.string().min(5, 'Refund reason must be at least 5 characters'),
+  refund_amount: z.number().positive().optional()
+});
+
+export async function processFeeRefund(req: Request, res: Response) {
+  try {
+    const parse = feeRefundSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    }
+    const { payment_id, reason, refund_amount } = parse.data;
+
+    const { data: payment, error: fetchErr } = await supabaseAdmin
+      .from('fee_payments')
+      .select('*')
+      .eq('id', payment_id)
+      .eq('institution_id', req.user?.institution_id)
+      .maybeSingle();
+
+    if (fetchErr || !payment) {
+      return res.status(404).json({ success: false, error: 'Payment record not found.' });
+    }
+
+    if (payment.status !== 'Completed') {
+      return res.status(400).json({ success: false, error: `Only completed payments can be refunded. Current status: ${payment.status}` });
+    }
+
+    const maxRefund = Number(payment.amount_paid);
+    const calculatedRefundAmount = refund_amount ?? maxRefund;
+
+    if (calculatedRefundAmount > maxRefund) {
+      return res.status(400).json({ success: false, error: `Refund amount cannot exceed amount paid (₹${maxRefund}).` });
+    }
+
+    const transactionId = payment.transaction_id;
+    if (transactionId && !transactionId.startsWith('pay_mock_') && !isMockOrderId(transactionId)) {
+      try {
+        const razorpay = getRazorpayClient();
+        if (razorpay) {
+          await razorpay.payments.refund(transactionId, {
+            amount: Math.round(calculatedRefundAmount * 100),
+            speed: 'normal',
+            notes: { reason, initiated_by: req.user?.id || 'Admin' }
+          });
+        }
+      } catch (rzpErr: any) {
+        logger.error('Razorpay refund API error:', rzpErr);
+        return res.status(500).json({ success: false, error: `Razorpay refund failed: ${rzpErr.message}` });
+      }
+    }
+
+    const finalStatus = calculatedRefundAmount === maxRefund ? 'Refunded' : 'Partially Refunded';
+    const { data: updatedPayment, error: updateErr } = await supabaseAdmin
+      .from('fee_payments')
+      .update({
+        status: finalStatus,
+        receipt_url: null
+      })
+      .eq('id', payment_id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      logger.error('Failed to update fee payment refund status:', updateErr);
+      return res.status(500).json({ success: false, error: 'Failed to record refund in database.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Refund of ₹${calculatedRefundAmount} processed successfully.`,
+      payment: updatedPayment
+    });
+  } catch (err) {
+    logger.error('processFeeRefund error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  }
+}
+
+// =========================================================================
+// 34. STUDENT DOCUMENTS & PROFILE PHOTO CONTROLLERS
+// =========================================================================
+
+export async function uploadStudentPhoto(req: Request, res: Response) {
+  try {
+    const { id } = req.params; // student_id
+    const { photo } = req.body; // base64 string
+    
+    if (!photo) {
+      return res.status(400).json({ success: false, error: 'photo base64 string required.' });
+    }
+    
+    // Retrieve user_id from students table
+    const { data: studentCheck, error: checkErr } = await supabaseAdmin
+      .from('students')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (checkErr || !studentCheck) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+
+    // Authorization: User can update their own student profile photo, or Admin/HOD
+    const isSelf = req.user?.role === 'Student' && req.user?.id === studentCheck.user_id;
+    const isAuthorized = req.user?.role === 'Admin' || req.user?.role === 'SuperAdmin' || req.user?.role === 'HOD' || isSelf;
+    
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to update this student photo.' });
+    }
+    
+    // Clean base64 string
+    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const path = `photos/${id}/profile.png`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('student-records')
+      .upload(path, buffer, { contentType: 'image/png', upsert: true });
+      
+    if (uploadError) {
+      throw uploadError;
+    }
+    
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('student-records')
+      .getPublicUrl(path);
+      
+    const publicUrl = publicUrlData?.publicUrl || '';
+      
+    // Update students table
+    const { data: student, error: studentErr } = await supabaseAdmin
+      .from('students')
+      .update({ photo_url: publicUrl })
+      .eq('id', id)
+      .select('id, user_id, photo_url')
+      .single();
+      
+    if (studentErr) throw studentErr;
+    
+    // Update users table avatar_url
+    if (student?.user_id) {
+      await supabaseAdmin
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('id', student.user_id);
+    }
+    
+    return res.status(200).json({ success: true, photo_url: publicUrl });
+  } catch (err: any) {
+    logger.error('uploadStudentPhoto error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function uploadStudentDocument(req: Request, res: Response) {
+  try {
+    const { id } = req.params; // student_id
+    const { document_name, document_type, file_name, file_data } = req.body;
+    
+    if (!document_name || !document_type || !file_name || !file_data) {
+      return res.status(400).json({ success: false, error: 'document_name, document_type, file_name, and file_data are required.' });
+    }
+    
+    // Clean base64 file data
+    const base64Data = file_data.replace(/^data:.+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileSizeKb = Math.round(buffer.length / 1024);
+    
+    const path = `documents/${id}/${document_type}/${Date.now()}_${file_name}`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('student-records')
+      .upload(path, buffer, { contentType: 'application/octet-stream', upsert: true });
+      
+    if (uploadError) throw uploadError;
+    
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('student-records')
+      .getPublicUrl(path);
+
+    const publicUrl = publicUrlData?.publicUrl || '';
+      
+    // Fetch student to verify institution
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('institution_id')
+      .eq('id', id)
+      .single();
+      
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('student_documents')
+      .insert({
+        institution_id: student.institution_id,
+        student_id: id,
+        document_name,
+        document_type,
+        file_url: publicUrl,
+        file_size_kb: fileSizeKb,
+        uploaded_by: req.user?.id
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(201).json({ success: true, document: data });
+  } catch (err: any) {
+    logger.error('uploadStudentDocument error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getStudentDocuments(req: Request, res: Response) {
+  try {
+    const { id } = req.params; // student_id
+    
+    // Retrieve student info
+    const { data: studentCheck, error: checkErr } = await supabaseAdmin
+      .from('students')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (checkErr || !studentCheck) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+
+    // Verify auth
+    const isSelf = req.user?.role === 'Student' && req.user?.id === studentCheck.user_id;
+    const isAuthorized = req.user?.role !== 'Student' || isSelf;
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, error: 'Unauthorized to view these documents.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('student_documents')
+      .select('*, uploaded_by_user:users!student_documents_uploaded_by_fkey(name)')
+      .eq('student_id', id)
+      .order('uploaded_at', { ascending: false });
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, documents: data || [] });
+  } catch (err: any) {
+    logger.error('getStudentDocuments error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function deleteStudentDocument(req: Request, res: Response) {
+  try {
+    const { id, docId } = req.params;
+    
+    // Fetch document to get file path
+    const { data: doc, error: docErr } = await supabaseAdmin
+      .from('student_documents')
+      .select('*')
+      .eq('id', docId)
+      .eq('student_id', id)
+      .single();
+      
+    if (docErr || !doc) {
+      return res.status(404).json({ success: false, error: 'Document not found.' });
+    }
+    
+    // Extract path from public URL
+    const urlParts = doc.file_url.split('/student-records/');
+    if (urlParts.length > 1) {
+      const storagePath = urlParts[1];
+      await supabaseAdmin.storage
+        .from('student-records')
+        .remove([storagePath]);
+    }
+    
+    const { error: deleteErr } = await supabaseAdmin
+      .from('student_documents')
+      .delete()
+      .eq('id', docId);
+      
+    if (deleteErr) throw deleteErr;
+    return res.status(200).json({ success: true, message: 'Document deleted successfully.' });
+  } catch (err: any) {
+    logger.error('deleteStudentDocument error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// 35. TIMETABLE HISTORY & ROLLBACK CONTROLLERS
+// =========================================================================
+
+export async function getTimetableVersions(req: Request, res: Response) {
+  try {
+    const { department_id, semester, batch_year } = req.query;
+    if (!department_id || !semester || !batch_year) {
+      return res.status(400).json({ success: false, error: 'department_id, semester, and batch_year are required queries.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('timetable_history')
+      .select('*, created_by_user:users!timetable_history_created_by_fkey(name)')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('department_id', department_id)
+      .eq('semester', parseInt(semester as string))
+      .eq('batch_year', batch_year)
+      .order('version', { ascending: false });
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, versions: data || [] });
+  } catch (err: any) {
+    logger.error('getTimetableVersions error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function saveTimetableVersion(req: Request, res: Response) {
+  try {
+    const { department_id, semester, batch_year, notes } = req.body;
+    if (!department_id || !semester || !batch_year) {
+      return res.status(400).json({ success: false, error: 'department_id, semester, and batch_year are required.' });
+    }
+    
+    // Fetch active timetable data
+    const { data: timetableData, error: ttErr } = await supabaseAdmin
+      .from('timetable')
+      .select('*')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('department_id', department_id)
+      .eq('semester', semester)
+      .eq('batch_year', batch_year);
+      
+    if (ttErr) throw ttErr;
+    
+    // Fetch latest version
+    const { data: latestVersion } = await supabaseAdmin
+      .from('timetable_history')
+      .select('version')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('department_id', department_id)
+      .eq('semester', semester)
+      .eq('batch_year', batch_year)
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      
+    const nextVersion = (latestVersion?.version || 0) + 1;
+    
+    const { data, error } = await supabaseAdmin
+      .from('timetable_history')
+      .insert({
+        institution_id: req.user?.institution_id,
+        department_id,
+        semester,
+        batch_year,
+        version: nextVersion,
+        timetable_data: timetableData || [],
+        created_by: req.user?.id
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(201).json({ success: true, version: data });
+  } catch (err: any) {
+    logger.error('saveTimetableVersion error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function rollbackTimetableVersion(req: Request, res: Response) {
+  try {
+    const { department_id, semester, batch_year, version } = req.body;
+    if (!department_id || !semester || !batch_year || !version) {
+      return res.status(400).json({ success: false, error: 'department_id, semester, batch_year, and version are required.' });
+    }
+    
+    // Get historical version
+    const { data: versionData, error: vErr } = await supabaseAdmin
+      .from('timetable_history')
+      .select('*')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('department_id', department_id)
+      .eq('semester', semester)
+      .eq('batch_year', batch_year)
+      .eq('version', version)
+      .single();
+      
+    if (vErr || !versionData) {
+      return res.status(404).json({ success: false, error: `Timetable version ${version} not found.` });
+    }
+    
+    // Delete current active timetable slots for this scope
+    const { error: delErr } = await supabaseAdmin
+      .from('timetable')
+      .delete()
+      .eq('institution_id', req.user?.institution_id)
+      .eq('department_id', department_id)
+      .eq('semester', semester)
+      .eq('batch_year', batch_year);
+      
+    if (delErr) throw delErr;
+    
+    // Restore slots from JSON data
+    const restoreSlots = (versionData.timetable_data as any[] || []).map((slot: any) => {
+      const { id, created_at, ...rest } = slot;
+      return {
+        ...rest,
+        institution_id: req.user?.institution_id
+      };
+    });
+    
+    if (restoreSlots.length > 0) {
+      const { error: insErr } = await supabaseAdmin
+        .from('timetable')
+        .insert(restoreSlots);
+        
+      if (insErr) throw insErr;
+    }
+    
+    return res.status(200).json({ success: true, message: `Timetable successfully rolled back to version ${version}.`, restored_slots: restoreSlots.length });
+  } catch (err: any) {
+    logger.error('rollbackTimetableVersion error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// =========================================================================
+// 36. EXAM ANALYTICS & WORKFLOWS CONTROLLERS
+// =========================================================================
+
+export async function getExamAnalytics(req: Request, res: Response) {
+  try {
+    const { id } = req.params; // exam_id
+    
+    // Fetch all results for this exam
+    const { data: results, error } = await supabaseAdmin
+      .from('exam_results')
+      .select('*')
+      .eq('exam_id', id);
+      
+    if (error) throw error;
+    if (!results || results.length === 0) {
+      return res.status(200).json({ success: true, message: 'No result data found for this exam.', analytics: {} });
+    }
+    
+    // Calculate analytics by subject
+    const subjectGroups: { [subject: string]: number[] } = {};
+    results.forEach(resRecord => {
+      const marks = parseFloat(resRecord.marks_obtained as any);
+      if (!subjectGroups[resRecord.subject]) subjectGroups[resRecord.subject] = [];
+      subjectGroups[resRecord.subject].push(marks);
+    });
+    
+    const subjectAnalytics: any = {};
+    let totalExamSum = 0;
+    let totalExamCount = 0;
+    
+    for (const [subject, marksList] of Object.entries(subjectGroups)) {
+      const sum = marksList.reduce((acc, val) => acc + val, 0);
+      const count = marksList.length;
+      const average = parseFloat((sum / count).toFixed(2));
+      const min = Math.min(...marksList);
+      const max = Math.max(...marksList);
+      
+      const passCount = marksList.filter(m => m >= 40).length; // Pass mark is 40
+      const passRatio = parseFloat(((passCount / count) * 100).toFixed(1));
+      
+      // Calculate grade distributions for this subject
+      const gradeCounts: any = { 'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0 };
+      results.filter(r => r.subject === subject).forEach(r => {
+        if (r.grade && gradeCounts[r.grade] !== undefined) {
+          gradeCounts[r.grade]++;
+        } else {
+          gradeCounts['F']++;
+        }
+      });
+      
+      subjectAnalytics[subject] = {
+        average,
+        min,
+        max,
+        total_students: count,
+        pass_ratio: passRatio,
+        grade_distribution: gradeCounts
+      };
+      
+      totalExamSum += sum;
+      totalExamCount += count;
+    }
+    
+    const overallAverage = totalExamCount > 0 ? parseFloat((totalExamSum / totalExamCount).toFixed(2)) : 0;
+    
+    return res.status(200).json({
+      success: true,
+      analytics: {
+        exam_id: id,
+        overall_average: overallAverage,
+        total_records: totalExamCount,
+        subjects: subjectAnalytics
+      }
+    });
+  } catch (err: any) {
+    logger.error('getExamAnalytics error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function exportGradeSheetPDF(req: Request, res: Response) {
+  try {
+    const { studentId, examId } = req.params;
+    
+    // Fetch student details
+    const { data: student, error: stdErr } = await supabaseAdmin
+      .from('students')
+      .select('*, users(name)')
+      .eq('id', studentId)
+      .single();
+      
+    if (stdErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+    
+    // Fetch exam details
+    const { data: exam, error: exErr } = await supabaseAdmin
+      .from('exams')
+      .select('*')
+      .eq('id', examId)
+      .single();
+      
+    if (exErr || !exam) {
+      return res.status(404).json({ success: false, error: 'Exam not found.' });
+    }
+    
+    // Fetch student's marks for this exam
+    const { data: marks, error: mErr } = await supabaseAdmin
+      .from('exam_results')
+      .select('*')
+      .eq('exam_id', examId)
+      .eq('student_id', studentId);
+      
+    if (mErr || !marks) {
+      return res.status(404).json({ success: false, error: 'No exam results found for this student.' });
+    }
+    
+    // Create PDFkit document
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const chunks: Buffer[] = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=gradesheet_${student.roll_number}.pdf`);
+      return res.status(200).send(buffer);
+    });
+    
+    // Title & Header
+    doc.fontSize(22).fillColor('#6C2BD9').text('IRIS 365 UNIVERSITY SYSTEM', { align: 'center' });
+    doc.fontSize(14).fillColor('#1F2937').text('OFFICIAL EXAMINATIONS GRADE SHEET', { align: 'center' });
+    doc.moveDown();
+    
+    // Student Info Panel
+    doc.fontSize(10).fillColor('#4B5563');
+    doc.text(`Student Name: ${(student.users as any)?.name || 'N/A'}`);
+    doc.text(`Roll Number: ${student.roll_number}`);
+    doc.text(`Semester: ${student.semester} | Batch: ${student.batch_year}`);
+    doc.text(`Exam: ${exam.name}`);
+    doc.text(`Date of Issue: ${new Date().toLocaleDateString()}`);
+    doc.moveDown(2);
+    
+    // Table Headers
+    const startY = doc.y;
+    doc.fontSize(11).fillColor('#1F2937').font('Helvetica-Bold');
+    doc.text('Subject', 50, startY);
+    doc.text('Marks Obtained', 250, startY);
+    doc.text('Max Marks', 350, startY);
+    doc.text('Grade', 450, startY);
+    
+    doc.moveTo(50, startY + 15).lineTo(550, startY + 15).strokeColor('#E5E7EB').stroke();
+    doc.moveDown();
+    
+    let currentY = startY + 25;
+    let totalObtained = 0;
+    let totalMax = 0;
+    
+    marks.forEach(item => {
+      doc.fontSize(10).fillColor('#4B5563').font('Helvetica');
+      doc.text(item.subject, 50, currentY);
+      doc.text(item.marks_obtained.toString(), 250, currentY);
+      doc.text(item.max_marks.toString(), 350, currentY);
+      doc.text(item.grade || 'F', 450, currentY);
+      
+      totalObtained += parseFloat(item.marks_obtained as any);
+      totalMax += parseFloat(item.max_marks as any);
+      currentY += 20;
+    });
+    
+    doc.moveTo(50, currentY).lineTo(550, currentY).strokeColor('#1F2937').stroke();
+    currentY += 10;
+    
+    // Total Summary
+    doc.fontSize(11).fillColor('#1F2937').font('Helvetica-Bold');
+    doc.text('Total Summary:', 50, currentY);
+    doc.text(totalObtained.toFixed(1), 250, currentY);
+    doc.text(totalMax.toFixed(1), 350, currentY);
+    
+    const percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+    doc.text(`${percentage.toFixed(1)}%`, 450, currentY);
+    
+    currentY += 40;
+    
+    // Signatures
+    doc.fontSize(10).fillColor('#4B5563').font('Helvetica');
+    doc.text('Prepared by: Examination Section', 50, currentY);
+    doc.text('Approved by: Controller of Examinations', 350, currentY);
+    
+    doc.end();
+  } catch (err: any) {
+    logger.error('exportGradeSheetPDF error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function applySupplementary(req: Request, res: Response) {
+  try {
+    const { student_id, exam_id, subject, remarks } = req.body;
+    if (!student_id || !exam_id || !subject) {
+      return res.status(400).json({ success: false, error: 'student_id, exam_id, and subject are required.' });
+    }
+    
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('institution_id')
+      .eq('id', student_id)
+      .single();
+      
+    if (!student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('supplementary_exams')
+      .insert({
+        institution_id: student.institution_id,
+        exam_id,
+        student_id,
+        subject,
+        status: 'applied',
+        remarks
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(201).json({ success: true, application: data });
+  } catch (err: any) {
+    logger.error('applySupplementary error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getSupplementaryApplications(req: Request, res: Response) {
+  try {
+    const { student_id, exam_id, status } = req.query;
+    
+    let query = supabaseAdmin
+      .from('supplementary_exams')
+      .select('*, students(roll_number, users(name)), exams(name)')
+      .eq('institution_id', req.user?.institution_id);
+      
+    if (student_id) query = query.eq('student_id', student_id);
+    if (exam_id) query = query.eq('exam_id', exam_id);
+    if (status) query = query.eq('status', status);
+    
+    const { data, error } = await query.order('applied_at', { ascending: false });
+    if (error) throw error;
+    
+    return res.status(200).json({ success: true, applications: data || [] });
+  } catch (err: any) {
+    logger.error('getSupplementaryApplications error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function updateSupplementaryStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { status, remarks } = req.body;
+    
+    if (!status || !['approved', 'rejected', 'completed'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Valid status is required.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('supplementary_exams')
+      .update({ status, remarks })
+      .eq('id', id)
+      .eq('institution_id', req.user?.institution_id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, application: data });
+  } catch (err: any) {
+    logger.error('updateSupplementaryStatus error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function applyReEvaluation(req: Request, res: Response) {
+  try {
+    const { result_id, student_id, exam_id, subject, reason } = req.body;
+    if (!result_id || !student_id || !exam_id || !subject) {
+      return res.status(400).json({ success: false, error: 'result_id, student_id, exam_id, and subject are required.' });
+    }
+    
+    const { data: result, error: resErr } = await supabaseAdmin
+      .from('exam_results')
+      .select('marks_obtained, institution_id')
+      .eq('id', result_id)
+      .single();
+      
+    if (resErr || !result) {
+      return res.status(404).json({ success: false, error: 'Exam result not found.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('re_evaluation_requests')
+      .insert({
+        institution_id: result.institution_id,
+        result_id,
+        student_id,
+        exam_id,
+        subject,
+        reason,
+        previous_marks: result.marks_obtained,
+        status: 'applied'
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(201).json({ success: true, request: data });
+  } catch (err: any) {
+    logger.error('applyReEvaluation error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getReEvaluationApplications(req: Request, res: Response) {
+  try {
+    const { student_id, exam_id, status } = req.query;
+    
+    let query = supabaseAdmin
+      .from('re_evaluation_requests')
+      .select('*, students(roll_number, users(name)), exams(name)')
+      .eq('institution_id', req.user?.institution_id);
+      
+    if (student_id) query = query.eq('student_id', student_id);
+    if (exam_id) query = query.eq('exam_id', exam_id);
+    if (status) query = query.eq('status', status);
+    
+    const { data, error } = await query.order('applied_at', { ascending: false });
+    if (error) throw error;
+    
+    return res.status(200).json({ success: true, applications: data || [] });
+  } catch (err: any) {
+    logger.error('getReEvaluationApplications error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function updateReEvaluationStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { status, new_marks, remarks } = req.body;
+    
+    if (!status || !['under_review', 'approved', 'rejected', 'completed'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Valid status is required.' });
+    }
+    
+    const { data: request, error: reqErr } = await supabaseAdmin
+      .from('re_evaluation_requests')
+      .select('*')
+      .eq('id', id)
+      .eq('institution_id', req.user?.institution_id)
+      .single();
+      
+    if (reqErr || !request) {
+      return res.status(404).json({ success: false, error: 'Re-evaluation request not found.' });
+    }
+    
+    const updateData: any = {
+      status,
+      remarks,
+      resolved_at: new Date().toISOString(),
+      resolved_by: req.user?.id
+    };
+    
+    if (status === 'approved' && new_marks !== undefined) {
+      updateData.new_marks = new_marks;
+      
+      const { data: origResult } = await supabaseAdmin
+        .from('exam_results')
+        .select('max_marks')
+        .eq('id', request.result_id)
+        .single();
+        
+      const maxMarks = origResult?.max_marks ? parseFloat(origResult.max_marks as any) : 100.00;
+      const pct = (new_marks / maxMarks) * 100;
+      let newGrade = 'F';
+      if (pct >= 90) newGrade = 'A+';
+      else if (pct >= 80) newGrade = 'A';
+      else if (pct >= 70) newGrade = 'B';
+      else if (pct >= 60) newGrade = 'C';
+      else if (pct >= 40) newGrade = 'D';
+      
+      const { error: updateResultErr } = await supabaseAdmin
+        .from('exam_results')
+        .update({
+          marks_obtained: new_marks,
+          grade: newGrade,
+          remarks: `Re-evaluated (Previous Marks: ${request.previous_marks})`
+        })
+        .eq('id', request.result_id);
+        
+      if (updateResultErr) throw updateResultErr;
+    }
+    
+    const { data: updatedRequest, error: updateReqErr } = await supabaseAdmin
+      .from('re_evaluation_requests')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (updateReqErr) throw updateReqErr;
+    return res.status(200).json({ success: true, request: updatedRequest });
+  } catch (err: any) {
+    logger.error('updateReEvaluationStatus error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 }

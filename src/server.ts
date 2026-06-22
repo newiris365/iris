@@ -31,6 +31,9 @@ import permissionsRouter from './routes/permissions';
 import grievancesRouter from './routes/grievances';
 import attendanceEngineRouter from './services/attendanceEngine/routes';
 import { initGateHardware } from './services/gateHardware';
+import { authMiddleware } from './middleware/auth';
+import { requireFeature } from './middleware/permissions';
+import { razorpayWebhook } from './controllers/campusCore';
 
 dotenv.config();
 
@@ -192,18 +195,20 @@ eventsNs.on('connection', (socket) => {
 });
 
 // Periodically broadcast KPI updates to director:dashboard room every 30 seconds
-setInterval(async () => {
-  try {
-    directorNs.to('director:dashboard').emit('director:kpis_updated', {
-      attendance_rate: 80 + Math.floor(Math.random() * 12),
-      fee_collected_today: 185000 + Math.floor(Math.random() * 15000),
-      students_on_campus: 40 + Math.floor(Math.random() * 20),
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    logger.error('Failed broadcasting director KPIs:', err);
-  }
-}, 30000);
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(async () => {
+    try {
+      directorNs.to('director:dashboard').emit('director:kpis_updated', {
+        attendance_rate: 80 + Math.floor(Math.random() * 12),
+        fee_collected_today: 185000 + Math.floor(Math.random() * 15000),
+        students_on_campus: 40 + Math.floor(Math.random() * 20),
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      logger.error('Failed broadcasting director KPIs:', err);
+    }
+  }, 30000);
+}
 
 // Export io for use in controllers (e.g. transit GPS broadcast)
 export { io, transitNs, notificationsNs, canteenNs, gateNs, directorNs, eventsNs };
@@ -219,7 +224,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Client-Device-ID']
 }));
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 // Global rate limiter (500 req / 15 min per IP)
 app.use(globalLimiter);
@@ -261,6 +270,7 @@ app.use((req, res, next) => {
 });
 
 // Routes mapping (auth gets stricter rate limiter)
+app.post('/api/v1/webhooks/razorpay', razorpayWebhook);
 app.use('/api/v1/auth', authLimiter, authRouter);
 
 // When Supabase is offline, return 503 for data-dependent routes (skip auth/login which has sandbox fallback)
@@ -297,33 +307,33 @@ app.use('/api/v1/permissions', requireSupabaseOnline);
 
 app.use('/api/v1/core', coreRouter);
 app.use('/api/v1/campusCore', coreRouter);
-app.use('/api/canteen', canteenRouter);
-app.use('/api/v1/canteen', canteenRouter);
+app.use('/api/canteen', authMiddleware, requireFeature('canteen'), canteenRouter);
+app.use('/api/v1/canteen', authMiddleware, requireFeature('canteen'), canteenRouter);
 app.use('/api/v1/hostel-gate', hostelGateRouter);
 app.use('/api/v1/lib-events', libEventsRouter);
-app.use('/api/v1/fitzone', fitzoneRouter);
-app.use('/api/gym', fitzoneRouter);
-app.use('/api/fitzone', fitzoneRouter);
-app.use('/api/v1/events', eventsRouter);
-app.use('/api/v1/hostel', hostelRouter);
-app.use('/api/v1/transit', transitRouter);
-app.use('/api/v1/director', directorRouter);
-app.use('/api/v1/ai', aiConciergeRouter);
-app.use('/api/library', libraryRouter);
-app.use('/api/gate', gateRouter);
-app.use('/api/v1/gate', gateRouter);
-app.use('/api/parent', parentRouter);
-app.use('/api/v1/parent', parentRouter);
-app.use('/api/admissions', admissionsRouter);
-app.use('/api/v1/admissions', admissionsRouter);
-app.use('/api/placements', placementsRouter);
-app.use('/api/v1/placements', placementsRouter);
-app.use('/api/obe', obeRouter);
-app.use('/api/v1/obe', obeRouter);
-app.use('/api/naac', naacRouter);
-app.use('/api/v1/naac', naacRouter);
-app.use('/api/hr', hrRouter);
-app.use('/api/v1/hr', hrRouter);
+app.use('/api/v1/fitzone', authMiddleware, requireFeature('gym'), fitzoneRouter);
+app.use('/api/gym', authMiddleware, requireFeature('gym'), fitzoneRouter);
+app.use('/api/fitzone', authMiddleware, requireFeature('gym'), fitzoneRouter);
+app.use('/api/v1/events', authMiddleware, requireFeature('events'), eventsRouter);
+app.use('/api/v1/hostel', authMiddleware, requireFeature('hostel'), hostelRouter);
+app.use('/api/v1/transit', authMiddleware, requireFeature('transit'), transitRouter);
+app.use('/api/v1/director', authMiddleware, requireFeature('director'), directorRouter);
+app.use('/api/v1/ai', authMiddleware, requireFeature('ai_concierge'), aiConciergeRouter);
+app.use('/api/library', authMiddleware, requireFeature('library'), libraryRouter);
+app.use('/api/gate', authMiddleware, requireFeature('gate'), gateRouter);
+app.use('/api/v1/gate', authMiddleware, requireFeature('gate'), gateRouter);
+app.use('/api/parent', authMiddleware, requireFeature('parent_portal'), parentRouter);
+app.use('/api/v1/parent', authMiddleware, requireFeature('parent_portal'), parentRouter);
+app.use('/api/admissions', authMiddleware, requireFeature('admissions'), admissionsRouter);
+app.use('/api/v1/admissions', authMiddleware, requireFeature('admissions'), admissionsRouter);
+app.use('/api/placements', authMiddleware, requireFeature('placements'), placementsRouter);
+app.use('/api/v1/placements', authMiddleware, requireFeature('placements'), placementsRouter);
+app.use('/api/obe', authMiddleware, requireFeature('obe'), obeRouter);
+app.use('/api/v1/obe', authMiddleware, requireFeature('obe'), obeRouter);
+app.use('/api/naac', authMiddleware, requireFeature('naac'), naacRouter);
+app.use('/api/v1/naac', authMiddleware, requireFeature('naac'), naacRouter);
+app.use('/api/hr', authMiddleware, requireFeature('hr'), hrRouter);
+app.use('/api/v1/hr', authMiddleware, requireFeature('hr'), hrRouter);
 app.use('/api/v1/permissions', permissionsRouter);
 app.use('/api/grievances', grievancesRouter);
 app.use('/api/v1/grievances', grievancesRouter);
@@ -350,38 +360,40 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 });
 
 // Main Server listener (use httpServer for Socket.io support)
-httpServer.listen(PORT, () => {
-  logger.info(`IRIS 365 Core Backend Server running on port ${PORT}`);
-  logger.info(`Socket.io namespaces: /transit, /notifications, /canteen, /gate`);
+if (process.env.NODE_ENV !== 'test') {
+  httpServer.listen(PORT, () => {
+    logger.info(`IRIS 365 Core Backend Server running on port ${PORT}`);
+    logger.info(`Socket.io namespaces: /transit, /notifications, /canteen, /gate`);
 
-  // Lazy-load cron jobs AFTER server is listening (avoids blocking startup)
-  setTimeout(() => {
-    try {
-      require('./config/cron');
-      logger.info('Background cron jobs loaded successfully.');
-    } catch (err) {
-      logger.error('Failed to initialize cron jobs:', err);
-    }
-  }, 2000);
+    // Lazy-load cron jobs AFTER server is listening (avoids blocking startup)
+    setTimeout(() => {
+      try {
+        require('./config/cron');
+        logger.info('Background cron jobs loaded successfully.');
+      } catch (err) {
+        logger.error('Failed to initialize cron jobs:', err);
+      }
+    }, 2000);
 
-  setTimeout(() => {
-    try {
-      const { startFeeReminderScheduler } = require('./services/feeReminderScheduler');
-      startFeeReminderScheduler();
-      logger.info('Fee reminder scheduler started.');
-    } catch (err) {
-      logger.error('Failed to start fee reminder scheduler:', err);
-    }
-  }, 4000);
+    setTimeout(() => {
+      try {
+        const { startFeeReminderScheduler } = require('./services/feeReminderScheduler');
+        startFeeReminderScheduler();
+        logger.info('Fee reminder scheduler started.');
+      } catch (err) {
+        logger.error('Failed to start fee reminder scheduler:', err);
+      }
+    }, 4000);
 
-  // Defer gate hardware init to avoid blocking startup with native module loading
-  setTimeout(() => {
-    try {
-      initGateHardware();
-    } catch (err) {
-      logger.error('Failed to initialize gate hardware integrations:', err);
-    }
-  }, 3000);
-});
+    // Defer gate hardware init to avoid blocking startup with native module loading
+    setTimeout(() => {
+      try {
+        initGateHardware();
+      } catch (err) {
+        logger.error('Failed to initialize gate hardware integrations:', err);
+      }
+    }, 3000);
+  });
+}
 
 export default app;

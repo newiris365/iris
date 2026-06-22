@@ -7,7 +7,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
-import crypto from 'crypto';
+import { getFingerprintHash } from '../lib/auth-helpers';
 
 export interface AuthenticatedUser {
   id: string;
@@ -22,27 +22,11 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthenticatedUser;
+      rawBody?: any;
     }
   }
 }
 
-function getFingerprintHash(req: Request): string {
-  const userAgent = req.headers['user-agent'] || 'unknown';
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const deviceId = req.headers['x-client-device-id'] || 'unknown-device';
-  
-  let ipSegment = ip;
-  if (ip.includes(':')) {
-    // IPv6 address: mask to /64 subnet (first 4 groups) to tolerate tower switching
-    ipSegment = ip.split(':').slice(0, 4).join(':');
-  } else if (ip.includes('.')) {
-    // IPv4 address: mask to /24 subnet (first 3 groups)
-    ipSegment = ip.split('.').slice(0, 3).join('.');
-  }
-  
-  const raw = `${userAgent}-${ipSegment}-${deviceId}`;
-  return crypto.createHash('sha256').update(raw).digest('hex');
-}
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -55,6 +39,9 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   authLocalStorage.run(token, () => {
     if (token.startsWith('mock-sandbox-jwt-token-value.')) {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ success: false, error: 'Sandbox mock tokens are disabled in production.' });
+      }
       try {
         const parts = token.split('.');
         const payloadBase64 = parts[1];

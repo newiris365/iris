@@ -1046,3 +1046,82 @@ export async function updateCompanyVisit(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+export async function registerAlumni(req: Request, res: Response) {
+  try {
+    const { student_id, graduation_year, current_company, current_role, current_ctc, location, linkedin_url, is_mentor, mentoring_slots } = req.body;
+    if (!student_id) {
+      return res.status(400).json({ success: false, error: 'student_id required.' });
+    }
+    
+    const { data: student, error: stdErr } = await supabaseAdmin
+      .from('students')
+      .select('institution_id, user_id')
+      .eq('id', student_id)
+      .single();
+      
+    if (stdErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('alumni')
+      .insert({
+        student_id,
+        institution_id: student.institution_id,
+        graduation_year: graduation_year || new Date().getFullYear(),
+        current_company,
+        current_role: current_role,
+        current_ctc,
+        location,
+        linkedin_url,
+        is_mentor: !!is_mentor,
+        mentoring_slots: mentoring_slots || 0
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    if (student.user_id) {
+      await supabaseAdmin
+        .from('users')
+        .update({ role: 'Alumni' })
+        .eq('id', student.user_id);
+    }
+    
+    return res.status(201).json({ success: true, alumni: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function updateAlumniProfile(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { graduation_year, current_company, current_role, current_ctc, location, linkedin_url, is_mentor, mentoring_slots, achievements } = req.body;
+    
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (graduation_year !== undefined) updateData.graduation_year = graduation_year;
+    if (current_company !== undefined) updateData.current_company = current_company;
+    if (current_role !== undefined) updateData.current_role = current_role;
+    if (current_ctc !== undefined) updateData.current_ctc = current_ctc;
+    if (location !== undefined) updateData.location = location;
+    if (linkedin_url !== undefined) updateData.linkedin_url = linkedin_url;
+    if (is_mentor !== undefined) updateData.is_mentor = is_mentor;
+    if (mentoring_slots !== undefined) updateData.mentoring_slots = mentoring_slots;
+    if (achievements !== undefined) updateData.achievements = achievements;
+    
+    const { data, error } = await supabaseAdmin
+      .from('alumni')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, alumni: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}

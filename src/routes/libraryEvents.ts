@@ -7,11 +7,16 @@ import {
   checkinTicket 
 } from '../controllers/libraryEvents';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { requireFeature } from '../middleware/permissions';
 
 const router = Router();
 
 // Apply auth middleware to protect all routes
 router.use(authMiddleware);
+
+// Apply feature toggle gates
+router.use('/library', requireFeature('library'));
+router.use('/events', requireFeature('events'));
 
 // Library endpoints
 router.post('/library/issue', requireRole(['Staff', 'Admin', 'SuperAdmin']), issueBook);

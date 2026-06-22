@@ -26,38 +26,81 @@ const _supabaseAdminInternal = createClient(supabaseUrl, supabaseServiceKey, {
 
 export let isSupabaseOffline = false;
 
-// Simple connectivity check
+// Simple connectivity check (periodic every 60s)
 async function checkConnectivity() {
+  if (process.env.NODE_ENV === 'test') {
+    isSupabaseOffline = true;
+    return;
+  }
   if (!supabaseUrl || !supabaseServiceKey) {
     isSupabaseOffline = true;
     return;
   }
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(`${supabaseUrl}/rest/v1/`, {
       method: 'GET',
       headers: { apikey: supabaseServiceKey },
       signal: controller.signal
     });
     clearTimeout(timeoutId);
-    if (!res.ok && res.status !== 404 && res.status !== 401) {
+    if (res.ok || res.status === 404 || res.status === 401) {
+      if (isSupabaseOffline) {
+        console.log('[SUPABASE CONNECTIVITY] Supabase connection restored.');
+      }
+      isSupabaseOffline = false;
+    } else {
       isSupabaseOffline = true;
     }
   } catch (err) {
     isSupabaseOffline = true;
-    console.warn(`[SUPABASE CONNECTIVITY] Supabase is offline or unreachable (${supabaseUrl}). Running in simulated offline sandbox mode.`);
+    console.warn(`[SUPABASE CONNECTIVITY] Supabase is offline or unreachable (${supabaseUrl}).`);
   }
 }
-checkConnectivity();
+if (process.env.NODE_ENV !== 'test') {
+  checkConnectivity();
+  const intervalId = setInterval(checkConnectivity, 60000);
+  if (intervalId && intervalId.unref) {
+    intervalId.unref();
+  }
+} else {
+  isSupabaseOffline = true;
+}
+
+/**
+ * Exponential backoff retry wrapper for Supabase database/auth calls.
+ */
+export async function retrySupabaseCall<T>(fn: () => Promise<T>, maxRetries = 3, initialDelay = 100): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      attempt++;
+      if (attempt >= maxRetries || (err.status && err.status >= 400 && err.status < 500)) {
+        throw err;
+      }
+      const delay = initialDelay * Math.pow(2, attempt);
+      console.warn(`[SUPABASE RETRY] Call failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms... Error: ${err.message || err}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
 
 // Helper to get client dynamically
 export function getDynamicSupabaseClient(): SupabaseClient {
   const token = authLocalStorage.getStore();
   if (token && supabaseUrl) {
-    const jwtSecret = process.env.JWT_SECRET || 'iris365-superSecure-jwt-K3y!2026@SIET-campus-prod-xK9mT4wQ';
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required!');
+    }
     let isBackendToken = false;
     if (token.startsWith('mock-sandbox')) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('CRITICAL SECURITY VIOLATION: Sandbox mock tokens are disabled in production.');
+      }
       isBackendToken = true;
     } else {
       try {
@@ -109,6 +152,97 @@ export let mockCourseRegistrations: any[] = [
   }
 ];
 
+export let mockStudentDocuments: any[] = [
+  {
+    id: 'doc-1',
+    institution_id: 'a0000000-0000-0000-0000-000000000001',
+    student_id: 'test-student-id',
+    document_name: '10th Marksheet',
+    document_type: '10th_marksheet',
+    file_url: 'https://example.com/marksheet10.pdf',
+    file_size_kb: 150,
+    uploaded_at: new Date().toISOString(),
+    uploaded_by: 'b0000000-0000-0000-0000-000000000002'
+  }
+];
+
+export let mockTimetableHistory: any[] = [
+  {
+    id: 'tth-1',
+    institution_id: 'a0000000-0000-0000-0000-000000000001',
+    department_id: 'd1',
+    semester: 5,
+    batch_year: '2024-2028',
+    version: 1,
+    timetable_data: [],
+    created_at: new Date().toISOString(),
+    created_by: 'b0000000-0000-0000-0000-000000000002'
+  }
+];
+
+export let mockSupplementaryExams: any[] = [
+  {
+    id: 'supp-1',
+    institution_id: 'a0000000-0000-0000-0000-000000000001',
+    exam_id: 'e1',
+    student_id: 'test-student-id',
+    subject: 'Computer Networks',
+    status: 'applied',
+    applied_at: new Date().toISOString(),
+    remarks: 'Needs supplementary attempt'
+  }
+];
+
+export let mockReEvaluationRequests: any[] = [
+  {
+    id: 're-eval-1',
+    institution_id: 'a0000000-0000-0000-0000-000000000001',
+    result_id: 'res-1',
+    student_id: 'test-student-id',
+    exam_id: 'e1',
+    subject: 'Operating Systems',
+    reason: 'Total calculation error',
+    status: 'applied',
+    previous_marks: 38,
+    new_marks: null,
+    applied_at: new Date().toISOString(),
+    resolved_at: null,
+    resolved_by: null,
+    remarks: null
+  }
+];
+
+export let mockAlumni: any[] = [
+  {
+    id: 'alumni-123',
+    institution_id: 'a0000000-0000-0000-0000-000000000001',
+    student_id: 'test-student-id',
+    graduation_year: 2026,
+    current_company: 'Google',
+    current_role: 'SWE',
+    is_mentor: true,
+    created_at: new Date().toISOString()
+  }
+];
+
+export let mockGateLockdown: any[] = [];
+export let mockEquipmentMaintenanceLogs: any[] = [];
+export let mockVisitorPasses: any[] = [];
+export let mockGymEquipment: any[] = [
+  {
+    id: 'equip-1',
+    institution_id: 'a0000000-0000-0000-0000-000000000001',
+    name: 'Treadmill',
+    category: 'Cardio',
+    quantity: 2,
+    condition: 'good',
+    is_active: true
+  }
+];
+export let mockBookReservations: any[] = [];
+export let mockStudentTransitLogs: any[] = [];
+export let mockEventCertificates: any[] = [];
+
 // Define Mock client details for offline simulation mode
 const mockAuth = {
   signInWithPassword: async ({ email }: { email: string }) => {
@@ -118,7 +252,7 @@ const mockAuth = {
     return {
       data: {
         user: { id, email, role: 'authenticated' },
-        session: { access_token: 'mock-token' }
+        session: { access_token: 'mock-token', refresh_token: 'mock-refresh-token' }
       },
       error: null
     };
@@ -131,6 +265,15 @@ const mockAuth = {
   },
   signOut: async () => {
     return { error: null };
+  },
+  refreshSession: async ({ refresh_token }: { refresh_token: string }) => {
+    return {
+      data: {
+        user: { id: 'b0000000-0000-0000-0000-000000000006', email: 'khushal@gmail.com', role: 'authenticated' },
+        session: { access_token: 'mock-token-refreshed', refresh_token: 'mock-refresh-token-refreshed' }
+      },
+      error: null
+    };
   }
 };
 
@@ -190,6 +333,23 @@ function getMockDataForTable(tableName: string) {
       return [
         {
           id: 'test-student-id',
+          roll_number: 'CS23B1042',
+          user_id: 'b0000000-0000-0000-0000-000000000006',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          department_id: 'd1',
+          semester: '5',
+          users: {
+            name: 'Khushal Gehlot',
+            full_name: 'Khushal Gehlot',
+            phone: '+919999988888',
+            email: 'khushal@gmail.com'
+          },
+          departments: {
+            name: 'Computer Science'
+          }
+        },
+        {
+          id: 'c0000000-0000-0000-0000-000000000006',
           roll_number: 'CS23B1042',
           user_id: 'b0000000-0000-0000-0000-000000000006',
           institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -281,7 +441,58 @@ function getMockDataForTable(tableName: string) {
       ];
     case 'bus_trips':
       return [
-        { id: 'trip1', route_name: 'Route A', status: 'active', driver_name: 'Ramesh Kumar', bus_number: 'KA-01-F-1234' }
+        { id: 'trip1', route_name: 'Route A', status: 'active', driver_name: 'Ramesh Kumar', bus_number: 'KA-01-F-1234' },
+        {
+          id: '70000000-0000-0000-0000-000000000001',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          bus_id: '70000000-0000-0000-0000-000000000001',
+          route_id: '80000000-0000-0000-0000-000000000001',
+          status: 'active',
+          passenger_count: 5
+        }
+      ];
+    case 'buses':
+      return [
+        {
+          id: '70000000-0000-0000-0000-000000000001',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          vehicle_number: 'RJ-19-PB-4050',
+          device_id: 'GPS-DEV-4050',
+          route_id: '80000000-0000-0000-0000-000000000001'
+        }
+      ];
+    case 'parent_student_links':
+      return [
+        {
+          id: 'link-1',
+          parent_user_id: 'parent-1',
+          student_id: 'c0000000-0000-0000-0000-000000000006',
+          relationship: 'father',
+          verified: true,
+          users: {
+            phone: '+919999988889'
+          }
+        }
+      ];
+    case 'events':
+      return [
+        {
+          id: 'e0000000-0000-0000-0000-000000000001',
+          title: 'Tech Fest 2026',
+          start_datetime: new Date().toISOString(),
+          venue: 'Main Auditorium',
+          institution_id: 'a0000000-0000-0000-0000-000000000001'
+        }
+      ];
+    case 'event_registrations':
+      return [
+        {
+          id: 'reg-1',
+          event_id: 'e0000000-0000-0000-0000-000000000001',
+          student_id: 'c0000000-0000-0000-0000-000000000006',
+          attendance_marked: true,
+          institution_id: 'a0000000-0000-0000-0000-000000000001'
+        }
       ];
     case 'bus_routes':
       return [
@@ -471,11 +682,77 @@ function getMockDataForTable(tableName: string) {
       ];
     case 'course_registrations':
       return mockCourseRegistrations;
+    case 'student_documents':
+      return mockStudentDocuments;
+    case 'timetable_history':
+      return mockTimetableHistory;
+    case 'supplementary_exams':
+      return mockSupplementaryExams;
+    case 're_evaluation_requests':
+      return mockReEvaluationRequests;
+    case 'alumni':
+      return mockAlumni;
+    case 'gate_lockdown':
+      return mockGateLockdown;
+    case 'equipment_maintenance_logs':
+      return mockEquipmentMaintenanceLogs;
+    case 'visitor_passes':
+      return mockVisitorPasses;
+    case 'gym_equipment':
+      return mockGymEquipment;
+    case 'book_reservations':
+      return mockBookReservations;
+    case 'student_transit_logs':
+      return mockStudentTransitLogs;
+    case 'event_certificates':
+      return mockEventCertificates;
+    case 'exam_results':
+      return [
+        {
+          id: 'res-1',
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          student_id: 'test-student-id',
+          exam_id: 'exam-1',
+          subject: 'Maths',
+          marks_obtained: 75,
+          max_marks: 100,
+          grade: 'B',
+          created_at: new Date().toISOString()
+        }
+      ];
     case 'parent_topup_child_wallet':
       return [
         {
           success: true,
           new_balance: 500
+        }
+      ];
+    case 'get_child_bus_status':
+      return [
+        {
+          is_on_bus: true,
+          bus_name: 'Tata Starbus 40-Seater',
+          route_name: 'Jodhpur Central Route',
+          last_stop: 'Sardarpura 4th Road',
+          eta_minutes: 10,
+          latitude: 26.2912,
+          longitude: 73.0156,
+          last_updated: new Date().toISOString()
+        }
+      ];
+    case 'get_bus_eta_for_student':
+      return [
+        {
+          bus_id: '70000000-0000-0000-0000-000000000001',
+          bus_name: 'Tata Starbus 40-Seater',
+          route_name: 'Jodhpur Central Route',
+          stop_name: 'Sardarpura 4th Road',
+          stop_index: 0,
+          distance_km: 1.2,
+          eta_minutes: 10,
+          latitude: 26.2912,
+          longitude: 73.0156,
+          last_updated: new Date().toISOString()
         }
       ];
     default:
@@ -493,10 +770,12 @@ function createMockBuilder(tableName: string) {
     then(onfulfilled: any, onrejected: any) {
       const isSingle = this.chain.includes('single') || this.chain.includes('maybeSingle');
       
+      let resolvedData: any;
+      
       // Perform simulated write operations
       if (this.chain.includes('insert') && this.insertedData) {
         const records = Array.isArray(this.insertedData) ? this.insertedData : [this.insertedData];
-        records.forEach((rec: any) => {
+        const newRecords = records.map((rec: any) => {
           const newRec = {
             id: rec.id || `mock-id-${Math.random().toString(36).substr(2, 9)}`,
             ...rec,
@@ -515,33 +794,142 @@ function createMockBuilder(tableName: string) {
               semester: courseObj.semester
             } : null;
             mockCourseRegistrations.push(newRec);
+          } else if (tableName === 'student_documents') {
+            mockStudentDocuments.push(newRec);
+          } else if (tableName === 'timetable_history') {
+            mockTimetableHistory.push(newRec);
+          } else if (tableName === 'supplementary_exams') {
+            mockSupplementaryExams.push(newRec);
+          } else if (tableName === 're_evaluation_requests') {
+            mockReEvaluationRequests.push(newRec);
+          } else if (tableName === 'alumni') {
+            mockAlumni.push(newRec);
+          } else if (tableName === 'gate_lockdown') {
+            mockGateLockdown.push(newRec);
+          } else if (tableName === 'equipment_maintenance_logs') {
+            mockEquipmentMaintenanceLogs.push(newRec);
+          } else if (tableName === 'visitor_passes') {
+            mockVisitorPasses.push(newRec);
+          } else if (tableName === 'gym_equipment') {
+            mockGymEquipment.push(newRec);
+          } else if (tableName === 'book_reservations') {
+            mockBookReservations.push(newRec);
+          } else if (tableName === 'student_transit_logs') {
+            mockStudentTransitLogs.push(newRec);
+          } else if (tableName === 'event_certificates') {
+            mockEventCertificates.push(newRec);
           }
+          return newRec;
         });
-      }
-      
-      if (this.chain.includes('update') && this.updatedData) {
+        resolvedData = newRecords;
+      } else {
+        if (this.chain.includes('update') && this.updatedData) {
+          if (tableName === 'course_registrations') {
+            const targetId = this.eqFilters.id || this.eqFilters.course_id;
+            mockCourseRegistrations = mockCourseRegistrations.map(r => {
+              if (r.id === targetId || r.course_id === targetId) {
+                return { ...r, ...this.updatedData, status: this.updatedData.status || r.status };
+              }
+              return r;
+            });
+          } else if (tableName === 'supplementary_exams') {
+            const targetId = this.eqFilters.id;
+            mockSupplementaryExams = mockSupplementaryExams.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 're_evaluation_requests') {
+            const targetId = this.eqFilters.id;
+            mockReEvaluationRequests = mockReEvaluationRequests.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'alumni') {
+            const targetId = this.eqFilters.id;
+            mockAlumni = mockAlumni.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'gate_lockdown') {
+            const targetId = this.eqFilters.id;
+            mockGateLockdown = mockGateLockdown.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'equipment_maintenance_logs') {
+            const targetId = this.eqFilters.id;
+            mockEquipmentMaintenanceLogs = mockEquipmentMaintenanceLogs.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'visitor_passes') {
+            const targetId = this.eqFilters.id || this.eqFilters.pass_number;
+            mockVisitorPasses = mockVisitorPasses.map(r => {
+              if (r.id === targetId || r.pass_number === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'gym_equipment') {
+            const targetId = this.eqFilters.id;
+            mockGymEquipment = mockGymEquipment.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'book_reservations') {
+            const targetId = this.eqFilters.id;
+            mockBookReservations = mockBookReservations.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          }
+        }
+
         if (tableName === 'course_registrations') {
-          const targetId = this.eqFilters.id || this.eqFilters.course_id;
-          mockCourseRegistrations = mockCourseRegistrations.map(r => {
-            if (r.id === targetId || r.course_id === targetId) {
-              return { ...r, ...this.updatedData, status: this.updatedData.status || r.status };
+          resolvedData = mockCourseRegistrations;
+        } else if (tableName === 'student_documents') {
+          resolvedData = mockStudentDocuments;
+        } else if (tableName === 'timetable_history') {
+          resolvedData = mockTimetableHistory;
+        } else if (tableName === 'supplementary_exams') {
+          resolvedData = mockSupplementaryExams;
+        } else if (tableName === 're_evaluation_requests') {
+          resolvedData = mockReEvaluationRequests;
+        } else if (tableName === 'alumni') {
+          resolvedData = mockAlumni;
+        } else if (tableName === 'gate_lockdown') {
+          resolvedData = mockGateLockdown;
+        } else if (tableName === 'equipment_maintenance_logs') {
+          resolvedData = mockEquipmentMaintenanceLogs;
+        } else if (tableName === 'visitor_passes') {
+          resolvedData = mockVisitorPasses;
+        } else if (tableName === 'gym_equipment') {
+          resolvedData = mockGymEquipment;
+        } else if (tableName === 'book_reservations') {
+          resolvedData = mockBookReservations;
+        } else if (tableName === 'student_transit_logs') {
+          resolvedData = mockStudentTransitLogs;
+        } else if (tableName === 'event_certificates') {
+          resolvedData = mockEventCertificates;
+        } else {
+          resolvedData = getMockDataForTable(this.tableName);
+        }
+
+        // Apply eq filters if present
+        if (Object.keys(this.eqFilters).length > 0) {
+          resolvedData = resolvedData.filter((item: any) => {
+            for (const [key, value] of Object.entries(this.eqFilters)) {
+              if (item[key] !== undefined && item[key] !== value) {
+                return false;
+              }
             }
-            return r;
+            return true;
           });
         }
       }
 
-      let resolvedData: any;
-      if (tableName === 'course_registrations') {
-        resolvedData = mockCourseRegistrations;
-      } else {
-        resolvedData = getMockDataForTable(this.tableName);
-      }
-
       if (isSingle) {
-        resolvedData = resolvedData.length > 0 ? resolvedData[0] : null;
+        resolvedData = resolvedData && resolvedData.length > 0 ? resolvedData[0] : null;
       }
-      const count = resolvedData.length;
+      const count = Array.isArray(resolvedData) ? resolvedData.length : (resolvedData ? 1 : 0);
       return Promise.resolve({
         data: resolvedData,
         error: null,
@@ -585,7 +973,7 @@ const mockSupabaseClient = {
 // Export supabaseAdmin as a Proxy that dynamically routes to getDynamicSupabaseClient()
 export const supabaseAdmin = new Proxy(_supabaseAdminInternal, {
   get(target, prop, receiver) {
-    if (isSupabaseOffline) {
+    if (isSupabaseOffline && process.env.NODE_ENV !== 'production') {
       const value = Reflect.get(mockSupabaseClient, prop, mockSupabaseClient);
       if (typeof value === 'function') {
         return value.bind(mockSupabaseClient);
@@ -604,7 +992,7 @@ export const supabaseAdmin = new Proxy(_supabaseAdminInternal, {
 // Export a raw, un-proxied client for explicit administrative actions
 export const supabaseServiceRole = new Proxy(_supabaseAdminInternal, {
   get(target, prop, receiver) {
-    if (isSupabaseOffline) {
+    if (isSupabaseOffline && process.env.NODE_ENV !== 'production') {
       const value = Reflect.get(mockSupabaseClient, prop, mockSupabaseClient);
       if (typeof value === 'function') {
         return value.bind(mockSupabaseClient);
@@ -620,7 +1008,7 @@ export const supabaseServiceRole = new Proxy(_supabaseAdminInternal, {
 }) as any;
 
 export function getSupabaseClient(req?: Request) {
-  if (isSupabaseOffline) {
+  if (isSupabaseOffline && process.env.NODE_ENV !== 'production') {
     return mockSupabaseClient;
   }
   const authHeader = req?.headers?.authorization;
@@ -645,7 +1033,12 @@ export function getSupabaseClient(req?: Request) {
 
 // Middleware: block requests when Supabase is offline (returns 503)
 export function requireSupabaseOnline(req: Request, res: Response, next: NextFunction) {
-  // Allow requests to pass through in offline sandbox simulation mode so mock data is served successfully
+  if (isSupabaseOffline && process.env.NODE_ENV === 'production') {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service is temporarily unavailable. Please try again later.'
+    });
+  }
   next();
 }
 

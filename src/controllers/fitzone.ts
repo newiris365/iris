@@ -909,6 +909,22 @@ export async function getMaintenanceDue(req: Request, res: Response) {
   }
 }
 
+export async function getEquipmentMaintenanceLogs(req: Request, res: Response) {
+  try {
+    const { id } = req.params; // equipment_id
+    const { data, error } = await supabaseAdmin
+      .from('equipment_maintenance_logs')
+      .select('*')
+      .eq('equipment_id', id)
+      .order('date', { ascending: false });
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.status(200).json({ success: true, logs: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 export async function logEquipmentUsage(req: Request, res: Response) {
   try {
     const parseResult = logUsageSchema.safeParse(req.body);

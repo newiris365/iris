@@ -26,6 +26,7 @@ import {
   updateEquipment,
   logEquipmentMaintenance,
   getMaintenanceDue,
+  getEquipmentMaintenanceLogs,
   logEquipmentUsage,
   logFitnessMetrics,
   getFitnessMetrics,
@@ -91,6 +92,7 @@ router.post('/gym/equipment', requireRole(['Admin', 'SuperAdmin']), createEquipm
 router.put('/gym/equipment/:id', requireRole(['Admin', 'SuperAdmin']), updateEquipment);
 router.post('/gym/equipment/:id/maintenance', requireRole(['Admin', 'SuperAdmin']), logEquipmentMaintenance);
 router.get('/gym/equipment/maintenance-due', requireRole(['Admin', 'SuperAdmin']), getMaintenanceDue);
+router.get('/gym/equipment/:id/maintenance-logs', requireRole(['Admin', 'SuperAdmin']), getEquipmentMaintenanceLogs);
 router.post('/gym/equipment/usage', logEquipmentUsage);
 
 // ========== 5. FITNESS & PROGRESS TRACKING ==========

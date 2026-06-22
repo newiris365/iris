@@ -712,6 +712,67 @@ export async function listReservationsForBook(req: Request, res: Response) {
   }
 }
 
+export async function processReservationQueue(req: Request, res: Response) {
+  try {
+    const now = new Date().toISOString();
+    
+    // 1. Fetch expired notified reservations
+    const { data: expiredReservations, error: expErr } = await supabaseAdmin
+      .from('book_reservations')
+      .select('*')
+      .eq('status', 'notified')
+      .lt('expires_at', now);
+      
+    if (expErr) return res.status(500).json({ success: false, error: expErr.message });
+    
+    const expiredList = expiredReservations || [];
+    const newlyNotified: any[] = [];
+    
+    for (const resv of expiredList) {
+      // Mark as expired
+      await supabaseAdmin
+        .from('book_reservations')
+        .update({ status: 'expired' })
+        .eq('id', resv.id);
+        
+      // Fetch next in queue for the same book (FIFO order)
+      const { data: nextResv } = await supabaseAdmin
+        .from('book_reservations')
+        .select('*')
+        .eq('book_id', resv.book_id)
+        .eq('status', 'waiting')
+        .order('reserved_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+        
+      if (nextResv) {
+        const expiresAt = new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString(); // 48h
+        const { data: updated } = await supabaseAdmin
+          .from('book_reservations')
+          .update({
+            status: 'notified',
+            notified_at: now,
+            expires_at: expiresAt
+          })
+          .eq('id', nextResv.id)
+          .select()
+          .single();
+          
+        if (updated) newlyNotified.push(updated);
+      }
+    }
+    
+    return res.status(200).json({
+      success: true,
+      expired_count: expiredList.length,
+      expired_reservations: expiredList,
+      newly_notified_reservations: newlyNotified
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
 // ============================================================
 // 4. E-RESOURCES PORTAL
 // ============================================================

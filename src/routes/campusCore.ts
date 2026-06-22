@@ -43,6 +43,8 @@ import {
   getStudentFees,
   getFeesReport,
   createConcession,
+  cloneFeeStructures,
+  processFeeRefund,
   triggerFeeReminders,
   getReminderHistory,
   toggleAutoReminders,
@@ -180,8 +182,24 @@ import {
   getMyHallTickets,
   getHallTicketDetail,
   downloadHallTicketPdf,
+  uploadStudentPhoto,
+  uploadStudentDocument,
+  getStudentDocuments,
+  deleteStudentDocument,
+  getTimetableVersions,
+  saveTimetableVersion,
+  rollbackTimetableVersion,
+  getExamAnalytics,
+  exportGradeSheetPDF,
+  applySupplementary,
+  getSupplementaryApplications,
+  updateSupplementaryStatus,
+  applyReEvaluation,
+  getReEvaluationApplications,
+  updateReEvaluationStatus,
 } from '../controllers/campusCore';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { requireFeature } from '../middleware/permissions';
 
 const router = Router();
 
@@ -189,6 +207,16 @@ const router = Router();
 router.get('/idcards/verify/:studentId', verifyCard); // public check
 
 router.use(authMiddleware);
+
+// Apply feature toggle gates
+router.use('/attendance', requireFeature('attendance'));
+router.use('/students', requireFeature('students'));
+router.use('/timetable', requireFeature('timetable'));
+router.use('/classes', requireFeature('timetable'));
+router.use('/fees', requireFeature('fees'));
+router.use('/notices', requireFeature('notices'));
+router.use('/exams', requireFeature('exams'));
+router.use('/idcards', requireFeature('idcards'));
 
 // =========================================================================
 // 1. ATTENDANCE ROUTERS
@@ -255,8 +283,10 @@ router.get('/classes', getTimetable);
 // =========================================================================
 router.get('/fees/structures', getFeeStructures);
 router.post('/fees/structures', requireRole(['Admin', 'SuperAdmin']), createFeeStructure);
+router.post('/fees/structures/clone', requireRole(['Admin', 'SuperAdmin']), cloneFeeStructures);
 router.post('/fees/payment/initiate', requireRole(['Student', 'Parent']), initiatePayment);
 router.post('/fees/payment/verify', requireRole(['Student', 'Parent']), verifyPayment);
+router.post('/fees/refund', requireRole(['Admin', 'SuperAdmin']), processFeeRefund);
 router.get('/fees/student/:studentId', getStudentFees);
 router.get('/fees/report', requireRole(['Admin', 'SuperAdmin']), getFeesReport);
 router.post('/fees/concession', requireRole(['Admin', 'SuperAdmin']), createConcession);
@@ -547,5 +577,32 @@ router.post('/hall-tickets/generate', requireRole(['Admin', 'SuperAdmin']), gene
 router.get('/hall-tickets/my', requireRole(['Student']), getMyHallTickets);
 router.get('/hall-tickets/:id', getHallTicketDetail);
 router.get('/hall-tickets/:id/pdf', downloadHallTicketPdf);
+
+// =========================================================================
+// 34. STUDENT DOCUMENTS & PROFILE PHOTO ROUTERS
+// =========================================================================
+router.post('/students/:id/photo', requireRole(['Admin', 'SuperAdmin', 'Student', 'HOD']), uploadStudentPhoto);
+router.post('/students/:id/documents', requireRole(['Admin', 'SuperAdmin', 'Staff', 'Teacher', 'HOD']), uploadStudentDocument);
+router.get('/students/:id/documents', getStudentDocuments);
+router.delete('/students/:id/documents/:docId', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), deleteStudentDocument);
+
+// =========================================================================
+// 35. TIMETABLE HISTORY & ROLLBACK ROUTERS
+// =========================================================================
+router.get('/timetable/history/versions', requireRole(['Admin', 'SuperAdmin', 'Director', 'HOD']), getTimetableVersions);
+router.post('/timetable/history/save', requireRole(['Admin', 'SuperAdmin']), saveTimetableVersion);
+router.post('/timetable/history/rollback', requireRole(['Admin', 'SuperAdmin']), rollbackTimetableVersion);
+
+// =========================================================================
+// 36. EXAM ANALYTICS, SUPPLEMENTARY & RE-EVALUATION ROUTERS
+// =========================================================================
+router.get('/exams/:id/analytics', requireRole(['Admin', 'SuperAdmin', 'Director', 'Teacher', 'HOD']), getExamAnalytics);
+router.get('/exams/gradesheet/:studentId/:examId/pdf', requireRole(['Admin', 'SuperAdmin', 'Director', 'Teacher', 'HOD', 'Student', 'Parent']), exportGradeSheetPDF);
+router.post('/exams/supplementary/apply', requireRole(['Student']), applySupplementary);
+router.get('/exams/supplementary/applications', requireRole(['Admin', 'SuperAdmin', 'Director', 'Staff', 'Teacher', 'HOD']), getSupplementaryApplications);
+router.put('/exams/supplementary/applications/:id/status', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), updateSupplementaryStatus);
+router.post('/exams/re-evaluation/apply', requireRole(['Student']), applyReEvaluation);
+router.get('/exams/re-evaluation/applications', requireRole(['Admin', 'SuperAdmin', 'Director', 'Staff', 'Teacher', 'HOD']), getReEvaluationApplications);
+router.put('/exams/re-evaluation/applications/:id/status', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), updateReEvaluationStatus);
 
 export default router;

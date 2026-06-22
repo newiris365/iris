@@ -1502,7 +1502,23 @@ export async function getCurrentAIMenu(req: Request, res: Response) {
 
 export async function approveAIMenu(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    let { id } = req.params;
+
+    if (!id || id === 'approve') {
+      const { data: latestPlan, error: findError } = await supabaseAdmin
+        .from('ai_menu_plans')
+        .select('id')
+        .eq('institution_id', req.user?.institution_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (findError || !latestPlan) {
+        return res.status(404).json({ success: false, error: 'No weekly AI menu plan draft found to approve.' });
+      }
+      id = latestPlan.id;
+    }
+
     await supabaseAdmin.from('ai_menu_plans').update({ is_active: false }).eq('institution_id', req.user?.institution_id);
 
     const { data, error } = await supabaseAdmin

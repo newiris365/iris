@@ -38,13 +38,18 @@ import {
   registerVehicle,
   getParkingSlots,
   occupyParkingSlot,
-  getParkingAlerts
+  getParkingAlerts,
+  ingestGpsTelemetry,
+  recordStudentTransitTap
 } from '../controllers/transit';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Apply auth middleware to protect all routes
+// --- UN-AUTHENTICATED HARDWARE TELEMETRY ROUTE ---
+router.post('/telemetry/gps', ingestGpsTelemetry);
+
+// Apply auth middleware to protect all other routes
 router.use(authMiddleware);
 
 // --- ROUTE MANAGEMENT ---
@@ -67,6 +72,7 @@ router.post('/trips/start', requireRole(['Driver', 'Admin', 'SuperAdmin']), star
 router.put('/trips/:id/end', requireRole(['Driver', 'Admin', 'SuperAdmin']), endTrip);
 router.get('/trips/:busId', getTrips);
 router.post('/trips/:id/stop-reached', requireRole(['Driver', 'Admin', 'SuperAdmin']), stopReached);
+router.post('/trips/:id/tap', requireRole(['Driver', 'Admin', 'SuperAdmin']), recordStudentTransitTap);
 
 // --- TELEMETRY & TRACKING ---
 router.post('/location', requireRole(['Driver', 'Admin', 'SuperAdmin']), updateBusLocation);

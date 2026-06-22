@@ -154,6 +154,20 @@ async function getLastDirection(person_id: string): Promise<'in' | 'out'> {
 // ========== 1. QR CODE ENTRY (QR SCAN) ==========
 export async function entryQR(req: Request, res: Response) {
   try {
+    // Check if campus is in emergency lockdown
+    const { data: activeLockdown } = await supabaseAdmin
+      .from('gate_lockdown')
+      .select('is_locked_down')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('is_locked_down', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeLockdown && activeLockdown.is_locked_down) {
+      return res.status(403).json({ success: false, error: 'ACCESS DENIED: Campus is in emergency lockdown.' });
+    }
+
     const parse = qrEntrySchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ success: false, error: parse.error.errors[0].message });
@@ -263,6 +277,20 @@ export async function entryQR(req: Request, res: Response) {
 // ========== 2. BIOMETRIC ENTRY ==========
 export async function entryBiometric(req: Request, res: Response) {
   try {
+    // Check if campus is in emergency lockdown
+    const { data: activeLockdown } = await supabaseAdmin
+      .from('gate_lockdown')
+      .select('is_locked_down')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('is_locked_down', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeLockdown && activeLockdown.is_locked_down) {
+      return res.status(403).json({ success: false, error: 'ACCESS DENIED: Campus is in emergency lockdown.' });
+    }
+
     const parse = biometricEntrySchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ success: false, error: parse.error.errors[0].message });
@@ -337,6 +365,20 @@ export async function entryBiometric(req: Request, res: Response) {
 // ========== 3. RFID ENTRY ==========
 export async function entryRfid(req: Request, res: Response) {
   try {
+    // Check if campus is in emergency lockdown
+    const { data: activeLockdown } = await supabaseAdmin
+      .from('gate_lockdown')
+      .select('is_locked_down')
+      .eq('institution_id', req.user?.institution_id)
+      .eq('is_locked_down', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeLockdown && activeLockdown.is_locked_down) {
+      return res.status(403).json({ success: false, error: 'ACCESS DENIED: Campus is in emergency lockdown.' });
+    }
+
     const parse = rfidEntrySchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ success: false, error: parse.error.errors[0].message });
@@ -2028,6 +2070,232 @@ export async function searchPerson(req: Request, res: Response) {
     return res.status(200).json({ success: true, results: enrichedResults });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal server error searching persons.' });
+  }
+}
+
+export async function toggleLockdown(req: Request, res: Response) {
+  try {
+    const { is_locked_down, reason } = req.body;
+    if (is_locked_down === undefined) {
+      return res.status(400).json({ success: false, error: 'is_locked_down is required.' });
+    }
+
+    const { data: lockdown, error } = await supabaseAdmin
+      .from('gate_lockdown')
+      .insert({
+        institution_id: req.user?.institution_id,
+        is_locked_down: !!is_locked_down,
+        reason: reason || (is_locked_down ? 'Emergency lockdown triggered' : 'Lockdown resolved'),
+        locked_by: req.user?.id
+      })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    // Broadcast state change
+    try {
+      const { gateNs } = require('../server');
+      if (gateNs) {
+        gateNs.to('admin:gate').emit('gate:lockdown_toggled', {
+          is_locked_down: !!is_locked_down,
+          reason: reason || '',
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch {}
+
+    return res.status(200).json({ success: true, message: `Campus lockdown status set to ${is_locked_down}.`, lockdown });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+export async function getLockdownStatus(req: Request, res: Response) {
+  try {
+    const { data: activeLockdown, error } = await supabaseAdmin
+      .from('gate_lockdown')
+      .select('*')
+      .eq('institution_id', req.user?.institution_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    return res.status(200).json({
+      success: true,
+      is_locked_down: activeLockdown ? activeLockdown.is_locked_down : false,
+      lockdown: activeLockdown || null
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+export async function getGateAnalytics(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // A. Entries and Exits count today
+    const { data: entries, error: entErr } = await supabaseAdmin
+      .from('gate_entries')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .gte('timestamp', `${todayStr}T00:00:00Z`)
+      .lte('timestamp', `${todayStr}T23:59:59Z`);
+
+    if (entErr) return res.status(500).json({ success: false, error: entErr.message });
+
+    const totalEntries = (entries || []).filter(e => e.direction === 'in').length;
+    const totalExits = (entries || []).filter(e => e.direction === 'out').length;
+
+    // B. Breakdown by type
+    const studentCount = (entries || []).filter(e => e.person_type === 'student').length;
+    const staffCount = (entries || []).filter(e => e.person_type === 'staff').length;
+    const visitorCount = (entries || []).filter(e => e.person_type === 'visitor').length;
+
+    // C. Live occupancy count
+    const { data: occupancy } = await supabaseAdmin
+      .from('campus_occupancy')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // D. Incidents today
+    const { data: incidents } = await supabaseAdmin
+      .from('security_incidents')
+      .select('severity')
+      .eq('institution_id', institutionId)
+      .gte('created_at', `${todayStr}T00:00:00Z`);
+
+    const incidentSeverityBreakdown = { low: 0, medium: 0, high: 0, critical: 0 };
+    (incidents || []).forEach(inc => {
+      const sev = inc.severity?.toLowerCase();
+      if (sev === 'low' || sev === 'medium' || sev === 'high' || sev === 'critical') {
+        incidentSeverityBreakdown[sev as 'low' | 'medium' | 'high' | 'critical']++;
+      }
+    });
+
+    // E. Hourly distribution (entries)
+    const hourlyTraffic = Array(24).fill(0);
+    (entries || []).forEach(e => {
+      if (e.direction === 'in') {
+        const hour = new Date(e.timestamp).getHours();
+        hourlyTraffic[hour]++;
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      traffic: {
+        total_entries: totalEntries,
+        total_exits: totalExits,
+        by_type: {
+          student: studentCount,
+          staff: staffCount,
+          visitor: visitorCount
+        }
+      },
+      occupancy: {
+        students_inside: occupancy?.students_inside || 0,
+        staff_inside: occupancy?.staff_inside || 0,
+        visitors_inside: occupancy?.visitors_inside || 0,
+        total: (occupancy?.students_inside || 0) + (occupancy?.staff_inside || 0) + (occupancy?.visitors_inside || 0)
+      },
+      incidents: {
+        total: incidents?.length || 0,
+        breakdown: incidentSeverityBreakdown
+      },
+      hourly_entries_distribution: hourlyTraffic
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+export async function checkinVisitorQR(req: Request, res: Response) {
+  try {
+    const { qr_code } = req.body;
+    if (!qr_code) return res.status(400).json({ success: false, error: 'qr_code is required.' });
+
+    // A. Parse pass number
+    const passNum = qr_code.replace(/^QR-/, '');
+
+    // B. Fetch pass details
+    const { data: pass, error: passErr } = await supabaseAdmin
+      .from('visitor_passes')
+      .select('*')
+      .eq('pass_number', passNum)
+      .eq('institution_id', req.user?.institution_id)
+      .single();
+
+    if (passErr || !pass) {
+      return res.status(404).json({ success: false, error: 'Visitor pass details not found.' });
+    }
+
+    // C. Check expiration
+    const now = new Date();
+    if (new Date(pass.valid_from) > now || new Date(pass.valid_until) < now) {
+      return res.status(400).json({ success: false, error: 'Visitor pass is expired or not yet valid.' });
+    }
+
+    if (pass.is_used) {
+      return res.status(400).json({ success: false, error: 'Visitor pass has already been checked in.' });
+    }
+
+    // D. Update pass status to checked in
+    const { data: updatedPass, error: updatePassErr } = await supabaseAdmin
+      .from('visitor_passes')
+      .update({ is_used: true })
+      .eq('id', pass.id)
+      .select()
+      .single();
+
+    if (updatePassErr) return res.status(500).json({ success: false, error: updatePassErr.message });
+
+    // E. Log check-in entry log
+    const { data: entry, error: entryErr } = await supabaseAdmin
+      .from('gate_entries')
+      .insert({
+        institution_id: req.user?.institution_id,
+        person_id: pass.id,
+        person_type: 'visitor',
+        person_name: pass.visitor_name,
+        entry_method: 'visitor_pass',
+        direction: 'in',
+        gate_number: 'main',
+        reason: pass.purpose || 'QR visitor check-in',
+        authorized_by: req.user?.id
+      })
+      .select()
+      .single();
+
+    if (entryErr) return res.status(500).json({ success: false, error: entryErr.message });
+
+    await updateOccupancyCounts(req.user?.institution_id!, 'visitor', 'in');
+
+    try {
+      const { gateNs } = require('../server');
+      if (gateNs) {
+        gateNs.to('admin:gate').emit('gate:entry_logged', {
+          id: entry.id,
+          person_name: pass.visitor_name,
+          person_type: 'visitor',
+          direction: 'in',
+          entry_method: 'visitor_pass_qr',
+          gate_number: 'main',
+          timestamp: entry.timestamp
+        });
+      }
+    } catch {}
+
+    return res.status(200).json({ success: true, message: 'Visitor QR check-in successful.', pass: updatedPass, entry });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 
