@@ -263,6 +263,15 @@ export let mockGymEquipment: any[] = [
 export let mockBookReservations: any[] = [];
 export let mockStudentTransitLogs: any[] = [];
 export let mockEventCertificates: any[] = [];
+export let mockSchoolAttendance: any[] = [];
+export let mockInstitutionFeatures: any[] = [];
+export let mockAttendanceMethods: any[] = [
+  { id: 'm-qr', institution_id: 'a0000000-0000-0000-0000-000000000001', method_key: 'qr', is_enabled: true, config: { rotate_interval_minutes: 5, geo_lat: 26.2389, geo_lng: 73.0243, geo_radius: 200 } },
+  { id: 'm-bio', institution_id: 'a0000000-0000-0000-0000-000000000001', method_key: 'biometric', is_enabled: true, config: { require_session: true, auto_match: true } },
+  { id: 'm-rfid', institution_id: 'a0000000-0000-0000-0000-000000000001', method_key: 'rfid', is_enabled: true, config: { require_session: true } },
+  { id: 'm-man', institution_id: 'a0000000-0000-0000-0000-000000000001', method_key: 'manual', is_enabled: true, config: {} }
+];
+export let mockAttendanceDevices: any[] = [];
 export let mockInstitutions: any[] = [
   {
     id: 'a0000000-0000-0000-0000-000000000001',
@@ -275,8 +284,10 @@ export let mockInstitutions: any[] = [
     gemini_api_key: '',
     openai_api_key: '',
     claude_api_key: '',
+    institute_type: 'college',
   }
 ];
+
 
 // Define Mock client details for offline simulation mode
 const mockAuth = {
@@ -649,21 +660,42 @@ function getMockDataForTable(tableName: string) {
       return [
         {
           child_id: 'test-student-id',
+          student_id: 'test-student-id',
           child_name: 'Khushal Gehlot',
+          student_name: 'Khushal Gehlot',
           roll_number: 'CS23B1042',
           class: 'Semester 5 CS',
-          attendance_percent: 88
+          attendance_percent: 88,
+          institution_id: 'a0000000-0000-0000-0000-000000000001',
+          institute_type: mockInstitutions[0]?.institute_type || 'college'
         }
       ];
     case 'get_parent_daily_summary':
       return [
         {
-          date: today,
-          attendance_status: 'Present',
+          student_name: 'Khushal Gehlot',
+          attendance_present: 1,
+          attendance_total: 1,
+          attendance_pct: 100,
+          canteen_spend: 120,
           canteen_spent: 120,
-          bus_status: 'On time'
+          bus_boarded: true,
+          bus_status: 'On time',
+          bus_time: '08:30:00',
+          gate_in: '08:45:00',
+          gate_out: '16:00:00',
+          pending_fees: 0,
+          wallet_balance: 500
         }
       ];
+    case 'school_attendance':
+      return mockSchoolAttendance;
+    case 'institution_features':
+      return mockInstitutionFeatures;
+    case 'attendance_methods':
+      return mockAttendanceMethods;
+    case 'attendance_devices':
+      return mockAttendanceDevices;
     case 'courses':
       return [
         {
@@ -808,7 +840,7 @@ function createMockBuilder(tableName: string) {
       let resolvedData: any;
       
       // Perform simulated write operations
-      if (this.chain.includes('insert') && this.insertedData) {
+      if ((this.chain.includes('insert') || this.chain.includes('upsert')) && this.insertedData) {
         const records = Array.isArray(this.insertedData) ? this.insertedData : [this.insertedData];
         const newRecords = records.map((rec: any) => {
           const newRec = {
@@ -853,6 +885,28 @@ function createMockBuilder(tableName: string) {
             mockStudentTransitLogs.push(newRec);
           } else if (tableName === 'event_certificates') {
             mockEventCertificates.push(newRec);
+          } else if (tableName === 'school_attendance') {
+            mockSchoolAttendance.push(newRec);
+          } else if (tableName === 'institution_features') {
+            const idx = mockInstitutionFeatures.findIndex(
+              (f: any) => f.institution_id === rec.institution_id && f.feature_key === rec.feature_key
+            );
+            if (idx >= 0) {
+              mockInstitutionFeatures[idx] = newRec;
+            } else {
+              mockInstitutionFeatures.push(newRec);
+            }
+          } else if (tableName === 'attendance_methods') {
+            const idx = mockAttendanceMethods.findIndex(
+              (m: any) => m.institution_id === rec.institution_id && m.method_key === rec.method_key
+            );
+            if (idx >= 0) {
+              mockAttendanceMethods[idx] = newRec;
+            } else {
+              mockAttendanceMethods.push(newRec);
+            }
+          } else if (tableName === 'attendance_devices') {
+            mockAttendanceDevices.push(newRec);
           }
           return newRec;
         });
@@ -921,6 +975,36 @@ function createMockBuilder(tableName: string) {
               if (r.id === targetId) return { ...r, ...this.updatedData };
               return r;
             });
+          } else if (tableName === 'school_attendance') {
+            const targetId = this.eqFilters.id;
+            mockSchoolAttendance = mockSchoolAttendance.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
+          } else if (tableName === 'institution_features') {
+            const targetId = this.eqFilters.id;
+            const targetKey = this.eqFilters.feature_key;
+            mockInstitutionFeatures = mockInstitutionFeatures.map(r => {
+              if (r.id === targetId || (r.feature_key === targetKey && r.institution_id === this.eqFilters.institution_id)) {
+                return { ...r, ...this.updatedData };
+              }
+              return r;
+            });
+          } else if (tableName === 'attendance_methods') {
+            const targetId = this.eqFilters.id;
+            const targetKey = this.eqFilters.method_key;
+            mockAttendanceMethods = mockAttendanceMethods.map(r => {
+              if (r.id === targetId || (r.method_key === targetKey && r.institution_id === this.eqFilters.institution_id)) {
+                return { ...r, ...this.updatedData };
+              }
+              return r;
+            });
+          } else if (tableName === 'attendance_devices') {
+            const targetId = this.eqFilters.id;
+            mockAttendanceDevices = mockAttendanceDevices.map(r => {
+              if (r.id === targetId) return { ...r, ...this.updatedData };
+              return r;
+            });
           }
         }
 
@@ -952,6 +1036,12 @@ function createMockBuilder(tableName: string) {
           resolvedData = mockEventCertificates;
         } else if (tableName === 'institutions') {
           resolvedData = mockInstitutions;
+        } else if (tableName === 'school_attendance') {
+          resolvedData = mockSchoolAttendance;
+        } else if (tableName === 'attendance_methods') {
+          resolvedData = mockAttendanceMethods;
+        } else if (tableName === 'attendance_devices') {
+          resolvedData = mockAttendanceDevices;
         } else {
           resolvedData = getMockDataForTable(this.tableName);
         }
@@ -989,7 +1079,7 @@ function createMockBuilder(tableName: string) {
       return (...args: any[]) => {
         if (typeof prop === 'string') {
           target.chain.push(prop);
-          if (prop === 'insert' && args[0]) {
+          if ((prop === 'insert' || prop === 'upsert') && args[0]) {
             target.insertedData = args[0];
           }
           if (prop === 'update' && args[0]) {

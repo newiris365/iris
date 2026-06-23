@@ -6,6 +6,7 @@ import {
   MoreVertical, Key, UserX, UserCheck, ChevronDown, X, Eye, EyeOff, Mail, Phone, Building2
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../lib/api';
+import { getRoleLabel } from '../../../lib/roleLabels';
 
 const ALL_ROLES = [
   { value: 'Admin', label: 'Admin', color: 'text-violet-400 bg-violet-500/20' },
@@ -31,6 +32,19 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [instituteType, setInstituteType] = useState('college');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setInstituteType(parsed.institute_type || 'college');
+        } catch (e) {}
+      }
+    }
+  }, []);
   const [activeFilter, setActiveFilter] = useState('true');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -205,7 +219,7 @@ export default function AdminUsersPage() {
         {ALL_ROLES.filter(r => stats[r.value]).map(r => (
           <div key={r.value} className="bg-white/5 rounded-xl border border-white/10 p-3 text-center">
             <p className="text-lg font-bold text-white">{stats[r.value] || 0}</p>
-            <p className="text-xs text-slate-400">{r.label}</p>
+            <p className="text-xs text-slate-400">{getRoleLabel(r.value, instituteType)}</p>
           </div>
         ))}
       </div>
@@ -222,7 +236,7 @@ export default function AdminUsersPage() {
         <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
           <option value="">All Roles</option>
-          {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
         </select>
         <select value={activeFilter} onChange={e => { setActiveFilter(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
@@ -271,7 +285,7 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="p-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleStyle(user.role)}`}>
-                        {user.role}
+                        {getRoleLabel(user.role, instituteType)}
                       </span>
                     </td>
                     <td className="p-3 text-slate-300 text-xs">
@@ -364,7 +378,7 @@ export default function AdminUsersPage() {
                   <label className="text-xs font-medium text-slate-400">Role *</label>
                   <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
-                    {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -426,7 +440,7 @@ export default function AdminUsersPage() {
                   <label className="text-xs font-medium text-slate-400">Role</label>
                   <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
-                    {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">

@@ -35,10 +35,11 @@ class SimpleCache<K, V> {
   }
 }
 
-// Instantiate LRU caches for features and permissions (5 minute TTL)
+// Instantiate LRU caches for features and permissions (3 second TTL for features to allow instant toggles, 5 second TTL for permissions)
 const featureCache = new SimpleCache<string, boolean>(1000);
 const permissionCache = new SimpleCache<string, { can_read: boolean; can_write: boolean; can_delete: boolean }>(2000);
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const FEATURE_CACHE_TTL_MS = 3000;
+const PERMISSION_CACHE_TTL_MS = 5000;
 
 /**
  * Helper to log permission denials to the permission_audit_log table asynchronously.
@@ -106,11 +107,11 @@ export function requireFeature(featureKey: string) {
 
       if (error || !data) {
         // Default to enabled if no record found
-        featureCache.set(cacheKey, true, CACHE_TTL_MS);
+        featureCache.set(cacheKey, true, FEATURE_CACHE_TTL_MS);
         return next();
       }
 
-      featureCache.set(cacheKey, data.enabled, CACHE_TTL_MS);
+      featureCache.set(cacheKey, data.enabled, FEATURE_CACHE_TTL_MS);
 
       if (!data.enabled) {
         await logPermissionDenial(req, 'feature', featureKey, 'read');
@@ -163,7 +164,7 @@ export function requireModulePermission(module: string, action: 'read' | 'write'
             can_write: false,
             can_delete: false
           };
-          permissionCache.set(cacheKey, defaultPerm, CACHE_TTL_MS);
+          permissionCache.set(cacheKey, defaultPerm, PERMISSION_CACHE_TTL_MS);
           permissionData = defaultPerm;
         } else {
           const perm = {
@@ -171,7 +172,7 @@ export function requireModulePermission(module: string, action: 'read' | 'write'
             can_write: !!data.can_write,
             can_delete: !!data.can_delete
           };
-          permissionCache.set(cacheKey, perm, CACHE_TTL_MS);
+          permissionCache.set(cacheKey, perm, PERMISSION_CACHE_TTL_MS);
           permissionData = perm;
         }
       } catch (err) {

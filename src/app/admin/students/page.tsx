@@ -11,6 +11,19 @@ export default function AdminStudentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedBatch, setSelectedBatch] = useState('');
+  const [instituteType, setInstituteType] = useState('college');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setInstituteType(parsed.institute_type || 'college');
+        } catch (e) {}
+      }
+    }
+  }, []);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -53,7 +66,11 @@ export default function AdminStudentsPage() {
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await apiPost('/core/students', formData);
+      const submitData = { ...formData };
+      if (instituteType === 'school') {
+        submitData.email = `${formData.roll_number.toLowerCase()}@school.internal`;
+      }
+      const res = await apiPost('/core/students', submitData);
       if (res.success) {
         setShowAddModal(false);
         fetchStudents();
@@ -196,7 +213,7 @@ export default function AdminStudentsPage() {
                   <th className="p-4">Roll Number</th>
                   <th className="p-4">Name</th>
                   <th className="p-4">Email</th>
-                  <th className="p-4">Semester</th>
+                  <th className="p-4">{instituteType === 'school' ? 'Grade / Standard' : 'Semester'}</th>
                   <th className="p-4">Guardian Details</th>
                   <th className="p-4 text-center">Actions</th>
                 </tr>
@@ -219,7 +236,7 @@ export default function AdminStudentsPage() {
                         <div className="text-[10px] text-[#C4B5FD]/70">Batch: {student.batch_year}</div>
                       </td>
                       <td className="p-4 text-[#C4B5FD]/80">{student.users?.email || 'N/A'}</td>
-                      <td className="p-4 font-semibold text-white">Sem {student.semester}</td>
+                      <td className="p-4 font-semibold text-white">{instituteType === 'school' ? `Grade ${student.semester}` : `Sem ${student.semester}`}</td>
                       <td className="p-4">
                         <div className="text-[#C4B5FD]">{student.guardian_name || 'N/A'}</div>
                         <div className="text-[10px] text-[#C4B5FD]/50">{student.guardian_phone || ''}</div>
@@ -251,7 +268,7 @@ export default function AdminStudentsPage() {
             
             <form onSubmit={handleAddStudent} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
+                <div className={`flex flex-col gap-1 ${instituteType === 'school' ? 'col-span-2' : ''}`}>
                   <label className="text-[#C4B5FD]">Full Name</label>
                   <input 
                     type="text" required
@@ -261,16 +278,18 @@ export default function AdminStudentsPage() {
                     className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                   />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[#C4B5FD]">Institutional Email</label>
-                  <input 
-                    type="email" required
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    placeholder="khushal@college.edu.in"
-                    className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
-                  />
-                </div>
+                {instituteType !== 'school' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[#C4B5FD]">Institutional Email</label>
+                    <input 
+                      type="email" required={instituteType !== 'school'}
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="khushal@college.edu.in"
+                      className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -298,7 +317,7 @@ export default function AdminStudentsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[#C4B5FD]">Semester</label>
+                  <label className="text-[#C4B5FD]">{instituteType === 'school' ? 'Grade / Standard' : 'Semester'}</label>
                   <input 
                     type="number" required min={1}
                     value={formData.semester}

@@ -41,7 +41,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, type, email, phone, plan_tier, is_active, address, city, state, subscription_period, password } = body;
+    const { name, type, email, phone, plan_tier, is_active, address, city, state, subscription_period, password, institute_type } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Name, email, and password are required.' }, { status: 400 });
@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
         subscription_start_date: startDate,
         subscription_end_date: endDate,
         subscription_period: period,
+        institute_type: institute_type || 'college',
       })
       .select()
       .single();

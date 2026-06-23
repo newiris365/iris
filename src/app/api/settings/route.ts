@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
+import { supabaseAdmin, isSupabaseOffline } from '../../../config/supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 
 function getScopedSupabase(req: NextRequest): any {
+  if (isSupabaseOffline && process.env.NODE_ENV !== 'production') {
+    return supabaseAdmin;
+  }
   const authHeader = req.headers.get('authorization') || '';
   const token = authHeader.replace('Bearer ', '');
   const jwtSecret = process.env.JWT_SECRET;

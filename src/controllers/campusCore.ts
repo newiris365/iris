@@ -581,6 +581,67 @@ export async function markAttendanceBulk(req: Request, res: Response) {
   }
 }
 
+export async function markSchoolAttendanceBulk(req: Request, res: Response) {
+  try {
+    const { date, academic_year, records } = req.body;
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+    if (!date || !academic_year || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ success: false, error: 'date, academic_year, and records are required.' });
+    }
+
+    const dbRecords = records.map((r: any) => ({
+      institution_id: institutionId,
+      student_id: r.student_id,
+      date,
+      academic_year,
+      status: r.status,
+      marked_by: req.user?.id
+    }));
+
+    const { data, error } = await supabaseAdmin
+      .from('school_attendance')
+      .upsert(dbRecords, { onConflict: 'student_id,date,academic_year' });
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, count: dbRecords.length, message: 'Daily school attendance register updated successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to update daily attendance register.' });
+  }
+}
+
+export async function getSchoolAttendanceReport(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    const { grade, section, academic_year } = req.query;
+
+    if (!academic_year) {
+      return res.status(400).json({ success: false, error: 'academic_year query parameter is required.' });
+    }
+
+    let query = supabaseAdmin
+      .from('school_attendance')
+      .select('*, students!inner(*, users(*))')
+      .eq('institution_id', institutionId)
+      .eq('academic_year', academic_year);
+
+    if (grade) {
+      query = query.eq('students.semester', Number(grade));
+    }
+
+    const { data: logs, error } = await query;
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+
+    return res.status(200).json({ success: true, reports: logs });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 // =========================================================================
 // ATTENDANCE SESSION MANAGEMENT
 // =========================================================================
@@ -1067,6 +1128,78 @@ export async function getStudentAttendance(req: Request, res: Response) {
   try {
     const { id } = req.params;
 
+    // Check if the student belongs to a school
+    const { data: student, error: studErr } = await supabaseAdmin
+      .from('students')
+      .select('*, institutions(institute_type)')
+      .eq('id', id)
+      .single();
+
+    if (studErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student details not found.' });
+    }
+
+    const isSchool = student.institutions?.institute_type === 'school';
+
+    if (isSchool) {
+      const { data: logs, error } = await supabaseAdmin
+        .from('school_attendance')
+        .select('*')
+        .eq('student_id', id);
+
+      if (error) return res.status(500).json({ success: false, error: error.message });
+
+      const total = logs.length;
+      let presentCount = 0;
+      logs.forEach(l => {
+        if (l.status === 'Present' || l.status === 'Leave') presentCount += 1;
+        else if (l.status === 'Half-Day') presentCount += 0.5;
+      });
+      const percentage = total > 0 ? Math.round((presentCount / total) * 100) : 100;
+
+      // Group by month to create monthly summary
+      const monthlyMap: Record<string, { total: number; present: number }> = {};
+      logs.forEach(log => {
+        const [yearStr, monthStr, dayStr] = log.date.split('-');
+        const dateObj = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+        const monthName = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+        if (!monthlyMap[monthName]) monthlyMap[monthName] = { total: 0, present: 0 };
+        monthlyMap[monthName].total++;
+        if (log.status === 'Present' || log.status === 'Leave') {
+          monthlyMap[monthName].present += 1;
+        } else if (log.status === 'Half-Day') {
+          monthlyMap[monthName].present += 0.5;
+        }
+      });
+
+      const breakdown = Object.entries(monthlyMap).map(([month, counts]) => ({
+        subject: month,
+        percentage: Math.round((counts.present / counts.total) * 100),
+        total: counts.total,
+        present: counts.present
+      }));
+
+      const heatmap = logs.map(l => ({
+        date: l.date,
+        status: l.status
+      }));
+
+      let daysNeeded = 0;
+      if (percentage < 75) {
+        daysNeeded = Math.max(0, Math.ceil(3 * total - 4 * presentCount));
+      }
+
+      return res.status(200).json({
+        success: true,
+        stats: { overall: percentage, total, present: presentCount, daysNeeded },
+        breakdown,
+        heatmap,
+        logs
+      });
+    }
+
+    // College behavior
     const { data: logs, error } = await supabaseAdmin
       .from('attendance')
       .select('*, attendance_sessions(subject)')
@@ -1103,7 +1236,6 @@ export async function getStudentAttendance(req: Request, res: Response) {
     // Reach 75% calculator
     let daysNeeded = 0;
     if (percentage < 75) {
-      // 75% formula: (present + x) / (total + x) = 0.75 => x = (3*total - 4*present)
       daysNeeded = Math.max(0, Math.ceil(3 * total - 4 * present));
     }
 
@@ -2898,14 +3030,28 @@ export async function importStudentProfiles(req: Request, res: Response) {
     }
 
     const institutionId = req.user?.institution_id;
+    
+    // Fetch institution type
+    const { data: inst } = await supabaseAdmin
+      .from('institutions')
+      .select('institute_type')
+      .eq('id', institutionId)
+      .single();
+    const isSchool = inst?.institute_type === 'school';
+
     const imported: any[] = [];
     const errors: { row: number; error: string }[] = [];
 
     for (let i = 0; i < records.length; i++) {
       const rec = records[i];
       try {
+        let email = rec.email;
+        if (isSchool && (!email || email.trim() === '')) {
+          email = `${rec.roll_number.toLowerCase()}@school.internal`;
+        }
+
         // Validate required fields
-        if (!rec.name || !rec.email || !rec.roll_number) {
+        if (!rec.name || !email || !rec.roll_number) {
           errors.push({ row: i + 1, error: 'Missing required fields (name, email, roll_number)' });
           continue;
         }
@@ -2914,11 +3060,11 @@ export async function importStudentProfiles(req: Request, res: Response) {
         const { data: existingUser } = await supabaseAdmin
           .from('users')
           .select('id')
-          .eq('email', rec.email)
+          .eq('email', email)
           .maybeSingle();
 
         if (existingUser) {
-          errors.push({ row: i + 1, error: `Email already exists: ${rec.email}` });
+          errors.push({ row: i + 1, error: `Email already exists: ${email}` });
           continue;
         }
 
@@ -2941,7 +3087,7 @@ export async function importStudentProfiles(req: Request, res: Response) {
           .insert({
             institution_id: institutionId,
             name: rec.name,
-            email: rec.email,
+            email: email,
             phone: rec.phone || rec.guardian_phone || null,
             role: 'Student',
             is_active: true

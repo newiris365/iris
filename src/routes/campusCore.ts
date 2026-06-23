@@ -6,6 +6,8 @@ import {
   markAttendanceQr,
   markAttendanceBiometric,
   markAttendanceBulk,
+  markSchoolAttendanceBulk,
+  getSchoolAttendanceReport,
   getStudentAttendance,
   getAttendanceReport,
   submitRegularize,
@@ -218,6 +220,31 @@ router.use('/fees', requireFeature('fees'));
 router.use('/notices', requireFeature('notices'));
 router.use('/exams', requireFeature('exams'));
 router.use('/idcards', requireFeature('idcards'));
+router.use('/assignments', requireFeature('students'));
+router.use('/study-materials', requireFeature('students'));
+router.use('/leaves', requireFeature('students'));
+router.use('/wallet', requireFeature('fees'));
+router.use('/transit', requireFeature('transit'));
+router.use('/parent', requireFeature('parent_portal'));
+router.use('/parent-otp', requireFeature('parent_portal'));
+router.use('/parent-verify-otp', requireFeature('parent_portal'));
+router.use('/parent-link-child', requireFeature('parent_portal'));
+router.use('/admissions', requireFeature('admissions'));
+router.use('/calendar', requireFeature('timetable'));
+router.use('/hostel', requireFeature('hostel'));
+router.use('/gate', requireFeature('gate'));
+router.use('/events', requireFeature('events'));
+router.use('/library', requireFeature('library'));
+router.use('/import/attendance', requireFeature('attendance'));
+router.use('/import/students', requireFeature('students'));
+router.use('/faculty/attendance', requireFeature('attendance'));
+router.use('/faculty/leaves', requireFeature('students'));
+router.use('/faculty/timetable', requireFeature('timetable'));
+router.use('/faculty/cia', requireFeature('exams'));
+router.use('/student/cia', requireFeature('exams'));
+router.use('/exam-halls', requireFeature('exams'));
+router.use('/exam-seating', requireFeature('exams'));
+router.use('/reports/defaulters', requireFeature('fees'));
 
 // =========================================================================
 // 1. ATTENDANCE ROUTERS
@@ -228,6 +255,8 @@ router.put('/attendance/session/:id/close', requireRole(['Staff', 'Teacher', 'Ad
 router.post('/attendance/mark/qr', requireRole(['Student']), markAttendanceQr);
 router.post('/attendance/mark/biometric', markAttendanceBiometric);
 router.post('/attendance/mark/bulk', requireRole(['Staff', 'Admin', 'SuperAdmin']), markAttendanceBulk);
+router.post('/attendance/school/mark', requireRole(['Staff', 'Teacher', 'Admin', 'SuperAdmin']), markSchoolAttendanceBulk);
+router.get('/attendance/school/report', requireRole(['Staff', 'Teacher', 'Admin', 'SuperAdmin']), getSchoolAttendanceReport);
 router.get('/attendance/student/:id', getStudentAttendance);
 router.get('/attendance/report/:departmentId', requireRole(['Staff', 'Admin', 'SuperAdmin']), getAttendanceReport);
 router.post('/attendance/regularize', requireRole(['Student']), submitRegularize);

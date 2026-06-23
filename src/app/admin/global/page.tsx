@@ -32,6 +32,7 @@ interface Institution {
   gemini_api_key?: string;
   openai_api_key?: string;
   claude_api_key?: string;
+  institute_type?: string;
 }
 
 interface GlobalUser {
@@ -126,8 +127,9 @@ export default function SuperAdminConsole() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInst, setNewInst] = useState({
-    name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: ''
+    name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: '', institute_type: 'college'
   });
+  const [instTypeFilter, setInstTypeFilter] = useState<'all' | 'college' | 'school'>('all');
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingInst, setEditingInst] = useState<Institution | null>(null);
@@ -456,7 +458,7 @@ export default function SuperAdminConsole() {
       // Re-fetch fresh data from DB to sync everything
       await loadSystemData();
       setShowAddModal(false);
-      setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: '' });
+      setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: '', institute_type: 'college' });
     } catch (err: any) {
       alert('Error: ' + (err.message || 'Failed to provision campus'));
     }
@@ -510,6 +512,7 @@ export default function SuperAdminConsole() {
           gemini_api_key: editingInst.gemini_api_key || null,
           openai_api_key: editingInst.openai_api_key || null,
           claude_api_key: editingInst.claude_api_key || null,
+          institute_type: editingInst.institute_type || 'college',
         }),
       });
       const json = await res.json();
@@ -680,9 +683,31 @@ export default function SuperAdminConsole() {
         {activeTab === 'tenants' && (
           <>
             <div className="glass-panel rounded-2xl border border-white/5 p-6 flex flex-col gap-4">
-              <div>
-                <h2 className="text-lg font-bold">Campus Instances Directory</h2>
-                <p className="text-[11px] text-[#C4B5FD]/60 mt-0.5">Manage institution tenants, subscription tiers, and activation status.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold">Campus Instances Directory</h2>
+                  <p className="text-[11px] text-[#C4B5FD]/60 mt-0.5">Manage institution tenants, subscription tiers, and activation status.</p>
+                </div>
+                <div className="flex gap-2 p-1 bg-black/40 border border-white/5 rounded-xl self-start">
+                  <button type="button" onClick={() => setInstTypeFilter('all')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      instTypeFilter === 'all' ? 'bg-[#6C2BD9] text-white' : 'text-[#C4B5FD]/60 hover:text-white'
+                    }`}>
+                    All ({institutions.length})
+                  </button>
+                  <button type="button" onClick={() => setInstTypeFilter('college')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      instTypeFilter === 'college' ? 'bg-[#6C2BD9] text-white' : 'text-[#C4B5FD]/60 hover:text-white'
+                    }`}>
+                    Colleges ({institutions.filter(i => (i.institute_type || 'college') === 'college').length})
+                  </button>
+                  <button type="button" onClick={() => setInstTypeFilter('school')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      instTypeFilter === 'school' ? 'bg-[#6C2BD9] text-white' : 'text-[#C4B5FD]/60 hover:text-white'
+                    }`}>
+                    Schools ({institutions.filter(i => i.institute_type === 'school').length})
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto w-full">
                 <table className="w-full text-xs text-left border-collapse">
@@ -691,6 +716,7 @@ export default function SuperAdminConsole() {
                       <th className="py-3 px-4">Campus Name</th>
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Type</th>
+                      <th className="py-3 px-4">Institute Type</th>
                       <th className="py-3 px-4">Plan</th>
                       <th className="py-3 px-4">Subscription</th>
                       <th className="py-3 px-4">Plan Revenue</th>
@@ -700,10 +726,13 @@ export default function SuperAdminConsole() {
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={8} className="py-10 text-center text-[#C4B5FD]/40 italic">Loading...</td></tr>
+                      <tr><td colSpan={9} className="py-10 text-center text-[#C4B5FD]/40 italic">Loading...</td></tr>
                     ) : institutions.length === 0 ? (
-                      <tr><td colSpan={8} className="py-10 text-center text-[#C4B5FD]/40 italic">No institutions found.</td></tr>
-                    ) : institutions.map(inst => (
+                      <tr><td colSpan={9} className="py-10 text-center text-[#C4B5FD]/40 italic">No institutions found.</td></tr>
+                    ) : institutions.filter(inst => {
+                      if (instTypeFilter === 'all') return true;
+                      return (inst.institute_type || 'college') === instTypeFilter;
+                    }).map(inst => (
                       <tr key={inst.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
                         <td className="py-3.5 px-4 font-semibold text-white">
                           <button
@@ -718,6 +747,15 @@ export default function SuperAdminConsole() {
                         </td>
                         <td className="py-3.5 px-4 text-[#C4B5FD]/80 font-mono">{inst.email || 'N/A'}</td>
                         <td className="py-3.5 px-4 capitalize text-[#C4B5FD]/80">{inst.type}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                            (inst.institute_type || 'college') === 'school'
+                              ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                              : 'bg-pink-500/10 border-pink-500/20 text-pink-400'
+                          }`}>
+                            {(inst.institute_type || 'college').toUpperCase()}
+                          </span>
+                        </td>
                         <td className="py-3.5 px-4">
                           <select value={inst.plan_tier} onChange={(e) => updatePlanTier(inst.id, e.target.value)}
                             className="bg-black/30 border border-white/10 rounded px-2.5 py-1 text-white text-[11px] font-medium outline-none focus:border-violet-500">
@@ -1252,6 +1290,25 @@ export default function SuperAdminConsole() {
                   value={newInst.name} onChange={(e) => setNewInst({ ...newInst, name: e.target.value })}
                   className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Institute Type</label>
+                <div className="flex gap-4 p-2.5 bg-black/40 border border-white/10 rounded-xl">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="institute_type" value="college" 
+                      checked={newInst.institute_type === 'college'}
+                      onChange={() => setNewInst({ ...newInst, institute_type: 'college' })}
+                      className="accent-violet-500" />
+                    College
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="institute_type" value="school" 
+                      checked={newInst.institute_type === 'school'}
+                      onChange={() => setNewInst({ ...newInst, institute_type: 'school' })}
+                      className="accent-violet-500" />
+                    School
+                  </label>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[#C4B5FD] font-semibold">Type</label>
@@ -1343,6 +1400,28 @@ export default function SuperAdminConsole() {
                     <option value="Enterprise">Enterprise</option>
                   </select>
                 </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Institute Type</label>
+                <div className="flex gap-4 p-2.5 bg-black/40 border border-white/10 rounded-xl">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="edit_institute_type" value="college" 
+                      checked={(editingInst.institute_type || 'college') === 'college'}
+                      onChange={() => setEditingInst({ ...editingInst, institute_type: 'college' })}
+                      className="accent-violet-500" />
+                    College
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="edit_institute_type" value="school" 
+                      checked={editingInst.institute_type === 'school'}
+                      onChange={() => setEditingInst({ ...editingInst, institute_type: 'school' })}
+                      className="accent-violet-500" />
+                    School
+                  </label>
+                </div>
+                <p className="text-[10px] text-yellow-500 mt-0.5 italic">
+                  * Warning: Changing the institute type modifies role displays, portal routing, and attendance engines downstream.
+                </p>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[#C4B5FD] font-semibold">Monthly Price (₹)</label>

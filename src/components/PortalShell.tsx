@@ -22,28 +22,30 @@ interface PortalShellProps {
 }
 
 const FEATURE_TO_LINK_MAP: Record<string, string[]> = {
-  admissions: ['/admin/admissions'],
-  students: ['/admin/students'],
-  attendance: ['/admin/attendance'],
-  timetable: ['/admin/timetable'],
-  fees: ['/admin/fees'],
-  exams: ['/admin/exams'],
-  canteen: ['/admin/canteen', '/student/canteen', '/vendor/canteen'],
-  hostel: ['/admin/hostel', '/student/hostel', '/warden/hostel'],
-  library: ['/admin/library', '/student/library', '/librarian/library'],
-  placements: ['/admin/placements', '/student/placements', '/tpo/placements'],
-  hr: ['/admin/hr', '/hr'],
-  gate: ['/admin/gate', '/gate'],
+  admissions: ['/admin/admissions', '/officer/admissions', '/applicant'],
+  students: ['/admin/students', '/student/assignments', '/student/study-materials', '/student/leave', '/student/courses', '/parent/assignments', '/faculty/students', '/hod/students', '/hod/leaves', '/faculty/leaves', '/faculty/study-materials'],
+  attendance: ['/admin/attendance', '/student/attendance', '/student/dashboard', '/parent/attendance', '/teacher/attendance', '/faculty/attendance', '/hod/attendance'],
+  timetable: ['/admin/timetable', '/student/timetable', '/student/calendar', '/parent/timetable', '/teacher/timetable', '/faculty/timetable', '/hod/timetable', '/admin/calendar'],
+  fees: ['/admin/fees', '/student/fees', '/parent/fees', '/student/wallet', '/hod/fees', '/applicant/fees', '/hostel/fees'],
+  exams: ['/admin/exams', '/admin/exam/seating', '/admin/exam/enrollment', '/student/exams', '/student/results', '/parent/results', '/teacher/results', '/faculty/cia', '/hod/exams'],
+  canteen: ['/admin/canteen', '/student/canteen', '/student/mess', '/vendor', '/teacher/canteen', '/hod/canteen'],
+  hostel: ['/admin/hostel', '/student/hostel', '/warden/hostel', '/warden/curfew', '/warden/leaves', '/warden/rooms', '/warden/meals', '/warden/transfers', '/warden/complaints', '/warden/visitors', '/hostel'],
+  library: ['/admin/library', '/student/library', '/librarian/library', '/library'],
+  placements: ['/admin/placements', '/student/placements', '/tpo/placements', '/tpo/companies', '/tpo/drives', '/tpo/students', '/tpo/reports', '/company', '/hod/placements'],
+  hr: ['/admin/hr', '/hr', '/teacher/leave', '/principal/hr', '/hr/my', '/hr/hod'],
+  gate: ['/admin/gate', '/gate', '/security'],
   gym: ['/admin/gym', '/student/gym', '/teacher/gym'],
-  transit: ['/admin/transit', '/transit'],
-  events: ['/admin/events', '/student/events'],
-  notices: ['/admin/notices', '/student/notices'],
+  transit: ['/admin/transit', '/transit', '/parent/transit', '/driver'],
+  events: ['/admin/events', '/student/events', '/teacher/events', '/hod/events'],
+  notices: ['/admin/notices', '/student/notices', '/parent/notices', '/teacher/notices', '/faculty/notices', '/hod/notices', '/principal/notices'],
   idcards: ['/admin/idcards', '/student/idcard'],
   ai_concierge: ['/admin/ai', '/ai'],
   obe: ['/admin/obe', '/teacher/obe', '/hod/obe', '/iqac/obe'],
-  naac: ['/admin/naac', '/iqac'],
+  naac: ['/admin/naac', '/iqac', '/hod/naac', '/principal/academics', '/director/naac'],
   director: ['/director'],
   parent_portal: ['/parent'],
+  faculty_development: ['/admin/faculty-development', '/hod/faculty-development'],
+  achievements: ['/admin/achievements', '/hod/achievements', '/principal/achievements']
 };
 
 const getDefaultNotifications = (role: string) => {
@@ -106,7 +108,7 @@ export default function PortalShell({
   const pathname = usePathname();
   const [profile, setProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [disabledFeatures, setDisabledFeatures] = useState<Set<string>>(new Set());
+  const [disabledFeatures, setDisabledFeatures] = useState<string[]>([]);
 
   // Custom states for new features
   const [showFallbackBanner, setShowFallbackBanner] = useState(false);
@@ -147,7 +149,9 @@ export default function PortalShell({
             }
           }
         }
-        setDisabledFeatures(disabled);
+        const disabledList: string[] = [];
+        disabled.forEach(val => disabledList.push(val));
+        setDisabledFeatures(disabledList);
       } catch {
         // Fail open - show all links
       }
@@ -274,7 +278,12 @@ export default function PortalShell({
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5 scrollbar-thin">
           {sidebarLinks
-            .filter(link => !disabledFeatures.has(link.href))
+            .filter(link => {
+              // Exact match or subpath match of any disabled features
+              return !disabledFeatures.some(disabledPath =>
+                link.href === disabledPath || link.href.startsWith(disabledPath + '/')
+              );
+            })
             .map((link) => {
             const active = isActive(link.href);
             const IconComp = link.icon;
