@@ -87,3 +87,31 @@ export async function saveAiConfig(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+/** Helper to retrieve configured keys for an institution (DB or in-memory fallback) */
+export async function getActiveInstitutionKeys(institutionId: string) {
+  try {
+    const { data } = await supabaseAdmin
+      .from('institutions')
+      .select('gemini_api_key, openai_api_key, claude_api_key')
+      .eq('id', institutionId)
+      .single();
+    if (data && (data.gemini_api_key || data.openai_api_key || data.claude_api_key)) {
+      return {
+        gemini_api_key: data.gemini_api_key || '',
+        openai_api_key: data.openai_api_key || '',
+        claude_api_key: data.claude_api_key || '',
+      };
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  // Fallback to local session configuration
+  return localAiConfigFallback[institutionId] || {
+    gemini_api_key: '',
+    openai_api_key: '',
+    claude_api_key: '',
+  };
+}
+

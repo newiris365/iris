@@ -19,50 +19,192 @@ export interface ChatMessage {
 }
 
 /**
- * Connects to Anthropic Claude Messages API
+ * Helper to dispatch to Google Gemini API
+ */
+async function askGemini(
+  userMessage: string,
+  userContext: MessageContext,
+  history: ChatMessage[],
+  apiKey: string
+): Promise<string> {
+  try {
+    const systemPrompt = buildSystemPrompt(userContext);
+    
+    // Format history for Gemini API
+    const contents = [
+      ...history.slice(-10).map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      })),
+      {
+        role: 'user',
+        parts: [{ text: userMessage }]
+      }
+    ];
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json() as any;
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        return data.candidates[0].content.parts[0].text;
+      }
+    } else {
+      const errText = await response.text();
+      logger.error(`Gemini API error status ${response.status}: ${errText}`);
+    }
+  } catch (err) {
+    logger.error('Failed to communicate with Google Gemini API:', err);
+  }
+  return '';
+}
+
+/**
+ * Helper to dispatch to OpenAI Chat Completion API
+ */
+async function askOpenAI(
+  userMessage: string,
+  userContext: MessageContext,
+  history: ChatMessage[],
+  apiKey: string
+): Promise<string> {
+  try {
+    const systemPrompt = buildSystemPrompt(userContext);
+    
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-10).map(msg => ({ role: msg.role, content: msg.content })),
+      { role: 'user', content: userMessage }
+    ];
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        max_tokens: 500
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json() as any;
+      if (data.choices && data.choices[0]?.message?.content) {
+        return data.choices[0].message.content;
+      }
+    } else {
+      const errText = await response.text();
+      logger.error(`OpenAI API error status ${response.status}: ${errText}`);
+    }
+  } catch (err) {
+    logger.error('Failed to communicate with OpenAI Chat API:', err);
+  }
+  return '';
+}
+
+/**
+ * Helper to dispatch to Anthropic Claude Messages API
+ */
+async function askClaudeWithKey(
+  userMessage: string,
+  userContext: MessageContext,
+  history: ChatMessage[],
+  apiKey: string
+): Promise<string> {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 500,
+        system: buildSystemPrompt(userContext),
+        messages: [
+          ...history.slice(-10).map(msg => ({ role: msg.role, content: msg.content })),
+          { role: 'user', content: userMessage }
+        ]
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json() as any;
+      return data.content[0].text;
+    } else {
+      const errText = await response.text();
+      logger.error(`Claude API error status ${response.status}: ${errText}`);
+    }
+  } catch (err) {
+    logger.error('Failed to communicate with Anthropic Claude API:', err);
+  }
+  return '';
+}
+
+/**
+ * Connects to Anthropic Claude Messages, Google Gemini, or OpenAI Chat APIs based on configured keys.
  */
 export async function askClaude(
   userMessage: string, 
   userContext: MessageContext, 
-  history: ChatMessage[]
+  history: ChatMessage[],
+  keys?: { gemini_api_key?: string; openai_api_key?: string; claude_api_key?: string }
 ): Promise<string> {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-
-  if (anthropicKey && !anthropicKey.startsWith('your-anthropic')) {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 500,
-          system: buildSystemPrompt(userContext),
-          messages: [
-            ...history.slice(-10).map(msg => ({ role: msg.role, content: msg.content })),
-            { role: 'user', content: userMessage }
-          ]
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json() as any;
-        return data.content[0].text;
-      } else {
-        const errText = await response.text();
-        logger.error(`Claude API error status ${response.status}: ${errText}`);
-      }
-    } catch (err) {
-      logger.error('Failed to communicate with Anthropic Claude API:', err);
+  // 1. Check custom institution keys
+  if (keys) {
+    if (keys.gemini_api_key && !keys.gemini_api_key.startsWith('your-')) {
+      const res = await askGemini(userMessage, userContext, history, keys.gemini_api_key);
+      if (res) return res;
+    }
+    if (keys.openai_api_key && !keys.openai_api_key.startsWith('your-')) {
+      const res = await askOpenAI(userMessage, userContext, history, keys.openai_api_key);
+      if (res) return res;
+    }
+    if (keys.claude_api_key && !keys.claude_api_key.startsWith('your-')) {
+      const res = await askClaudeWithKey(userMessage, userContext, history, keys.claude_api_key);
+      if (res) return res;
     }
   }
 
-  // High-fidelity sandbox fallback responses depending on intent
+  // 2. Fallback to process.env keys
+  const envGemini = process.env.GEMINI_API_KEY;
+  if (envGemini && !envGemini.startsWith('your-')) {
+    const res = await askGemini(userMessage, userContext, history, envGemini);
+    if (res) return res;
+  }
+
+  const envOpenAI = process.env.OPENAI_API_KEY;
+  if (envOpenAI && !envOpenAI.startsWith('your-')) {
+    const res = await askOpenAI(userMessage, userContext, history, envOpenAI);
+    if (res) return res;
+  }
+
+  const envClaude = process.env.ANTHROPIC_API_KEY;
+  if (envClaude && !envClaude.startsWith('your-')) {
+    const res = await askClaudeWithKey(userMessage, userContext, history, envClaude);
+    if (res) return res;
+  }
+
+  // 3. Fallback to mock responses if no key is configured
   return getMockClaudeResponse(userMessage, userContext);
 }
+
 
 /**
  * Builds the system prompt for Claude based on user context
