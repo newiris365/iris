@@ -55,7 +55,12 @@ CREATE POLICY "Students can view published CIA assessments" ON cia_assessments
 CREATE POLICY "Faculty can manage own CIA marks" ON cia_marks
     FOR ALL USING (
         get_auth_user_role() IN ('SuperAdmin', 'Admin', 'Teacher', 'Staff')
-        AND (get_auth_user_role() = 'SuperAdmin' OR institution_id = get_auth_institution_id())
+        AND (
+            get_auth_user_role() = 'SuperAdmin' 
+            OR assessment_id IN (
+                SELECT id FROM cia_assessments WHERE institution_id = get_auth_institution_id()
+            )
+        )
     );
 
 CREATE POLICY "Students can view own CIA marks" ON cia_marks
@@ -218,7 +223,6 @@ BEGIN
     FROM timetable t
     LEFT JOIN departments d ON t.department_id = d.id
     WHERE t.teacher_id = v_staff_id
-    AND (t.semester IS NULL OR t.semester = 0 OR t.batch_year = '' OR t.batch_year IS NULL)
     ORDER BY
         CASE t.day_of_week
             WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3

@@ -98,7 +98,7 @@ BEGIN
     SELECT json_agg(json_build_object(
         'id', dcm.id,
         'menu_item_id', dcm.menu_item_id,
-        'name', cm.name,
+        'name', cm.item_name,
         'description', cm.description,
         'category', cm.category,
         'price', COALESCE(dcm.price_override, cm.price),
@@ -116,7 +116,7 @@ BEGIN
     AND dcm.menu_date = CURRENT_DATE
     AND cm.is_available = true
     AND (p_meal_type IS NULL OR dcm.meal_type = p_meal_type)
-    ORDER BY dcm.meal_type, cm.category, cm.name;
+    ORDER BY dcm.meal_type, cm.category, cm.item_name;
 
     RETURN json_build_object('success', true, 'menu', COALESCE(v_result, '[]'::json), 'date', CURRENT_DATE);
 END;

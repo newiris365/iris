@@ -1,6 +1,6 @@
 -- Migration for Module 14: HR Management
 
-CREATE TABLE employee_profiles (
+CREATE TABLE IF NOT EXISTS employee_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   user_id uuid REFERENCES users(id),
@@ -35,7 +35,7 @@ CREATE TABLE employee_profiles (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE employment_details (
+CREATE TABLE IF NOT EXISTS employment_details (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   institution_id uuid REFERENCES institutions(id),
@@ -57,7 +57,7 @@ CREATE TABLE employment_details (
   status TEXT DEFAULT 'active'
 );
 
-CREATE TABLE salary_structures (
+CREATE TABLE IF NOT EXISTS salary_structures (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   name TEXT NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE salary_structures (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE employee_salaries (
+CREATE TABLE IF NOT EXISTS employee_salaries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   structure_id uuid REFERENCES salary_structures(id),
@@ -91,7 +91,7 @@ CREATE TABLE employee_salaries (
   is_current BOOLEAN DEFAULT true
 );
 
-CREATE TABLE payroll_runs (
+CREATE TABLE IF NOT EXISTS payroll_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   month INTEGER NOT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE payroll_runs (
   UNIQUE(institution_id, month, year)
 );
 
-CREATE TABLE payslips (
+CREATE TABLE IF NOT EXISTS payslips (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   payroll_run_id uuid REFERENCES payroll_runs(id) ON DELETE CASCADE,
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
@@ -138,7 +138,7 @@ CREATE TABLE payslips (
   is_published BOOLEAN DEFAULT false
 );
 
-CREATE TABLE leave_types (
+CREATE TABLE IF NOT EXISTS leave_types (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   name TEXT NOT NULL,
@@ -152,7 +152,7 @@ CREATE TABLE leave_types (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE leave_balances (
+CREATE TABLE IF NOT EXISTS leave_balances (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   leave_type_id uuid REFERENCES leave_types(id) ON DELETE CASCADE,
@@ -164,7 +164,7 @@ CREATE TABLE leave_balances (
   UNIQUE(employee_id, leave_type_id, year)
 );
 
-CREATE TABLE leave_applications (
+CREATE TABLE IF NOT EXISTS leave_applications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   leave_type_id uuid REFERENCES leave_types(id),
@@ -184,7 +184,7 @@ CREATE TABLE leave_applications (
   handover_notes TEXT
 );
 
-CREATE TABLE attendance_hr (
+CREATE TABLE IF NOT EXISTS attendance_hr (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -200,7 +200,7 @@ CREATE TABLE attendance_hr (
   UNIQUE(employee_id, date)
 );
 
-CREATE TABLE performance_cycles (
+CREATE TABLE IF NOT EXISTS performance_cycles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   name TEXT NOT NULL,
@@ -213,7 +213,7 @@ CREATE TABLE performance_cycles (
   status TEXT DEFAULT 'upcoming'
 );
 
-CREATE TABLE performance_appraisals (
+CREATE TABLE IF NOT EXISTS performance_appraisals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cycle_id uuid REFERENCES performance_cycles(id) ON DELETE CASCADE,
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
@@ -232,7 +232,7 @@ CREATE TABLE performance_appraisals (
   status TEXT DEFAULT 'pending_self'
 );
 
-CREATE TABLE appraisal_parameters (
+CREATE TABLE IF NOT EXISTS appraisal_parameters (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   category TEXT,
@@ -243,7 +243,7 @@ CREATE TABLE appraisal_parameters (
   applicable_to TEXT[]
 );
 
-CREATE TABLE employee_documents (
+CREATE TABLE IF NOT EXISTS employee_documents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   doc_type TEXT NOT NULL,
@@ -254,7 +254,7 @@ CREATE TABLE employee_documents (
   is_verified BOOLEAN DEFAULT false
 );
 
-CREATE TABLE increments (
+CREATE TABLE IF NOT EXISTS increments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   effective_date DATE,
@@ -268,7 +268,7 @@ CREATE TABLE increments (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE loan_advances (
+CREATE TABLE IF NOT EXISTS loan_advances (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   loan_type TEXT,
@@ -283,7 +283,7 @@ CREATE TABLE loan_advances (
   approved_by uuid REFERENCES users(id)
 );
 
-CREATE TABLE holidays (
+CREATE TABLE IF NOT EXISTS holidays (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id uuid REFERENCES institutions(id),
   name TEXT NOT NULL,
@@ -293,7 +293,7 @@ CREATE TABLE holidays (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE tds_declarations (
+CREATE TABLE IF NOT EXISTS tds_declarations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id uuid REFERENCES employee_profiles(id) ON DELETE CASCADE,
   financial_year TEXT,
@@ -316,6 +316,7 @@ ALTER TABLE performance_appraisals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tds_declarations ENABLE ROW LEVEL SECURITY;
 
 -- RLS: employee sees own payslip
+DROP POLICY IF EXISTS "employee_own_payslip" ON payslips;
 CREATE POLICY "employee_own_payslip" ON payslips
   FOR SELECT USING (
     employee_id = (

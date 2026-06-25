@@ -107,9 +107,10 @@ BEGIN
   ) THEN
     CREATE POLICY "Parents can view linked child gate logs" ON gate_logs
       FOR SELECT USING (
-        student_id IN (
-          SELECT student_id FROM parent_student_links
-          WHERE parent_user_id = auth.uid() AND verified = true
+        person_id IN (
+          SELECT s.user_id FROM parent_student_links psl
+          JOIN students s ON psl.student_id = s.id
+          WHERE psl.parent_user_id = auth.uid() AND psl.verified = true
         )
       );
   END IF;
@@ -120,9 +121,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE policyname = 'Parents can view linked child bus subscriptions'
-    AND tablename = 'bus_subscriptions'
+    AND tablename = 'transport_subscriptions'
   ) THEN
-    CREATE POLICY "Parents can view linked child bus subscriptions" ON bus_subscriptions
+    CREATE POLICY "Parents can view linked child bus subscriptions" ON transport_subscriptions
       FOR SELECT USING (
         student_id IN (
           SELECT student_id FROM parent_student_links
@@ -310,7 +311,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT s.id, u.full_name, s.roll_number, s.course, d.name,
+    SELECT s.id, u.name, s.roll_number, s.course, d.name,
            s.semester, s.year, s.guardian_phone, s.wallet_balance, s.institution_id
     FROM parent_student_links psl
     JOIN students s ON psl.student_id = s.id
@@ -345,10 +346,12 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_student_id UUID;
+    v_user_id UUID;
 BEGIN
     -- Get linked child
-    SELECT psl.student_id INTO v_student_id
+    SELECT psl.student_id, s.user_id INTO v_student_id, v_user_id
     FROM parent_student_links psl
+    JOIN students s ON psl.student_id = s.id
     WHERE psl.parent_user_id = auth.uid() AND psl.verified = true
     ORDER BY psl.is_primary DESC NULLS LAST LIMIT 1;
 
@@ -356,7 +359,7 @@ BEGIN
 
     RETURN QUERY
     SELECT
-        u.full_name,
+        u.name,
         COUNT(a.id) FILTER (WHERE a.status IN ('present', 'late'))::BIGINT,
         COUNT(a.id)::BIGINT,
         CASE WHEN COUNT(a.id) = 0 THEN 100.0
@@ -365,15 +368,15 @@ BEGIN
         COALESCE((SELECT SUM(co.total_amount) FROM canteen_orders co WHERE co.student_id = v_student_id AND co.created_at::DATE = p_date), 0),
         EXISTS(SELECT 1 FROM bus_tracking bt WHERE bt.student_id = v_student_id AND bt.boarded_at::DATE = p_date),
         (SELECT bt.boarded_at::TIME FROM bus_tracking bt WHERE bt.student_id = v_student_id AND bt.boarded_at::DATE = p_date LIMIT 1),
-        (SELECT gl.timestamp::TIME FROM gate_logs gl WHERE gl.person_id = v_student_id AND gl.direction = 'in' AND gl.timestamp::DATE = p_date LIMIT 1),
-        (SELECT gl.timestamp::TIME FROM gate_logs gl WHERE gl.person_id = v_student_id AND gl.direction = 'out' AND gl.timestamp::DATE = p_date ORDER BY gl.timestamp DESC LIMIT 1),
+        (SELECT gl.in_time::TIME FROM gate_logs gl WHERE gl.person_id = v_user_id AND gl.in_time::DATE = p_date LIMIT 1),
+        (SELECT gl.out_time::TIME FROM gate_logs gl WHERE gl.person_id = v_user_id AND gl.out_time::DATE = p_date ORDER BY gl.out_time DESC LIMIT 1),
         (SELECT COALESCE(SUM(sf.amount - COALESCE(sf.paid_amount, 0)), 0) FROM student_fees sf WHERE sf.student_id = v_student_id AND sf.payment_status IN ('pending', 'partial')),
         (SELECT COALESCE(s.wallet_balance, 0) FROM students s WHERE s.id = v_student_id)
     FROM attendance a
     JOIN students s ON a.student_id = s.id
     JOIN users u ON s.user_id = u.id
     WHERE a.student_id = v_student_id AND a.date = p_date
-    GROUP BY u.full_name;
+    GROUP BY u.name;
 END;
 $$;
 
@@ -466,20 +469,23 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_student_id UUID;
+    v_user_id UUID;
     v_subscription RECORD;
-    v_bus RECORD;
+    v_bus_record RECORD;
+    v_bus_loc RECORD;
 BEGIN
-    SELECT psl.student_id INTO v_student_id
+    SELECT psl.student_id, s.user_id INTO v_student_id, v_user_id
     FROM parent_student_links psl
+    JOIN students s ON psl.student_id = s.id
     WHERE psl.parent_user_id = auth.uid() AND psl.verified = true
     ORDER BY psl.is_primary DESC NULLS LAST LIMIT 1;
 
     IF v_student_id IS NULL THEN RETURN; END IF;
 
     -- Check if student has active bus subscription
-    SELECT bs.bus_id, bs.route_id, bs.stop_index INTO v_subscription
-    FROM bus_subscriptions bs
-    WHERE bs.student_id = v_student_id AND bs.is_active = true
+    SELECT bs.route_id, bs.stop_name INTO v_subscription
+    FROM transport_subscriptions bs
+    WHERE bs.student_id = v_student_id AND bs.status = 'active'
     LIMIT 1;
 
     IF v_subscription IS NULL THEN
@@ -488,37 +494,48 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Check gate log for boarding today
+    -- Check gate log for boarding today (i.e. went out today)
     IF NOT EXISTS (
         SELECT 1 FROM gate_logs
-        WHERE person_id = v_student_id
-          AND direction = 'out'
-          AND timestamp::DATE = CURRENT_DATE
+        WHERE person_id = v_user_id
+          AND out_time::DATE = CURRENT_DATE
     ) THEN
         is_on_bus := false;
         RETURN NEXT;
         RETURN;
     END IF;
 
-    -- Get bus location
-    SELECT bt.bus_id, bt.latitude, bt.longitude, bt.speed, bt.recorded_at
-    INTO v_bus
-    FROM bus_tracking bt
-    WHERE bt.bus_id = v_subscription.bus_id
-    ORDER BY bt.recorded_at DESC LIMIT 1;
+    -- Get bus assigned to this route
+    SELECT b.id, b.name INTO v_bus_record
+    FROM buses b
+    WHERE b.route_id = v_subscription.route_id
+    LIMIT 1;
 
-    IF v_bus IS NULL THEN
+    IF v_bus_record IS NULL THEN
+        is_on_bus := false;
+        RETURN NEXT;
+        RETURN;
+    END IF;
+
+    -- Get bus location
+    SELECT bt.latitude, bt.longitude, bt.speed, bt.timestamp
+    INTO v_bus_loc
+    FROM bus_tracking bt
+    WHERE bt.bus_id = v_bus_record.id
+    ORDER BY bt.timestamp DESC LIMIT 1;
+
+    IF v_bus_loc IS NULL THEN
         is_on_bus := false;
         RETURN NEXT;
         RETURN;
     END IF;
 
     is_on_bus := true;
-    bus_name := (SELECT name FROM buses WHERE id = v_bus.bus_id);
-    route_name := (SELECT route_name FROM bus_routes WHERE id = v_subscription.route_id);
-    latitude := v_bus.latitude;
-    longitude := v_bus.longitude;
-    last_updated := v_bus.recorded_at;
+    bus_name := v_bus_record.name;
+    route_name := (SELECT name FROM bus_routes WHERE id = v_subscription.route_id);
+    latitude := v_bus_loc.latitude;
+    longitude := v_bus_loc.longitude;
+    last_updated := v_bus_loc.timestamp;
     eta_minutes := 0; -- Would calculate from Haversine
     last_stop := '';
     RETURN NEXT;

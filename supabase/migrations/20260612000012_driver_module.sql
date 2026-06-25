@@ -358,7 +358,7 @@ BEGIN
     RETURN QUERY
     SELECT
         s.id,
-        u.full_name,
+        u.name,
         s.roll_number,
         ts.stop_name,
         CASE WHEN bt.boarded_at IS NOT NULL THEN true ELSE false END,
@@ -371,7 +371,7 @@ BEGIN
         AND bt.boarded_at::DATE = CURRENT_DATE
     WHERE ts.route_id = v_route_id
     AND ts.status = 'active'
-    ORDER BY ts.stop_name, u.full_name;
+    ORDER BY ts.stop_name, u.name;
 END;
 $$;
 

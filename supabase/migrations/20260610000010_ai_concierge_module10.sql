@@ -155,34 +155,34 @@ CREATE POLICY "tenant_isolation_nudge_preferences" ON nudge_preferences
 -- SEED DATA — PROACTIVE NUDGE SAMPLES
 -- ============================================================
 INSERT INTO proactive_nudges (student_id, institution_id, nudge_type, title, message, priority, channel, was_read, was_actioned) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    'weekly_prep', '📚 Week Ahead Prep',
    'You have 5 classes tomorrow starting with Maths at 9 AM. Your attendance is 84% — keep it up! Don''t forget: Physics assignment due Wednesday.',
    'normal', 'push', false, false),
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    'attendance_warning', '⚠️ Attendance Alert',
    'Your attendance in Data Structures dropped to 68% — you need 75% to sit for exams. Attend the next 4 classes consecutively to recover.',
    'high', 'push', true, false),
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    'fee_reminder', '💰 Fee Reminder',
    'Your semester fee installment of ₹12,500 is due in 3 days. Pay now to avoid late charges → /student/fees',
    'urgent', 'whatsapp', false, false),
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    'exam_countdown', '📝 Exam Countdown',
    'Mid-semester exams begin in 12 days! Your AI Study Plan suggests focusing on Linear Algebra and Thermodynamics this week.',
    'high', 'in_app', true, true),
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    'streak_celebration', '🔥 7-Day Streak!',
    'Congratulations! You''ve attended every class for 7 consecutive days. Keep the momentum going — you''re in the top 15% of your batch!',
    'low', 'push', true, true),
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    'library_due', '📖 Library Book Due',
    'Your book "Introduction to Algorithms" (CLRS) is due in 2 days. Return or renew it at /student/library to avoid ₹10/day fines.',
    'normal', 'in_app', false, false);
 
 -- SEED DATA — STUDY PLAN SAMPLE
 INSERT INTO study_plans (student_id, institution_id, exam_schedule, daily_plan, subjects, weak_areas, study_hours_per_day, plan_start_date, plan_end_date, status, completion_percentage, claude_reasoning) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    '[{"subject":"Mathematics","date":"2026-06-25","time":"09:00"},{"subject":"Physics","date":"2026-06-27","time":"09:00"},{"subject":"Data Structures","date":"2026-06-30","time":"14:00"},{"subject":"English","date":"2026-07-02","time":"09:00"}]',
    '[{"day":"Monday","blocks":[{"time":"06:00-08:00","subject":"Mathematics","topic":"Linear Algebra - Eigenvalues","type":"focus"},{"time":"09:00-10:30","subject":"Physics","topic":"Thermodynamics revision","type":"review"},{"time":"16:00-17:30","subject":"Data Structures","topic":"Binary Trees Practice","type":"practice"}]},{"day":"Tuesday","blocks":[{"time":"06:00-08:00","subject":"Data Structures","topic":"Graph Algorithms - DFS/BFS","type":"focus"},{"time":"09:00-10:30","subject":"Mathematics","topic":"Calculus - Integration","type":"review"},{"time":"16:00-17:30","subject":"English","topic":"Technical Writing","type":"light"}]},{"day":"Wednesday","blocks":[{"time":"06:00-08:00","subject":"Physics","topic":"Optics & Waves","type":"focus"},{"time":"16:00-18:00","subject":"Mathematics","topic":"Practice Problems Set","type":"practice"}]}]',
    '["Mathematics","Physics","Data Structures","English"]',
@@ -210,7 +210,7 @@ INSERT INTO sentiment_logs (institution_id, date, department, avg_sentiment, pos
 
 -- SEED DATA — NUDGE PREFERENCES
 INSERT INTO nudge_preferences (student_id, institution_id, enabled, enabled_types, preferred_channels, quiet_hours_start, quiet_hours_end, max_nudges_per_day) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('c0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001',
    true,
    ARRAY['weekly_prep', 'assignment_reminder', 'attendance_warning', 'fee_reminder', 'exam_countdown', 'streak_celebration'],
    ARRAY['push', 'in_app'],
@@ -218,7 +218,7 @@ INSERT INTO nudge_preferences (student_id, institution_id, enabled, enabled_type
 
 -- SEED DATA — VOICE TRANSCRIPT SAMPLE
 INSERT INTO voice_transcripts (user_id, institution_id, transcript, language, source, duration_seconds, confidence) VALUES
-  ('u0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
    'Mera attendance kitna hai is semester mein?', 'hi', 'web_speech', 4, 0.92),
-  ('u0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
    'What is my pending fee amount for this semester?', 'en', 'web_speech', 3, 0.97);

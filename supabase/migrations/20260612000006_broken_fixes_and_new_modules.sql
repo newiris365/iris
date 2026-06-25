@@ -377,7 +377,7 @@ CREATE POLICY "Students can view/insert own submissions" ON assignment_submissio
 CREATE POLICY "Staff/Admin can view submissions" ON assignment_submissions
     FOR SELECT USING (
         get_auth_user_role() IN ('SuperAdmin', 'Admin', 'Teacher', 'Staff')
-        AND institution_id = get_auth_institution_id()
+        AND assignment_id IN (SELECT id FROM assignments WHERE institution_id = get_auth_institution_id())
     );
 
 -- RPC: Submit assignment
@@ -477,7 +477,7 @@ CREATE POLICY "Students can view materials for their dept/semester" ON study_mat
 -- ============================================================
 -- 8. ADD: Leave application module
 -- ============================================================
-CREATE TABLE IF NOT EXISTS leave_applications (
+CREATE TABLE IF NOT EXISTS student_leave_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
@@ -494,20 +494,20 @@ CREATE TABLE IF NOT EXISTS leave_applications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE leave_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_leave_applications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Students can view/insert own leaves" ON leave_applications
+CREATE POLICY "Students can view/insert own leaves" ON student_leave_applications
     FOR ALL USING (
         student_id IN (SELECT id FROM students WHERE user_id = auth.uid())
     );
 
-CREATE POLICY "Faculty/HOD/Admin can view leaves" ON leave_applications
+CREATE POLICY "Faculty/HOD/Admin can view leaves" ON student_leave_applications
     FOR SELECT USING (
         get_auth_user_role() IN ('SuperAdmin', 'Admin', 'Teacher', 'HOD', 'Staff')
         AND institution_id = get_auth_institution_id()
     );
 
-CREATE POLICY "Faculty/HOD can update leave status" ON leave_applications
+CREATE POLICY "Faculty/HOD can update leave status" ON student_leave_applications
     FOR UPDATE USING (
         get_auth_user_role() IN ('SuperAdmin', 'Admin', 'Teacher', 'HOD')
     );
@@ -537,7 +537,7 @@ BEGIN
         RETURN json_build_object('success', false, 'error', 'End date cannot be before start date.');
     END IF;
 
-    INSERT INTO leave_applications (institution_id, student_id, leave_type, from_date, to_date, reason, attachment_url)
+    INSERT INTO student_leave_applications (institution_id, student_id, leave_type, from_date, to_date, reason, attachment_url)
     SELECT s.institution_id, v_student_id, p_leave_type, p_from_date, p_to_date, p_reason, p_attachment_url
     FROM students s WHERE s.id = v_student_id
     RETURNING id INTO v_leave_id;
@@ -560,7 +560,7 @@ DECLARE
     v_leave RECORD;
     v_new_status VARCHAR;
 BEGIN
-    SELECT * INTO v_leave FROM leave_applications WHERE id = p_leave_id;
+    SELECT * INTO v_leave FROM student_leave_applications WHERE id = p_leave_id;
     IF v_leave IS NULL THEN
         RETURN json_build_object('success', false, 'error', 'Leave application not found.');
     END IF;
@@ -570,13 +570,13 @@ BEGIN
             RETURN json_build_object('success', false, 'error', 'Leave already processed.');
         END IF;
         v_new_status := 'faculty_approved';
-        UPDATE leave_applications SET status = v_new_status, faculty_remarks = p_remarks, faculty_approved_at = NOW() WHERE id = p_leave_id;
+        UPDATE student_leave_applications SET status = v_new_status, faculty_remarks = p_remarks, faculty_approved_at = NOW() WHERE id = p_leave_id;
     ELSIF p_approver_role = 'HOD' OR p_approver_role = 'Admin' THEN
         IF v_leave.status != 'faculty_approved' THEN
             RETURN json_build_object('success', false, 'error', 'Leave must be faculty-approved before HOD approval.');
         END IF;
         v_new_status := 'hod_approved';
-        UPDATE leave_applications SET status = v_new_status, hod_remarks = p_remarks, hod_approved_at = NOW() WHERE id = p_leave_id;
+        UPDATE student_leave_applications SET status = v_new_status, hod_remarks = p_remarks, hod_approved_at = NOW() WHERE id = p_leave_id;
 
         -- Auto-mark attendance as excused for approved leave days
         UPDATE attendance SET status = 'excused', notes = 'Leave approved'
@@ -600,7 +600,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-    UPDATE leave_applications SET status = 'rejected', hod_remarks = p_remarks, hod_approved_at = NOW()
+    UPDATE student_leave_applications SET status = 'rejected', hod_remarks = p_remarks, hod_approved_at = NOW()
     WHERE id = p_leave_id AND status IN ('pending', 'faculty_approved');
 
     IF FOUND THEN
@@ -628,6 +628,38 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'wallet_transactions' AND column_name = 'payment_method'
+  ) THEN
+    ALTER TABLE wallet_transactions ADD COLUMN payment_method VARCHAR(30) DEFAULT 'razorpay';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'wallet_transactions' AND column_name = 'razorpay_order_id'
+  ) THEN
+    ALTER TABLE wallet_transactions ADD COLUMN razorpay_order_id VARCHAR(100);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'wallet_transactions' AND column_name = 'razorpay_payment_id'
+  ) THEN
+    ALTER TABLE wallet_transactions ADD COLUMN razorpay_payment_id VARCHAR(100);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'wallet_transactions' AND column_name = 'status'
+  ) THEN
+    ALTER TABLE wallet_transactions ADD COLUMN status VARCHAR(20) DEFAULT 'pending';
+  END IF;
+END $$;
+
 
 ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
 
@@ -708,39 +740,53 @@ AS $$
 DECLARE
     v_subscription RECORD;
     v_bus RECORD;
+    v_bus_id UUID;
     v_stop_index INTEGER;
     v_distance NUMERIC;
     v_velocity NUMERIC;
 BEGIN
     -- Get student's bus subscription
-    SELECT bs.bus_id, bs.route_id, bs.stop_index, br.stops
+    SELECT bs.route_id, bs.stop_name, br.stops
     INTO v_subscription
-    FROM bus_subscriptions bs
+    FROM transport_subscriptions bs
     JOIN bus_routes br ON bs.route_id = br.id
-    WHERE bs.student_id = p_student_id AND bs.is_active = true
+    WHERE bs.student_id = p_student_id AND bs.status = 'active'
     LIMIT 1;
 
     IF v_subscription IS NULL THEN RETURN; END IF;
+
+    -- Get bus assigned to this route
+    SELECT b.id INTO v_bus_id
+    FROM buses b
+    WHERE b.route_id = v_subscription.route_id
+    LIMIT 1;
+
+    IF v_bus_id IS NULL THEN RETURN; END IF;
 
     -- Get latest bus location
     SELECT bl.bus_id, bl.latitude, bl.longitude, bl.speed, bl.recorded_at
     INTO v_bus
     FROM bus_tracking bl
-    WHERE bl.bus_id = v_subscription.bus_id
+    WHERE bl.bus_id = v_bus_id
     ORDER BY bl.recorded_at DESC
     LIMIT 1;
 
     IF v_bus IS NULL THEN RETURN; END IF;
 
-    v_stop_index := v_subscription.stop_index;
+    -- Find stop_index from JSONB stops array
+    SELECT (pos - 1)::INTEGER INTO v_stop_index
+    FROM jsonb_array_elements(v_subscription.stops) WITH ORDINALITY AS arr(elem, pos)
+    WHERE elem->>'name' = v_subscription.stop_name
+    LIMIT 1;
+
+    IF v_stop_index IS NULL THEN RETURN; END IF;
 
     -- Calculate distance to student's stop using Haversine
-    IF v_subscription.stops IS NOT NULL AND array_length(v_subscription.stops, 1) > 0 THEN
+    IF v_subscription.stops IS NOT NULL AND jsonb_array_length(v_subscription.stops) > 0 THEN
         DECLARE
             v_stop_lat NUMERIC;
             v_stop_lon NUMERIC;
         BEGIN
-            -- stops is JSON array, extract by index
             v_stop_lat := (v_subscription.stops->v_stop_index->>'latitude')::NUMERIC;
             v_stop_lon := (v_subscription.stops->v_stop_index->>'longitude')::NUMERIC;
 
@@ -757,7 +803,7 @@ BEGIN
             bus_id := v_bus.bus_id;
             bus_name := (SELECT name FROM buses WHERE id = v_bus.bus_id);
             route_name := (SELECT route_name FROM bus_routes WHERE id = v_subscription.route_id);
-            stop_name := (v_subscription.stops->v_stop_index->>'name')::VARCHAR;
+            stop_name := v_subscription.stop_name;
             stop_index := v_stop_index;
             distance_km := ROUND(v_distance, 2);
             eta_minutes := ROUND((v_distance / v_velocity) * 60);

@@ -62,8 +62,8 @@ CREATE POLICY "Students can view their own seating" ON exam_seating
 CREATE POLICY "Parents can view linked child seating" ON exam_seating
     FOR SELECT USING (
         student_id IN (
-            SELECT child_student_id FROM parent_student_links
-            WHERE parent_user_id = auth.uid() AND is_verified = true
+            SELECT student_id FROM parent_student_links
+            WHERE parent_user_id = auth.uid() AND verified = true
         )
     );
 

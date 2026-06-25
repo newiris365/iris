@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS attendance_warnings (
     sent_to_hod BOOLEAN NOT NULL DEFAULT false,
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_warning_per_student_type UNIQUE (student_id, warning_type, sent_at::date)
+    warning_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    CONSTRAINT unique_warning_per_student_type UNIQUE (student_id, warning_type, warning_date)
 );
 
 -- Log of all attendance warning runs (audit trail)
@@ -55,8 +56,8 @@ CREATE POLICY "Students can view their own attendance warnings" ON attendance_wa
 CREATE POLICY "Parents can view linked child warnings" ON attendance_warnings
     FOR SELECT USING (
         student_id IN (
-            SELECT child_student_id FROM parent_student_links
-            WHERE parent_user_id = auth.uid() AND is_verified = true
+            SELECT student_id FROM parent_student_links
+            WHERE parent_user_id = auth.uid() AND verified = true
         )
     );
 
@@ -217,8 +218,8 @@ CREATE POLICY "Students can view their own fee escalations" ON fee_escalations
 CREATE POLICY "Parents can view linked child escalations" ON fee_escalations
     FOR SELECT USING (
         student_id IN (
-            SELECT child_student_id FROM parent_student_links
-            WHERE parent_user_id = auth.uid() AND is_verified = true
+            SELECT student_id FROM parent_student_links
+            WHERE parent_user_id = auth.uid() AND verified = true
         )
     );
 
@@ -275,8 +276,8 @@ BEGIN
         (sf.amount - sf.paid_amount) AS amount_overdue,
         sf.due_date,
         (CURRENT_DATE - sf.due_date)::INTEGER AS days_overdue,
-        calculate_fee_penalty(sf.fee_id, sf.due_date, sf.amount) AS late_fee,
-        (sf.amount - sf.paid_amount + calculate_fee_penalty(sf.fee_id, sf.due_date, sf.amount)) AS total_due
+        calculate_fee_penalty(sf.fee_id, CURRENT_DATE) AS late_fee,
+        (sf.amount - sf.paid_amount + calculate_fee_penalty(sf.fee_id, CURRENT_DATE)) AS total_due
     FROM student_fees sf
     JOIN fee_structures fs ON sf.fee_id = fs.id
     JOIN students s ON sf.student_id = s.id
@@ -317,7 +318,7 @@ CREATE TABLE IF NOT EXISTS parent_profiles (
     occupation VARCHAR(100),
     relationship VARCHAR(50) DEFAULT 'Guardian',
     is_verified BOOLEAN NOT NULL DEFAULT false,
-    verified_at TIMESTAMP WITH TIME ZREE,
+    verified_at TIMESTAMP WITH TIME ZONE,
     last_login TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -505,8 +506,8 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM parent_student_links
         WHERE parent_user_id = v_user_id
-          AND child_student_id = v_student.id
-          AND is_verified = true
+          AND student_id = v_student.id
+          AND verified = true
     ) THEN
         success := false;
         message := 'This student is already linked to your account.';
@@ -516,10 +517,10 @@ BEGIN
     END IF;
 
     -- Create or update link
-    INSERT INTO parent_student_links (parent_user_id, child_student_id, institution_id, is_verified)
-    VALUES (v_user_id, v_student.id, v_student.institution_id, true)
-    ON CONFLICT (parent_user_id, child_student_id)
-    DO UPDATE SET is_verified = true, verified_at = NOW();
+    INSERT INTO parent_student_links (parent_user_id, student_id, verified, relationship)
+    VALUES (v_user_id, v_student.id, true, 'Guardian')
+    ON CONFLICT (parent_user_id, student_id)
+    DO UPDATE SET verified = true;
 
     -- Update parent profile if exists
     UPDATE parent_profiles SET is_verified = true, verified_at = NOW()

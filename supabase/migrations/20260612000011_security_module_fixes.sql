@@ -30,9 +30,9 @@ BEGIN
     RETURN QUERY
     SELECT
         u.id,
-        u.full_name,
+        u.name AS full_name,
         u.role,
-        u.photo_url,
+        u.avatar_url AS photo_url,
         u.is_active,
         s.roll_number,
         d.name,
@@ -51,7 +51,7 @@ BEGIN
         OR u.email = p_identifier
         OR u.phone = p_identifier
         OR s.roll_number = p_identifier
-        OR LOWER(u.full_name) LIKE LOWER('%' || p_identifier || '%')
+        OR LOWER(u.name) LIKE LOWER('%' || p_identifier || '%')
         OR st.employee_id = p_identifier
     )
     LIMIT 5;
@@ -90,12 +90,12 @@ BEGIN
         hv.visitor_phone,
         hv.relation,
         hv.visit_purpose,
-        su.full_name,
+        su.name,
         s.roll_number,
         hr.room_number,
         hv.approval_status,
         hv.expected_time,
-        abu.full_name
+        abu.name
     FROM hostel_visitors hv
     LEFT JOIN students s ON hv.student_id = s.id
     LEFT JOIN users su ON s.user_id = su.id
@@ -165,7 +165,7 @@ BEGIN
         ar.restriction_type,
         ar.reason,
         ar.valid_until,
-        u.full_name
+        u.name
     FROM access_restrictions ar
     LEFT JOIN users u ON ar.restricted_by = u.id
     WHERE ar.person_id = p_person_id
@@ -312,7 +312,7 @@ BEGIN
     ) VALUES (
         get_auth_institution_id(), p_vehicle_number, p_vehicle_type,
         p_driver_name, p_driver_phone, p_purpose,
-        (SELECT id FROM staff WHERE user_id = auth.uid() LIMIT 1),
+        auth.uid(),
         p_gate_number
     ) RETURNING id INTO v_log_id;
 
@@ -329,7 +329,7 @@ AS $$
 BEGIN
     UPDATE vehicle_logs
     SET exit_time = NOW(),
-        exited_by = (SELECT id FROM staff WHERE user_id = auth.uid() LIMIT 1)
+        exited_by = auth.uid()
     WHERE id = p_log_id AND exit_time IS NULL;
 
     IF FOUND THEN
@@ -367,7 +367,7 @@ BEGIN
         e.event_date,
         er.id,
         er.user_id,
-        u.full_name,
+        u.name AS full_name,
         u.email,
         er.status,
         er.check_in_time,
@@ -377,6 +377,6 @@ BEGIN
     JOIN users u ON er.user_id = u.id
     WHERE e.institution_id = get_auth_institution_id()
     AND e.event_date = CURRENT_DATE
-    ORDER BY e.title, u.full_name;
+    ORDER BY e.title, u.name;
 END;
 $$;

@@ -112,7 +112,7 @@ BEGIN
     -- Deduct wallet atomically
     UPDATE canteen_wallets
     SET balance = balance - p_total_amount,
-        updated_at = NOW()
+        last_updated = NOW()
     WHERE id = v_wallet.id;
 
     -- Create order
@@ -136,10 +136,10 @@ BEGIN
     END LOOP;
 
     -- Log wallet transaction
-    INSERT INTO wallet_transactions (institution_id, student_id, amount, transaction_type, description)
+    INSERT INTO wallet_transactions (institution_id, student_id, amount, type, status, description)
     VALUES (
         (SELECT institution_id FROM students WHERE id = p_student_id),
-        p_student_id, -p_total_amount, 'canteen_order',
+        p_student_id, -p_total_amount, 'canteen_order', 'completed',
         'Canteen order ' || v_order_number
     );
 
@@ -246,7 +246,7 @@ BEGIN
         string_agg(DISTINCT co.special_instructions, '; ')
     FROM canteen_orders co,
          jsonb_array_elements(co.items) AS item
-    LEFT JOIN canteen_menus cm ON cm.name = (item->>'name')
+    LEFT JOIN canteen_menus cm ON cm.item_name = (item->>'name')
     WHERE co.institution_id = (SELECT institution_id FROM users WHERE id = auth.uid())
     AND co.created_at::DATE = p_date
     AND co.status IN ('placed', 'confirmed', 'preparing')

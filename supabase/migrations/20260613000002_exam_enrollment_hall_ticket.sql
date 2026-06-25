@@ -40,8 +40,8 @@ CREATE POLICY "Parents can view linked child enrollments"
   ON exam_enrollments FOR SELECT
   USING (
     student_id IN (
-      SELECT child_student_id FROM parent_student_links
-      WHERE parent_user_id = auth.uid() AND is_verified = true
+      SELECT student_id FROM parent_student_links
+      WHERE parent_user_id = auth.uid() AND verified = true
     )
   );
 
@@ -90,8 +90,8 @@ CREATE POLICY "Parents can view linked child hall tickets"
   ON hall_tickets FOR SELECT
   USING (
     student_id IN (
-      SELECT child_student_id FROM parent_student_links
-      WHERE parent_user_id = auth.uid() AND is_verified = true
+      SELECT student_id FROM parent_student_links
+      WHERE parent_user_id = auth.uid() AND verified = true
     )
   );
 

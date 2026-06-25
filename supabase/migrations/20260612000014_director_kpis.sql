@@ -76,9 +76,8 @@ DECLARE
   v_fee_by_dept JSONB := '[]'::JSONB;
 BEGIN
   SELECT u.institution_id INTO v_inst_id
-  FROM auth.users au
-  JOIN users u ON u.user_id = au.id
-  WHERE au.id = auth.uid();
+  FROM users u
+  WHERE u.id = auth.uid();
 
   IF v_inst_id IS NULL THEN
     SELECT id INTO v_inst_id FROM institutions LIMIT 1;
@@ -105,7 +104,7 @@ BEGIN
   INTO v_fee_billed, v_fee_collected, v_fee_outstanding
   FROM fee_structures fs
   LEFT JOIN student_fees sf ON sf.fee_structure_id = fs.id AND sf.institution_id = v_inst_id
-  LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id AND fp.status = 'completed'
+  LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id AND fp.status = 'completed'
     AND fp.payment_date >= v_this_month_start
   WHERE fs.institution_id = v_inst_id;
 
@@ -186,7 +185,7 @@ BEGIN
       SUM(COALESCE(fp.amount_paid, 0)) as collected
     FROM students s
     JOIN student_fees sf ON sf.student_id = s.id
-    LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id AND fp.status = 'completed'
+    LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id AND fp.status = 'completed'
     WHERE s.institution_id = v_inst_id AND s.is_active = TRUE
     GROUP BY s.department_id
   ) dept_fees
@@ -230,32 +229,32 @@ DECLARE
   v_result JSON;
 BEGIN
   SELECT u.institution_id INTO v_inst_id
-  FROM auth.users au JOIN users u ON u.user_id = au.id WHERE au.id = auth.uid();
+  FROM users u WHERE u.id = auth.uid();
   IF v_inst_id IS NULL THEN SELECT id INTO v_inst_id FROM institutions LIMIT 1; END IF;
 
   SELECT json_build_object(
     'summary', (
       SELECT json_build_object(
         'total_billed', COALESCE(SUM(sf.amount), 0),
-        'total_collected', COALESCE(SUM(fp.amount_paid), 0) FILTER (WHERE fp.status = 'completed'),
-        'total_outstanding', COALESCE(SUM(sf.amount), 0) - COALESCE(SUM(fp.amount_paid), 0) FILTER (WHERE fp.status = 'completed'),
+        'total_collected', COALESCE(SUM(fp.amount_paid) FILTER (WHERE fp.status = 'completed'), 0),
+        'total_outstanding', COALESCE(SUM(sf.amount), 0) - COALESCE(SUM(fp.amount_paid) FILTER (WHERE fp.status = 'completed'), 0),
         'collection_rate', CASE WHEN SUM(sf.amount) > 0
           THEN ROUND(100.0 * COALESCE(SUM(fp.amount_paid) FILTER (WHERE fp.status = 'completed'), 0) / SUM(sf.amount), 1)
           ELSE 0 END,
         'total_students', COUNT(DISTINCT sf.student_id),
         'fully_paid_count', COUNT(DISTINCT sf.student_id) FILTER (
-          WHERE COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_fee_id = sf.id AND status = 'completed'), 0) >= sf.amount
+          WHERE COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_id = sf.student_id AND fee_structure_id = sf.fee_structure_id AND status = 'completed'), 0) >= sf.amount
         ),
         'partial_paid_count', COUNT(DISTINCT sf.student_id) FILTER (
-          WHERE COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_fee_id = sf.id AND status = 'completed'), 0) > 0
-            AND COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_fee_id = sf.id AND status = 'completed'), 0) < sf.amount
+          WHERE COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_id = sf.student_id AND fee_structure_id = sf.fee_structure_id AND status = 'completed'), 0) > 0
+            AND COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_id = sf.student_id AND fee_structure_id = sf.fee_structure_id AND status = 'completed'), 0) < sf.amount
         ),
         'unpaid_count', COUNT(DISTINCT sf.student_id) FILTER (
-          WHERE COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_fee_id = sf.id AND status = 'completed'), 0) = 0
+          WHERE COALESCE((SELECT SUM(amount_paid) FROM fee_payments WHERE student_id = sf.student_id AND fee_structure_id = sf.fee_structure_id AND status = 'completed'), 0) = 0
         )
       )
       FROM student_fees sf
-      LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id
+      LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id
       JOIN students s ON s.id = sf.student_id AND s.institution_id = v_inst_id
       WHERE sf.institution_id = v_inst_id
         AND (p_semester IS NULL OR s.semester = p_semester)
@@ -275,7 +274,7 @@ BEGIN
         FROM students s
         JOIN departments dep ON dep.id = s.department_id
         LEFT JOIN student_fees sf ON sf.student_id = s.id
-        LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id
+        LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id
         WHERE s.institution_id = v_inst_id AND s.is_active = TRUE
           AND (p_semester IS NULL OR s.semester = p_semester)
         GROUP BY dep.id, dep.name
@@ -292,7 +291,7 @@ BEGIN
           COALESCE(SUM(sf.amount), 0) - COALESCE(SUM(fp.amount_paid) FILTER (WHERE fp.status = 'completed'), 0) as outstanding
         FROM fee_structures fs
         LEFT JOIN student_fees sf ON sf.fee_structure_id = fs.id
-        LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id
+        LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id
         WHERE fs.institution_id = v_inst_id
         GROUP BY fs.id, fs.name
         ORDER BY outstanding DESC
@@ -303,7 +302,7 @@ BEGIN
       FROM (
         SELECT
           s.id as student_id,
-          u.full_name as student_name,
+          u.name as student_name,
           s.roll_number,
           dep.name as department_name,
           s.semester,
@@ -316,13 +315,13 @@ BEGIN
         JOIN users u ON u.id = s.user_id
         JOIN departments dep ON dep.id = s.department_id
         LEFT JOIN student_fees sf ON sf.student_id = s.id
-        LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id
+        LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id
         LEFT JOIN LATERAL (
           SELECT s2.guardian_name, s2.guardian_phone
           FROM students s2 WHERE s2.id = s.id
         ) guardian ON TRUE
         WHERE s.institution_id = v_inst_id AND s.is_active = TRUE
-        GROUP BY s.id, u.full_name, s.roll_number, dep.name, s.semester, guardian.guardian_name, guardian.guardian_phone
+        GROUP BY s.id, u.name, s.roll_number, dep.name, s.semester, guardian.guardian_name, guardian.guardian_phone
         HAVING COALESCE(SUM(sf.amount), 0) - COALESCE(SUM(fp.amount_paid) FILTER (WHERE fp.status = 'completed'), 0) > 0
         ORDER BY overdue_amount DESC
         LIMIT 20
@@ -363,7 +362,7 @@ DECLARE
   v_start_date DATE;
 BEGIN
   SELECT u.institution_id INTO v_inst_id
-  FROM auth.users au JOIN users u ON u.user_id = au.id WHERE au.id = auth.uid();
+  FROM users u WHERE u.id = auth.uid();
   IF v_inst_id IS NULL THEN SELECT id INTO v_inst_id FROM institutions LIMIT 1; END IF;
 
   IF p_period = 'weekly' THEN
@@ -493,7 +492,7 @@ DECLARE
   v_result JSON;
 BEGIN
   SELECT u.institution_id INTO v_inst_id
-  FROM auth.users au JOIN users u ON u.user_id = au.id WHERE au.id = auth.uid();
+  FROM users u WHERE u.id = auth.uid();
   IF v_inst_id IS NULL THEN SELECT id INTO v_inst_id FROM institutions LIMIT 1; END IF;
 
   SELECT json_build_object(
@@ -604,7 +603,7 @@ DECLARE
   v_staff_count INT;
 BEGIN
   SELECT u.institution_id INTO v_inst_id
-  FROM auth.users au JOIN users u ON u.user_id = au.id WHERE au.id = auth.uid();
+  FROM users u WHERE u.id = auth.uid();
   IF v_inst_id IS NULL THEN SELECT id INTO v_inst_id FROM institutions LIMIT 1; END IF;
 
   v_academic_year := CASE
@@ -680,7 +679,7 @@ BEGIN
           THEN ROUND(100.0 * COALESCE(SUM(fp.amount_paid) FILTER (WHERE fp.status = 'completed'), 0) / SUM(sf.amount), 1)
           ELSE 0 END
         FROM student_fees sf
-        LEFT JOIN fee_payments fp ON fp.student_fee_id = sf.id
+        LEFT JOIN fee_payments fp ON fp.student_id = sf.student_id AND fp.fee_structure_id = sf.fee_structure_id
         WHERE sf.institution_id = v_inst_id
       )
     ),
@@ -733,7 +732,7 @@ DECLARE
   v_anomaly_count INT := 0;
 BEGIN
   SELECT u.institution_id INTO v_inst_id
-  FROM auth.users au JOIN users u ON u.user_id = au.id WHERE au.id = auth.uid();
+  FROM users u WHERE u.id = auth.uid();
   IF v_inst_id IS NULL THEN SELECT id INTO v_inst_id FROM institutions LIMIT 1; END IF;
 
   -- Detect duplicate attendance (same student, same session, multiple marks)
@@ -743,18 +742,18 @@ BEGIN
     'duplicate_attendance',
     'high',
     'Duplicate Attendance Detected',
-    'Student ' || u.full_name || ' has ' || COUNT(*) || ' attendance records for the same session on ' || a.date,
+    'Student ' || u.name || ' has ' || COUNT(*) || ' attendance records for the same session on ' || a.date,
     'attendance',
     a.student_id,
     'student',
-    u.full_name,
+    u.name,
     jsonb_build_object('date', a.date, 'session_id', a.session_id, 'count', COUNT(*))
   FROM attendance a
   JOIN students s ON s.id = a.student_id
   JOIN users u ON u.id = s.user_id
   WHERE a.institution_id = v_inst_id
     AND a.date >= CURRENT_DATE - 1
-  GROUP BY a.student_id, a.session_id, a.date, u.full_name
+  GROUP BY a.student_id, a.session_id, a.date, u.name
   HAVING COUNT(*) > 1
   ON CONFLICT DO NOTHING;
 
@@ -765,18 +764,18 @@ BEGIN
     'rapid_wallet_txn',
     'medium',
     'Rapid Wallet Transactions',
-    u.full_name || ' made ' || COUNT(*) || ' wallet transactions within 5 minutes',
+    u.name || ' made ' || COUNT(*) || ' wallet transactions within 5 minutes',
     'wallet',
     wt.student_id,
     'student',
-    u.full_name,
+    u.name,
     jsonb_build_object('transaction_count', COUNT(*), 'time_window', '5 minutes', 'total_amount', SUM(wt.amount))
   FROM wallet_transactions wt
   JOIN students s ON s.id = wt.student_id
   JOIN users u ON u.id = s.user_id
   WHERE wt.institution_id = v_inst_id
     AND wt.created_at >= NOW() - INTERVAL '1 hour'
-  GROUP BY wt.student_id, u.full_name, DATE_TRUNC('minute', wt.created_at)
+  GROUP BY wt.student_id, u.name, DATE_TRUNC('minute', wt.created_at)
   HAVING COUNT(*) >= 3
   ON CONFLICT DO NOTHING;
 
@@ -787,11 +786,11 @@ BEGIN
     'unusual_hours',
     'medium',
     'Attendance Marked at Unusual Hours',
-    'Attendance for ' || u.full_name || ' was marked at ' || TO_CHAR(a.created_at, 'HH24:MI'),
+    'Attendance for ' || u.name || ' was marked at ' || TO_CHAR(a.created_at, 'HH24:MI'),
     'attendance',
     a.student_id,
     'student',
-    u.full_name,
+    u.name,
     jsonb_build_object('marked_at', a.created_at, 'method', a.method)
   FROM attendance a
   JOIN students s ON s.id = a.student_id
@@ -808,11 +807,11 @@ BEGIN
     'geo_fence_violation',
     'high',
     'Attendance Outside Geo-Fence',
-    u.full_name || ' marked attendance from ' || ROUND(a.lat::NUMERIC, 4) || ', ' || ROUND(a.long::NUMERIC, 4),
+    u.name || ' marked attendance from ' || ROUND(a.lat::NUMERIC, 4) || ', ' || ROUND(a.long::NUMERIC, 4),
     'attendance',
     a.student_id,
     'student',
-    u.full_name,
+    u.name,
     jsonb_build_object('lat', a.lat, 'long', a.long, 'method', a.method)
   FROM attendance a
   JOIN students s ON s.id = a.student_id
@@ -896,7 +895,7 @@ ALTER TABLE naac_snapshots ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Director/Admin can view anomalies"
   ON system_anomalies FOR SELECT
-  USING (institution_id = (SELECT institution_id FROM users WHERE user_id = auth.uid()));
+  USING (institution_id = (SELECT institution_id FROM users WHERE id = auth.uid()));
 
 CREATE POLICY "System can insert anomalies"
   ON system_anomalies FOR INSERT
@@ -904,15 +903,15 @@ CREATE POLICY "System can insert anomalies"
 
 CREATE POLICY "Director/Admin can update anomalies"
   ON system_anomalies FOR UPDATE
-  USING (institution_id = (SELECT institution_id FROM users WHERE user_id = auth.uid()));
+  USING (institution_id = (SELECT institution_id FROM users WHERE id = auth.uid()));
 
 CREATE POLICY "Director/Admin can view NAAC snapshots"
   ON naac_snapshots FOR SELECT
-  USING (institution_id = (SELECT institution_id FROM users WHERE user_id = auth.uid()));
+  USING (institution_id = (SELECT institution_id FROM users WHERE id = auth.uid()));
 
 CREATE POLICY "Director/Admin can insert NAAC snapshots"
   ON naac_snapshots FOR INSERT
-  WITH CHECK (institution_id = (SELECT institution_id FROM users WHERE user_id = auth.uid()));
+  WITH CHECK (institution_id = (SELECT institution_id FROM users WHERE id = auth.uid()));
 
 -- =========================================================================
 -- 5. MATERIALIZED VIEW REFRESH FUNCTION
@@ -923,7 +922,15 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY IF EXISTS daily_attendance_summary;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY IF EXISTS daily_fee_summary;
+  BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY daily_attendance_summary;
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+  BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY daily_fee_summary;
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
 END;
 $$;

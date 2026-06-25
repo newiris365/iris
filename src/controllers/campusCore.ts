@@ -3497,7 +3497,7 @@ export async function getMyLeaves(req: Request, res: Response) {
     if (!student) return res.status(404).json({ success: false, error: 'Student profile not found.' });
 
     const { data, error } = await supabaseAdmin
-      .from('leave_applications')
+      .from('student_leave_applications')
       .select('*')
       .eq('student_id', student.id)
       .order('created_at', { ascending: false });
@@ -3512,7 +3512,7 @@ export async function getDepartmentLeaves(req: Request, res: Response) {
   try {
     const { departmentId } = req.query;
     let query = supabaseAdmin
-      .from('leave_applications')
+      .from('student_leave_applications')
       .select('*, students(roll_number, department_id, users(full_name))')
       .order('created_at', { ascending: false });
 
@@ -3925,7 +3925,7 @@ export async function getAttendanceShortageReport(req: Request, res: Response) {
 export async function getPendingLeaves(req: Request, res: Response) {
   try {
     const { data, error } = await supabaseAdmin
-      .from('leave_applications')
+      .from('student_leave_applications')
       .select('*, students(roll_number, department_id, users(full_name))')
       .in('status', ['pending', 'faculty_approved'])
       .order('created_at', { ascending: false });

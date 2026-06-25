@@ -107,19 +107,18 @@ BEGIN
 
         BEGIN
             -- Create user
-            INSERT INTO users (institution_id, full_name, email, role, is_active)
-            VALUES (p_institution_id, v_name, v_email, 'Student', true)
+            INSERT INTO users (institution_id, name, email, phone, role, is_active)
+            VALUES (p_institution_id, v_name, v_email, v_entry->>'phone', 'Student', true)
             RETURNING id INTO v_user_id;
 
             -- Create student profile
-            INSERT INTO students (user_id, institution_id, department_id, roll_number, semester, batch_year, dob, gender, phone, guardian_name, guardian_phone, fingerprint_id)
+            INSERT INTO students (user_id, institution_id, department_id, roll_number, semester, batch_year, dob, gender, guardian_name, guardian_phone, fingerprint_id)
             VALUES (
                 v_user_id, p_institution_id, v_dept_id, v_roll,
                 COALESCE((v_entry->>'semester')::INTEGER, 1),
                 COALESCE(v_entry->>'batch_year', EXTRACT(YEAR FROM CURRENT_DATE)::TEXT),
                 (v_entry->>'dob')::DATE,
                 v_entry->>'gender',
-                v_entry->>'phone',
                 v_entry->>'guardian_name',
                 v_entry->>'guardian_phone',
                 v_entry->>'fingerprint_id'
@@ -436,7 +435,7 @@ BEGIN
     )
     SELECT
         s.id,
-        u.full_name,
+        u.name,
         s.roll_number,
         d.name,
         COALESCE(att.pct, 100),

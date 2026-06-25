@@ -57,6 +57,78 @@ CREATE POLICY "parent_student_links_admin" ON parent_student_links
 -- 2. DROP EXISTING OVERLY-BROAD POLICIES
 -- ============================================================
 
+DO $$
+DECLARE
+  pol RECORD;
+BEGIN
+  FOR pol IN 
+    SELECT policyname, tablename 
+    FROM pg_policies 
+    WHERE schemaname = 'public'
+      AND policyname IN (
+        'users_select', 'users_insert', 'users_update', 'users_delete',
+        'departments_select', 'departments_manage',
+        'students_select', 'students_insert', 'students_update', 'students_delete',
+        'staff_select', 'staff_manage',
+        'attendance_sessions_select', 'attendance_sessions_insert', 'attendance_sessions_update', 'attendance_sessions_delete',
+        'attendance_select', 'attendance_insert', 'attendance_update',
+        'fee_structures_select', 'fee_structures_manage',
+        'fee_payments_select', 'fee_payments_insert', 'fee_payments_manage',
+        'fee_concessions_select', 'fee_concessions_manage',
+        'canteen_menus_select', 'canteen_menus_insert', 'canteen_menus_update', 'canteen_menus_delete',
+        'canteen_orders_select', 'canteen_orders_insert', 'canteen_orders_update',
+        'events_select', 'events_insert', 'events_update', 'events_delete',
+        'exam_results_select', 'exam_results_insert', 'exam_results_update',
+        'exams_select', 'exams_manage',
+        'timetable_select', 'timetable_manage',
+        'books_select', 'books_manage',
+        'book_issues_select', 'book_issues_insert', 'book_issues_update',
+        'hostel_rooms_select', 'hostel_rooms_manage',
+        'hostel_visitors_select', 'hostel_visitors_insert', 'hostel_visitors_update',
+        'gate_entries_select', 'gate_entries_insert', 'gate_entries_update',
+        'visitor_passes_select', 'visitor_passes_insert', 'visitor_passes_update',
+        'blacklisted_visitors_select', 'blacklisted_visitors_manage',
+        'rfid_cards_select', 'rfid_cards_manage',
+        'security_incidents_select', 'security_incidents_insert', 'security_incidents_update',
+        'gate_shifts_select', 'gate_shifts_manage',
+        'campus_occupancy_select', 'campus_occupancy_manage',
+        'bus_routes_select', 'bus_routes_manage',
+        'buses_select', 'buses_manage',
+        'bus_tracking_select', 'bus_tracking_insert', 'bus_tracking_update',
+        'bus_drivers_select', 'bus_drivers_manage',
+        'bus_trips_select', 'bus_trips_insert', 'bus_trips_update',
+        'trip_stop_logs_select', 'trip_stop_logs_insert',
+        'bus_incidents_select', 'bus_incidents_insert',
+        'bus_maintenance_select', 'bus_maintenance_manage',
+        'notifications_select', 'notifications_insert',
+        'event_registrations_select', 'event_registrations_insert', 'event_registrations_update',
+        'gym_slots_select', 'gym_slots_manage',
+        'gym_memberships_select', 'gym_memberships_insert',
+        'gym_bookings_select', 'gym_bookings_insert', 'gym_bookings_update',
+        'meal_subscriptions_select', 'meal_subscriptions_manage',
+        'fee_reminders_select', 'fee_reminders_manage',
+        'transport_subscriptions_select', 'transport_subscriptions_manage',
+        'visitor_logs_select', 'visitor_logs_insert', 'visitor_logs_update',
+        'id_card_templates_select', 'id_card_templates_manage',
+        'attendance_regularizations_select', 'attendance_regularizations_insert', 'attendance_regularizations_update',
+        'notification_logs_select', 'notification_logs_insert',
+        'companies_select', 'companies_manage',
+        'placement_drives_select', 'placement_drives_manage',
+        'student_profiles_select_own', 'student_profiles_manage_own',
+        'drive_applications_select', 'drive_applications_manage',
+        'interview_rounds_select', 'interview_rounds_manage',
+        'offer_letters_select', 'offer_letters_manage',
+        'mock_interviews_select', 'mock_interviews_manage',
+        'alumni_select', 'alumni_manage',
+        'alumni_mentorship_select', 'alumni_mentorship_manage',
+        'rls_audit_admin_only', 'parent_student_links_own', 'parent_student_links_admin'
+      )
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', pol.policyname, pol.tablename);
+  END LOOP;
+END $$;
+
+
 -- Drop the catch-all tenant policies that allow ALL roles full access
 DROP POLICY IF EXISTS "tenant_users_policy" ON users;
 DROP POLICY IF EXISTS "tenant_students_policy" ON students;
@@ -986,7 +1058,7 @@ CREATE POLICY "alumni_manage" ON alumni
 
 CREATE POLICY "alumni_mentorship_select" ON alumni_mentorship
   FOR SELECT USING (
-    institution_id = get_auth_institution_id()
+    alumni_id IN (SELECT id FROM alumni WHERE institution_id = get_auth_institution_id())
     OR get_auth_user_role() = 'SuperAdmin'
   );
 

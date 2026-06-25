@@ -4,7 +4,9 @@
 
 -- 1. Table schema constraints corrections
 ALTER TABLE public.users ALTER COLUMN email SET NOT NULL;
+ALTER TABLE public.hostel_rooms DROP CONSTRAINT IF EXISTS check_occupied_non_negative;
 ALTER TABLE public.hostel_rooms ADD CONSTRAINT check_occupied_non_negative CHECK (occupied >= 0);
+ALTER TABLE public.canteen_wallets DROP CONSTRAINT IF EXISTS check_balance_non_negative;
 ALTER TABLE public.canteen_wallets ADD CONSTRAINT check_balance_non_negative CHECK (balance >= 0.00);
 
 -- 2. Partial unique indexes to prevent duplicate active state allocations

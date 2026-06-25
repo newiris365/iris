@@ -43,51 +43,60 @@ ALTER TABLE institution_features ENABLE ROW LEVEL SECURITY;
 ALTER TABLE module_permissions ENABLE ROW LEVEL SECURITY;
 
 -- SuperAdmin can see all, others see their own institution
+DROP POLICY IF EXISTS "institution_features_select" ON institution_features;
 CREATE POLICY "institution_features_select" ON institution_features
   FOR SELECT USING (
     institution_id = get_auth_institution_id()
     OR get_auth_user_role() = 'SuperAdmin'
   );
 
+DROP POLICY IF EXISTS "institution_features_insert" ON institution_features;
 CREATE POLICY "institution_features_insert" ON institution_features
   FOR INSERT WITH CHECK (
     get_auth_user_role() = 'Admin'
     AND institution_id = get_auth_institution_id()
   );
 
+DROP POLICY IF EXISTS "institution_features_update" ON institution_features;
 CREATE POLICY "institution_features_update" ON institution_features
   FOR UPDATE USING (
     get_auth_user_role() = 'Admin'
     AND institution_id = get_auth_institution_id()
   );
 
+DROP POLICY IF EXISTS "institution_features_delete" ON institution_features;
 CREATE POLICY "institution_features_delete" ON institution_features
   FOR DELETE USING (
     get_auth_user_role() = 'SuperAdmin'
   );
 
+DROP POLICY IF EXISTS "module_permissions_select" ON module_permissions;
 CREATE POLICY "module_permissions_select" ON module_permissions
   FOR SELECT USING (
     institution_id = get_auth_institution_id()
     OR get_auth_user_role() = 'SuperAdmin'
   );
 
+DROP POLICY IF EXISTS "module_permissions_insert" ON module_permissions;
 CREATE POLICY "module_permissions_insert" ON module_permissions
   FOR INSERT WITH CHECK (
     get_auth_user_role() = 'SuperAdmin'
     OR get_auth_user_role() = 'Admin'
   );
 
+DROP POLICY IF EXISTS "module_permissions_update" ON module_permissions;
 CREATE POLICY "module_permissions_update" ON module_permissions
   FOR UPDATE USING (
     get_auth_user_role() = 'SuperAdmin'
     OR get_auth_user_role() = 'Admin'
   );
 
+DROP POLICY IF EXISTS "module_permissions_delete" ON module_permissions;
 CREATE POLICY "module_permissions_delete" ON module_permissions
   FOR DELETE USING (
     get_auth_user_role() = 'SuperAdmin'
   );
+
 
 -- ============================================================
 -- 4. SEED DATA: All features enabled for existing institutions
@@ -267,10 +276,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_institution_features_updated ON institution_features;
 CREATE TRIGGER trigger_institution_features_updated
   BEFORE UPDATE ON institution_features
   FOR EACH ROW EXECUTE FUNCTION update_permissions_timestamp();
 
+DROP TRIGGER IF EXISTS trigger_module_permissions_updated ON module_permissions;
 CREATE TRIGGER trigger_module_permissions_updated
   BEFORE UPDATE ON module_permissions
   FOR EACH ROW EXECUTE FUNCTION update_permissions_timestamp();
+

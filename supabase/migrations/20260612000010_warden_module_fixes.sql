@@ -79,7 +79,7 @@ $$;
 CREATE OR REPLACE VIEW unallocated_students AS
 SELECT
     s.id AS student_id,
-    u.full_name,
+    u.name AS full_name,
     s.roll_number,
     s.department_id,
     d.name AS department_name,
@@ -89,13 +89,13 @@ SELECT
 FROM students s
 JOIN users u ON s.user_id = u.id
 LEFT JOIN departments d ON s.department_id = d.id
-WHERE s.is_active = true
+WHERE u.is_active = true
 AND NOT EXISTS (
     SELECT 1 FROM hostel_allocations ha
     WHERE ha.student_id = s.id
     AND ha.is_current = true
 )
-ORDER BY u.full_name;
+ORDER BY u.name;
 
 -- RPC: Get unallocated students for warden's institution
 CREATE OR REPLACE FUNCTION get_unallocated_students()
@@ -324,7 +324,7 @@ BEGIN
     RETURN QUERY
     SELECT
         s.id,
-        u.full_name,
+        u.name,
         s.roll_number,
         hr.room_number,
         COALESCE(cc.is_present, false),
@@ -339,7 +339,7 @@ BEGIN
         AND cc.check_date = pcheck_date
     WHERE hr.block_id = p_block_id
     AND ha.is_current = true
-    ORDER BY hr.room_number, u.full_name;
+    ORDER BY hr.room_number, u.name;
 END;
 $$;
 
@@ -367,7 +367,7 @@ BEGIN
     RETURN QUERY
     SELECT
         s.id,
-        u.full_name,
+        u.name,
         s.roll_number,
         hr.room_number,
         mp.name,
@@ -386,7 +386,7 @@ BEGIN
     WHERE hr.block_id = p_block_id
     AND ha.is_current = true
     AND ms.status = 'active'
-    ORDER BY u.full_name;
+    ORDER BY u.name;
 END;
 $$;
 
