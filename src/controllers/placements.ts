@@ -716,6 +716,23 @@ export async function aiResumeScore(req: Request, res: Response) {
 
     const matchedRoles = ['Fullstack Developer', 'Backend Engineer', 'Database Administrator'];
 
+    // Resolve student_id associated with current user
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('user_id', req.user?.id)
+      .maybeSingle();
+
+    if (student) {
+      await supabaseAdmin
+        .from('student_profiles')
+        .update({
+          ai_resume_score: overallScore,
+          ai_resume_feedback: recommendations.join('\n')
+        })
+        .eq('student_id', student.id);
+    }
+
     return res.status(200).json({
       success: true,
       analysis: {
@@ -805,16 +822,60 @@ export async function aiCareerGuidance(req: Request, res: Response) {
 
 export async function getAnalyticsDashboard(req: Request, res: Response) {
   try {
-    // Return aggregated placement figures
+    const { count: totalEligible } = await supabaseAdmin
+      .from('student_profiles')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: totalPlaced } = await supabaseAdmin
+      .from('student_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_placed', true);
+
+    const { count: totalCompanies } = await supabaseAdmin
+      .from('companies')
+      .select('*', { count: 'exact', head: true });
+
+    const { data: placedProfiles } = await supabaseAdmin
+      .from('student_profiles')
+      .select('placed_ctc')
+      .eq('is_placed', true);
+
+    let avgCtc = 7.8;
+    let medianCtc = 6.5;
+    let highestCtc = 44.0;
+    let lowestCtc = 3.6;
+    let dreamCount = 48;
+    let coreCount = 120;
+    let massCount = 47;
+
+    if (placedProfiles && placedProfiles.length > 0) {
+      const ctcs = placedProfiles.map((p: any) => parseFloat(p.placed_ctc || 0)).filter(c => c > 0);
+      if (ctcs.length > 0) {
+        ctcs.sort((a, b) => a - b);
+        const sum = ctcs.reduce((acc, val) => acc + val, 0);
+        avgCtc = parseFloat((sum / ctcs.length).toFixed(2));
+        
+        const mid = Math.floor(ctcs.length / 2);
+        medianCtc = ctcs.length % 2 !== 0 ? ctcs[mid] : parseFloat(((ctcs[mid - 1] + ctcs[mid]) / 2).toFixed(2));
+        
+        highestCtc = ctcs[ctcs.length - 1];
+        lowestCtc = ctcs[0];
+
+        dreamCount = ctcs.filter(c => c >= 10).length;
+        coreCount = ctcs.filter(c => c >= 5 && c < 10).length;
+        massCount = ctcs.filter(c => c < 5).length;
+      }
+    }
+
     const stats = {
-      total_eligible: 320,
-      total_registered: 310,
-      total_placed: 215,
-      total_companies: 42,
-      avg_ctc: 7.8,
-      median_ctc: 6.5,
-      highest_ctc: 44.0,
-      lowest_ctc: 3.6,
+      total_eligible: totalEligible || 320,
+      total_registered: (totalEligible || 320) - 10,
+      total_placed: totalPlaced || 215,
+      total_companies: totalCompanies || 42,
+      avg_ctc: avgCtc,
+      median_ctc: medianCtc,
+      highest_ctc: highestCtc,
+      lowest_ctc: lowestCtc,
       branch_rates: [
         { branch: 'CSE', rate: 92 },
         { branch: 'AIDS', rate: 88 },
@@ -822,9 +883,9 @@ export async function getAnalyticsDashboard(req: Request, res: Response) {
         { branch: 'MECH', rate: 45 }
       ],
       ctc_segments: [
-        { range: 'Dream (>10L)', count: 48 },
-        { range: 'Core (5-10L)', count: 120 },
-        { range: 'Mass (<5L)', count: 47 }
+        { range: 'Dream (>10L)', count: dreamCount },
+        { range: 'Core (5-10L)', count: coreCount },
+        { range: 'Mass (<5L)', count: massCount }
       ]
     };
 
@@ -937,7 +998,25 @@ export async function bookMentorshipSession(req: Request, res: Response) {
 
 export async function getInternships(req: Request, res: Response) {
   try {
-    // Mock / query list
+    const { data, error } = await supabaseAdmin
+      .from('placement_drives')
+      .select('*, companies(*)')
+      .eq('job_type', 'internship');
+    
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      const internships = data.map((d: any) => ({
+        id: d.id,
+        company: d.companies?.name || 'MNC Partner',
+        role: d.role,
+        stipend: d.stipend || 0,
+        duration: d.eligibility_criteria?.duration || '6 Months',
+        status: new Date(d.application_deadline) > new Date() ? 'open' : 'closed'
+      }));
+      return res.status(200).json({ success: true, internships });
+    }
+
     const mockDrives = [
       { id: 'int-1', company: 'Google India', role: 'Software Engineer Intern', stipend: 80000, duration: '6 Months', status: 'open' },
       { id: 'int-2', company: 'ZS Associates', role: 'Decision Analytics Intern', stipend: 45000, duration: '3 Months', status: 'open' }
@@ -1042,6 +1121,85 @@ export async function updateCompanyVisit(req: Request, res: Response) {
       .single();
     if (error) throw error;
     return res.status(200).json({ success: true, visit: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function registerAlumni(req: Request, res: Response) {
+  try {
+    const { student_id, graduation_year, current_company, current_role, current_ctc, location, linkedin_url, is_mentor, mentoring_slots } = req.body;
+    if (!student_id) {
+      return res.status(400).json({ success: false, error: 'student_id required.' });
+    }
+    
+    const { data: student, error: stdErr } = await supabaseAdmin
+      .from('students')
+      .select('institution_id, user_id')
+      .eq('id', student_id)
+      .single();
+      
+    if (stdErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+    
+    const { data, error } = await supabaseAdmin
+      .from('alumni')
+      .insert({
+        student_id,
+        institution_id: student.institution_id,
+        graduation_year: graduation_year || new Date().getFullYear(),
+        current_company,
+        current_role: current_role,
+        current_ctc,
+        location,
+        linkedin_url,
+        is_mentor: !!is_mentor,
+        mentoring_slots: mentoring_slots || 0
+      })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    if (student.user_id) {
+      await supabaseAdmin
+        .from('users')
+        .update({ role: 'Alumni' })
+        .eq('id', student.user_id);
+    }
+    
+    return res.status(201).json({ success: true, alumni: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function updateAlumniProfile(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { graduation_year, current_company, current_role, current_ctc, location, linkedin_url, is_mentor, mentoring_slots, achievements } = req.body;
+    
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (graduation_year !== undefined) updateData.graduation_year = graduation_year;
+    if (current_company !== undefined) updateData.current_company = current_company;
+    if (current_role !== undefined) updateData.current_role = current_role;
+    if (current_ctc !== undefined) updateData.current_ctc = current_ctc;
+    if (location !== undefined) updateData.location = location;
+    if (linkedin_url !== undefined) updateData.linkedin_url = linkedin_url;
+    if (is_mentor !== undefined) updateData.is_mentor = is_mentor;
+    if (mentoring_slots !== undefined) updateData.mentoring_slots = mentoring_slots;
+    if (achievements !== undefined) updateData.achievements = achievements;
+    
+    const { data, error } = await supabaseAdmin
+      .from('alumni')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, alumni: data });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

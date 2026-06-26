@@ -44,7 +44,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Student',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Admin':
       return {
@@ -54,7 +55,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Admin',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Warden':
       return {
@@ -64,7 +66,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Warden',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Security':
       return {
@@ -74,7 +77,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Security',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Driver':
       return {
@@ -84,7 +88,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Driver',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Staff':
       return {
@@ -94,7 +99,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Staff',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Parent':
       return {
@@ -104,7 +110,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Parent',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Vendor':
       return {
@@ -114,7 +121,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Vendor',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Teacher':
       return {
@@ -124,7 +132,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Teacher',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'HOD':
       return {
@@ -134,7 +143,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'HOD',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Librarian':
       return {
@@ -144,7 +154,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Librarian',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'Director':
       return {
@@ -154,7 +165,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'Director',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
     case 'SuperAdmin':
       return {
@@ -164,7 +176,8 @@ const getMockProfile = (email: string, role: string) => {
         role: 'SuperAdmin',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'Enterprise'
+        plan_tier: 'Enterprise',
+        institute_type: 'college'
       };
     default:
       return {
@@ -174,7 +187,8 @@ const getMockProfile = (email: string, role: string) => {
         role: role,
         institution_id: 'a0000000-0000-0000-0000-000000000001',
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
-        plan_tier: 'University'
+        plan_tier: 'University',
+        institute_type: 'college'
       };
   }
 };

@@ -1,5 +1,7 @@
 "use client";
 
+import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   QrCode, Calendar, CalendarDays, CreditCard, ShoppingBag, Home, BookOpen,
@@ -34,7 +36,71 @@ const studentLinks: SidebarLink[] = [
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
-export default function StudentLayout({ children }: { children: React.ReactNode }) {
+function StudentLayoutContent({ children }: { children: React.ReactNode }) {
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('iris_user_profile');
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        const role = parsed.role || '';
+        let instType = parsed.institute_type || 'college';
+
+        const refreshProfile = () => {
+          const token = localStorage.getItem('iris_jwt_token');
+          if (!token) return;
+          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.profile) {
+                const freshType = data.profile.institute_type || 'college';
+                if (freshType !== instType) {
+                  parsed.institute_type = freshType;
+                  localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+                  window.location.reload();
+                }
+              }
+            })
+            .catch(() => {});
+        };
+
+        if (instType === 'school') {
+          alert('Student portal is not available for school-type institutes. Parents can access student details through the Parent Portal.');
+          window.location.href = '/login';
+          return;
+        }
+
+        if (role !== 'Student') {
+          window.location.href = '/login';
+          return;
+        }
+
+        setAuthorized(true);
+        refreshProfile();
+      } catch (e) {
+        console.error('Failed parsing profile for student auth check:', e);
+        setAuthorized(false);
+        window.location.href = '/login';
+      }
+    } else {
+      window.location.href = '/login';
+    }
+  }, []);
+
+  if (!hasMounted || authorized !== true) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <p className="text-slate-400 text-sm">Checking access...</p>
+      </div>
+    );
+  }
+
   return (
     <PortalShell
       portalName="Student Portal"
@@ -46,3 +112,14 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     </PortalShell>
   );
 }
+
+const StudentLayout = dynamic(() => Promise.resolve(StudentLayoutContent), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-[60vh] flex items-center justify-center bg-[#0D0A1A]">
+      <p className="text-slate-400 text-sm">Checking access...</p>
+    </div>
+  )
+});
+
+export default StudentLayout;

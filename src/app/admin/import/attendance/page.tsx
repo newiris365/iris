@@ -8,6 +8,7 @@ import {
 import Link from 'next/link';
 import { importAttendanceRecords } from '@/lib/api';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 interface ImportRow {
   student_roll: string;
@@ -48,31 +49,85 @@ export default function AttendanceImportPage() {
     setErrors([]);
     setImportResult(null);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const headers = results.meta.fields || [];
-        const rows = results.data as any[];
-        setRawHeaders(headers);
-        setRawData(rows);
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel';
 
-        // Auto-detect column mapping
-        const mapping: Record<string, string> = {};
-        REQUIRED_COLUMNS.forEach(req => {
-          const match = headers.find(h => 
-            h.toLowerCase().trim() === req.toLowerCase() ||
-            h.toLowerCase().trim().replace(/[\s-]/g, '_') === req
-          );
-          if (match) mapping[req] = match;
-        });
-        setColumnMapping(mapping);
-        setStep('map');
-      },
-      error: (err) => {
-        setErrors([{ row: 0, error: `CSV Parse Error: ${err.message}` }]);
-      }
-    });
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          if (!firstSheetName) {
+            setErrors([{ row: 0, error: 'Excel file is empty (no sheets found)' }]);
+            return;
+          }
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
+          
+          if (rawRows.length === 0) {
+            setErrors([{ row: 0, error: 'Excel sheet is empty' }]);
+            return;
+          }
+
+          const headers = (rawRows[0] || []).map(h => String(h).trim()).filter(h => h !== '');
+          const dataRows = rawRows.slice(1).map(row => {
+            const obj: Record<string, any> = {};
+            headers.forEach((h, index) => {
+              obj[h] = row[index] !== undefined ? String(row[index]).trim() : '';
+            });
+            return obj;
+          }).filter(row => Object.values(row).some(v => v !== ''));
+
+          setRawHeaders(headers);
+          setRawData(dataRows);
+
+          // Auto-detect column mapping
+          const mapping: Record<string, string> = {};
+          REQUIRED_COLUMNS.forEach(req => {
+            const match = headers.find(h => 
+              h.toLowerCase().trim() === req.toLowerCase() ||
+              h.toLowerCase().trim().replace(/[\s-]/g, '_') === req
+            );
+            if (match) mapping[req] = match;
+          });
+          setColumnMapping(mapping);
+          setStep('map');
+        } catch (err: any) {
+          setErrors([{ row: 0, error: `Excel Parse Error: ${err.message}` }]);
+        }
+      };
+      reader.onerror = () => {
+        setErrors([{ row: 0, error: 'File reading failed' }]);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const headers = (results.meta.fields || []).map(h => h.trim());
+          const rows = results.data as any[];
+          setRawHeaders(headers);
+          setRawData(rows);
+
+          // Auto-detect column mapping
+          const mapping: Record<string, string> = {};
+          REQUIRED_COLUMNS.forEach(req => {
+            const match = headers.find(h => 
+              h.toLowerCase().trim() === req.toLowerCase() ||
+              h.toLowerCase().trim().replace(/[\s-]/g, '_') === req
+            );
+            if (match) mapping[req] = match;
+          });
+          setColumnMapping(mapping);
+          setStep('map');
+        },
+        error: (err) => {
+          setErrors([{ row: 0, error: `CSV Parse Error: ${err.message}` }]);
+        }
+      });
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -156,7 +211,7 @@ export default function AttendanceImportPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-white">Import Attendance Records</h1>
-            <p className="text-sm text-gray-400 mt-1">Upload historical attendance data from CSV files</p>
+            <p className="text-sm text-gray-400 mt-1">Upload historical attendance data from CSV or Excel files</p>
           </div>
         </div>
 
@@ -192,13 +247,13 @@ export default function AttendanceImportPage() {
               onClick={() => fileRef.current?.click()}
             >
               <Upload className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-lg text-white font-medium mb-2">Drop your CSV file here</p>
+              <p className="text-lg text-white font-medium mb-2">Drop your CSV or Excel file here</p>
               <p className="text-sm text-gray-400 mb-4">or click to browse</p>
-              <p className="text-xs text-gray-500">Supports .csv files with headers</p>
+              <p className="text-xs text-gray-500">Supports .csv, .xls, .xlsx files with headers</p>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,.tsv,.txt"
+                accept=".csv,.tsv,.txt,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -223,9 +278,9 @@ export default function AttendanceImportPage() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-8"
           >
-            <h2 className="text-lg font-bold text-white mb-6">Map CSV Columns</h2>
+            <h2 className="text-lg font-bold text-white mb-6">Map Spreadsheet Columns</h2>
             <p className="text-sm text-gray-400 mb-6">
-              Map your CSV columns to the required fields. Auto-detected mappings are shown below.
+              Map your spreadsheet columns to the required fields. Auto-detected mappings are shown below.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">

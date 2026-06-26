@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import { askClaude, getEmbeddings, MessageContext } from '../services/aiConciergeService';
 import logger from '../config/logger';
+import { getActiveInstitutionKeys } from './aiConfig';
 
 // ========== ZOD VALIDATION SCHEMAS ==========
 export const chatQuerySchema = z.object({
@@ -213,6 +214,7 @@ export async function chatQuery(req: Request, res: Response) {
     const sessionId = session_id || `session_${Date.now()}`;
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
     const userId = req.user?.id || 'u0000000-0000-0000-0000-000000000001';
+    const keys = await getActiveInstitutionKeys(institutionId);
 
     const lang = detectLanguage(message);
     const intents = detectIntent(message);
@@ -263,7 +265,7 @@ export async function chatQuery(req: Request, res: Response) {
         .maybeSingle();
 
       const history = existingConv?.messages || [];
-      finalResponse = await askClaude(message, ctx, history);
+      finalResponse = await askClaude(message, ctx, history, keys);
     }
 
     // Auto Handoff escalation trigger checking
@@ -558,6 +560,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     // Subscriber is verified: run standard chat concierge answers
     const userId = subscriber.user_id;
     const instId = subscriber.institution_id;
+    const keys = await getActiveInstitutionKeys(instId);
     const lang = detectLanguage(userQueryText);
     const intents = detectIntent(userQueryText);
 
@@ -565,7 +568,7 @@ export async function whatsappWebhook(req: Request, res: Response) {
     ctx.language = lang;
 
     // Call Claude
-    const replyText = await askClaude(userQueryText, ctx, []);
+    const replyText = await askClaude(userQueryText, ctx, [], keys);
     await dispatchWhatsappReply(senderPhone, replyText);
 
     // Save history
@@ -1053,6 +1056,7 @@ export async function voiceTranscribe(req: Request, res: Response) {
 
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
     const userId = req.user?.id || 'u0000000-0000-0000-0000-000000000001';
+    const keys = await getActiveInstitutionKeys(institutionId);
 
     // Save voice transcript log
     const { data: txLog } = await supabaseAdmin
@@ -1097,7 +1101,7 @@ export async function voiceTranscribe(req: Request, res: Response) {
     } catch {}
 
     // Get Claude response if no FAQ match
-    let aiResponse = matchedAnswer || await askClaude(transcript, ctx, []);
+    let aiResponse = matchedAnswer || await askClaude(transcript, ctx, [], keys);
 
     // Update conversation log
     if (txLog?.id) {
@@ -1260,6 +1264,7 @@ export async function markNudgeActioned(req: Request, res: Response) {
 export async function sendNudgeBatch(req: Request, res: Response) {
   try {
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const keys = await getActiveInstitutionKeys(institutionId);
 
     // Fetch all students with nudge preferences enabled
     const { data: prefs } = await supabaseAdmin
@@ -1294,7 +1299,7 @@ export async function sendNudgeBatch(req: Request, res: Response) {
 
       let nudgeData: any;
       try {
-        const claudeResponse = await askClaude(nudgePrompt, ctx, []);
+        const claudeResponse = await askClaude(nudgePrompt, ctx, [], keys);
         nudgeData = JSON.parse(claudeResponse);
       } catch {
         // Fallback generated nudge
@@ -1437,6 +1442,7 @@ export async function generateStudyPlan(req: Request, res: Response) {
   try {
     const userId = req.user?.id || 'u0000000-0000-0000-0000-000000000001';
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const keys = await getActiveInstitutionKeys(institutionId);
     const { exam_schedule, study_hours_per_day, weak_areas } = req.body;
 
     const { data: student } = await supabaseAdmin
@@ -1489,7 +1495,7 @@ Rules:
 
     let studyPlanData: any;
     try {
-      const claudeResponse = await askClaude(planPrompt, ctx, []);
+      const claudeResponse = await askClaude(planPrompt, ctx, [], keys);
       // Try to parse JSON from Claude response
       const jsonMatch = claudeResponse.match(/\{[\s\S]*\}/);
       studyPlanData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;

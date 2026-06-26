@@ -1,0 +1,197 @@
+/**
+ * Shared Export & Reporting Utilities for IRIS 365
+ */
+
+/**
+ * Resolves nested paths like 'students.first_name' from an object.
+ */
+export function getNestedValue(obj: any, path: string): any {
+  if (!obj) return '';
+  const val = path.split('.').reduce((acc, part) => {
+    return acc && acc[part] !== undefined ? acc[part] : undefined;
+  }, obj);
+  return val !== undefined ? val : '';
+}
+
+/**
+ * Exports data objects to a CSV file download.
+ */
+export function exportToCSV(
+  data: any[],
+  filename: string,
+  headers: string[],
+  keys: string[]
+) {
+  const csvRows = [headers.join(',')];
+
+  for (const row of data) {
+    const values = keys.map(key => {
+      const val = getNestedValue(row, key);
+      const escaped = ('' + val).replace(/"/g, '""');
+      return `"${escaped}"`;
+    });
+    csvRows.push(values.join(','));
+  }
+
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename.endsWith('.csv') ? filename : `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Exports data objects to a beautiful print-ready PDF using the browser print API.
+ */
+export function exportToPDF(
+  title: string,
+  data: any[],
+  filename: string,
+  headers: string[],
+  keys: string[]
+) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to generate PDF reports.');
+    return;
+  }
+
+  const headersHtml = headers.map(h => `<th>${h}</th>`).join('');
+  const rowsHtml = data
+    .map(row => {
+      const tds = keys
+        .map(key => {
+          const val = getNestedValue(row, key);
+          return `<td>${typeof val === 'object' ? JSON.stringify(val) : val}</td>`;
+        })
+        .join('');
+      return `<tr>${tds}</tr>`;
+    })
+    .join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>${title}</title>
+        <meta charset="utf-8" />
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            padding: 40px;
+            margin: 0;
+            background: #ffffff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #6C2BD9;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+          }
+          .logo {
+            font-size: 20px;
+            font-weight: 800;
+            color: #6C2BD9;
+            letter-spacing: -0.025em;
+          }
+          .logo span {
+            color: #06B6D4;
+          }
+          .title-area {
+            text-align: right;
+          }
+          h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .date {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 4px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 12px;
+          }
+          th {
+            background-color: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+            color: #475569;
+            font-weight: 700;
+            text-align: left;
+            padding: 12px 10px;
+          }
+          td {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 10px;
+            color: #334155;
+          }
+          tr:nth-child(even) {
+            background-color: #fafafa;
+          }
+          .footer {
+            margin-top: 60px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+            font-size: 10px;
+            color: #94a3b8;
+            text-align: center;
+          }
+          @media print {
+            body {
+              padding: 0;
+            }
+            .no-print {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">IRIS <span>365</span></div>
+          <div class="title-area">
+            <h1>${title}</h1>
+            <div class="date">Generated on: ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN')}</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>${headersHtml}</tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <div class="footer">
+          This is an official document generated by IRIS 365 AI-Powered Campus Operating System.
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          }
+        </script>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+}

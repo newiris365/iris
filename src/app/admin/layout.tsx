@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Users, CalendarDays, CreditCard, ShoppingBag, BookOpen,
@@ -29,6 +30,7 @@ const adminLinks: SidebarLink[] = [
   { label: 'Defaulter Report', href: '/admin/reports/defaulters', icon: BarChart3 },
   { label: 'Canteen', href: '/admin/canteen', icon: ShoppingBag },
   { label: 'Hostel', href: '/admin/hostel', icon: Home },
+  { label: 'Pending Complaints', href: '/admin/complaints', icon: AlertTriangle },
   { label: 'Library', href: '/admin/library/bookclubs', icon: BookOpen },
   { label: 'Placements', href: '/admin/placements', icon: Briefcase },
   { label: 'HR Management', href: '/admin/hr', icon: HeartPulse },
@@ -55,6 +57,8 @@ const adminLinks: SidebarLink[] = [
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
 
+import { getRoleLabel } from '../../lib/roleLabels';
+
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
   SuperAdmin: '/admin/global',
   Admin: '/admin/dashboard',
@@ -73,10 +77,36 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
 
 const ALLOWED_ADMIN_ROLES = new Set(['SuperAdmin', 'Admin']);
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [links, setLinks] = useState<SidebarLink[]>(adminLinks);
   const [userRole, setUserRole] = useState<string>('');
+  const [instituteType, setInstituteType] = useState<string>('college');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  const applySidebar = (role: string, instType: string) => {
+    if (role === 'SuperAdmin') {
+      setLinks([
+        { label: 'Global Console', href: '/admin/global', icon: Shield },
+        { label: 'Profile', href: '/profile', icon: UserCircle },
+      ]);
+    } else {
+      let filteredLinks = adminLinks.filter(l => l.href !== '/admin/settings');
+      if (instType === 'school') {
+        filteredLinks = filteredLinks.filter(l => 
+          l.label !== 'OBE Maps' && 
+          l.label !== 'NAAC Scorecard' && 
+          l.label !== 'Placements' && 
+          l.label !== 'Faculty Dev'
+        );
+      }
+      setLinks(filteredLinks);
+    }
+  };
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
@@ -84,7 +114,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       try {
         const parsed = JSON.parse(savedProfile);
         const role = parsed.role || '';
+        const instType = parsed.institute_type || 'college';
         setUserRole(role);
+        setInstituteType(instType);
 
         if (!ALLOWED_ADMIN_ROLES.has(role)) {
           const redirect = ROLE_DASHBOARD_MAP[role] || '/dashboard';
@@ -93,13 +125,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         setAuthorized(true);
-        if (role === 'SuperAdmin') {
-          setLinks([
-            { label: 'Global Console', href: '/admin/global', icon: Shield },
-            { label: 'Profile', href: '/profile', icon: UserCircle },
-          ]);
-        } else {
-          setLinks(adminLinks.filter(l => l.href !== '/admin/settings'));
+        applySidebar(role, instType);
+
+        const token = localStorage.getItem('iris_jwt_token');
+        if (token) {
+          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.profile) {
+                const freshType = data.profile.institute_type || 'college';
+                if (freshType !== instType) {
+                  parsed.institute_type = freshType;
+                  localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+                  setInstituteType(freshType);
+                  applySidebar(role, freshType);
+                }
+              }
+            })
+            .catch(() => {});
         }
       } catch (e) {
         console.error('Failed parsing profile for admin auth check:', e);
@@ -110,18 +153,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  if (authorized === null || authorized === false) {
+  if (!hasMounted || authorized !== true) {
     return (
-      <div className="min-h-screen bg-[#0D0A1A] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <p className="text-slate-400 text-sm">Checking access...</p>
       </div>
     );
   }
 
+  const mappedRole = getRoleLabel(userRole, instituteType);
+
   return (
     <PortalShell
-      portalName={userRole === 'SuperAdmin' ? "SuperAdmin Console" : "Admin Console"}
-      portalBadge={userRole === 'SuperAdmin' ? "SuperAdmin" : "Admin"}
+      portalName={userRole === 'SuperAdmin' ? "SuperAdmin Console" : `${mappedRole} Console`}
+      portalBadge={userRole === 'SuperAdmin' ? "SuperAdmin" : mappedRole}
       sidebarLinks={links}
       accentColor="#6C2BD9"
     >
@@ -129,3 +174,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </PortalShell>
   );
 }
+
+const AdminLayout = dynamic(() => Promise.resolve(AdminLayoutContent), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-[60vh] flex items-center justify-center bg-[#0D0A1A]">
+      <p className="text-slate-400 text-sm">Checking access...</p>
+    </div>
+  )
+});
+
+export default AdminLayout;

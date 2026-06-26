@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
+import { sendTextMessage } from '../services/whatsapp';
 
 // ========== ZOD VALIDATION SCHEMAS ==========
 
@@ -1571,3 +1572,296 @@ export async function getParkingAlerts(req: Request, res: Response) {
   }
 }
 
+// ========== SPRINT 6: ADDED FOR GPS HARDWARE INGESTION & BOARDING LOGS ==========
+
+export const ingestGpsSchema = z.object({
+  device_id: z.string().min(1),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  speed: z.number().min(0).optional().default(0),
+  heading: z.number().min(0).max(360).optional().default(0)
+});
+
+export const studentTapSchema = z.object({
+  student_id: z.string().uuid(),
+  direction: z.enum(['boarding', 'alighting']),
+  stop_name: z.string().min(1)
+});
+
+/** POST /transit/telemetry/gps - Public Telemetry Ingestion from GPS Hardware */
+export async function ingestGpsTelemetry(req: Request, res: Response) {
+  try {
+    const parseResult = ingestGpsSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
+    }
+
+    const { device_id, latitude, longitude, speed, heading } = parseResult.data;
+
+    // Verify bus exists by device_id
+    const { data: bus, error: busError } = await supabaseAdmin
+      .from('buses')
+      .select('id, vehicle_number, route_id, institution_id')
+      .eq('device_id', device_id)
+      .single();
+
+    if (busError || !bus) {
+      return res.status(404).json({ success: false, error: 'Bus not found with this hardware device_id.' });
+    }
+
+    // Insert tracking record
+    const { data: tracking, error: trackError } = await supabaseAdmin
+      .from('bus_tracking')
+      .insert({
+        institution_id: bus.institution_id,
+        bus_id: bus.id,
+        latitude,
+        longitude,
+        speed,
+        heading,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (trackError) {
+      return res.status(500).json({ success: false, error: trackError.message });
+    }
+
+    // Calculate remaining ETAs for upcoming stops if active route exists
+    let etas: any[] = [];
+    if (bus.route_id) {
+      const { data: route } = await supabaseAdmin
+        .from('bus_routes')
+        .select('stops')
+        .eq('id', bus.route_id)
+        .single();
+
+      if (route && Array.isArray(route.stops)) {
+        const stopsList: any[] = route.stops;
+        etas = stopsList.map((stop: any) => {
+          const distance = calculateHaversineDistance(latitude, longitude, stop.latitude, stop.longitude);
+          const velocity = speed > 5 ? speed : 25;
+          const etaMins = Math.round((distance / velocity) * 60);
+          return {
+            name: stop.name,
+            stop_index: stop.stop_index,
+            distance_km: parseFloat(distance.toFixed(2)),
+            eta_minutes: etaMins
+          };
+        });
+      }
+    }
+
+    // Broadcast via Socket.io
+    try {
+      const { transitNs } = require('../server');
+      if (transitNs) {
+        transitNs.to(`bus_${bus.id}`).emit('bus:location_updated', {
+          bus_id: bus.id,
+          vehicle_number: bus.vehicle_number,
+          latitude,
+          longitude,
+          speed,
+          heading,
+          timestamp: new Date().toISOString(),
+          etas
+        });
+
+        transitNs.to('admin:transit').emit('bus:location_updated', {
+          bus_id: bus.id,
+          vehicle_number: bus.vehicle_number,
+          latitude,
+          longitude,
+          speed,
+          heading,
+          timestamp: new Date().toISOString()
+        });
+
+        etas.forEach((item: any) => {
+          if (item.distance_km < 0.8) {
+            transitNs.to(`bus_${bus.id}`).emit(`bus:approaching:${item.stop_index}`, {
+              stop_name: item.name,
+              eta_minutes: item.eta_minutes
+            });
+          }
+        });
+      }
+    } catch {
+      // Ignore Socket.io issues during builds
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bus position hardware telemetry updated.',
+      tracking,
+      etas
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+/** POST /transit/trips/:id/tap - Record student boarding/alighting and notify parent */
+export async function recordStudentTransitTap(req: Request, res: Response) {
+  try {
+    const { id: tripId } = req.params;
+    const parseResult = studentTapSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
+    }
+
+    const { student_id, direction, stop_name } = parseResult.data;
+
+    // Verify trip is active
+    const { data: trip, error: tripErr } = await supabaseAdmin
+      .from('bus_trips')
+      .select('id, bus_id, passenger_count, institution_id')
+      .eq('id', tripId)
+      .eq('status', 'active')
+      .single();
+
+    if (tripErr || !trip) {
+      return res.status(404).json({ success: false, error: 'Active trip not found.' });
+    }
+
+    // Insert student transit log
+    const { data: logEntry, error: logErr } = await supabaseAdmin
+      .from('student_transit_logs')
+      .insert({
+        institution_id: trip.institution_id,
+        student_id,
+        trip_id: tripId,
+        bus_id: trip.bus_id,
+        direction,
+        stop_name
+      })
+      .select()
+      .single();
+
+    if (logErr) {
+      return res.status(500).json({ success: false, error: logErr.message });
+    }
+
+    // Update passenger count on bus trip
+    const passengerDiff = direction === 'boarding' ? 1 : -1;
+    const newCount = Math.max(0, (trip.passenger_count || 0) + passengerDiff);
+    await supabaseAdmin
+      .from('bus_trips')
+      .update({ passenger_count: newCount })
+      .eq('id', tripId);
+
+    // Fetch Student & Parent details for notifications
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('*, users(full_name)')
+      .eq('id', student_id)
+      .single();
+
+    const studentName = student?.users?.full_name || 'Student';
+
+    // Broadcast student:tapped to Socket.io
+    try {
+      const { transitNs } = require('../server');
+      if (transitNs) {
+        transitNs.to(`bus_${trip.bus_id}`).emit('student:tapped', {
+          student_id,
+          student_name: studentName,
+          direction,
+          stop_name,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch {
+      // Ignore websocket failures in build
+    }
+
+    // Notify linked parents
+    const { data: parentLinks } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('parent_user_id, users(phone)')
+      .eq('student_id', student_id)
+      .eq('verified', true);
+
+    if (parentLinks && parentLinks.length > 0) {
+      const messageBody = `🚌 Bus Transit Notification: Your child, ${studentName}, has ${direction === 'boarding' ? 'boarded' : 'alighted from'} the bus at ${stop_name}. - IRIS 365`;
+      
+      for (const link of parentLinks) {
+        const parentUserId = link.parent_user_id;
+        const parentPhone = (link.users as any)?.phone;
+
+        // 1. Insert parent notification
+        await supabaseAdmin
+          .from('parent_notifications')
+          .insert({
+            parent_user_id: parentUserId,
+            student_id,
+            notification_type: 'bus_boarded',
+            title: 'Bus Transit Update',
+            message: messageBody,
+            metadata: {
+              student_name: studentName,
+              stop_name,
+              direction,
+              trip_id: tripId
+            }
+          });
+
+        // 2. Dispatch SMS/WhatsApp
+        if (parentPhone) {
+          await sendTextMessage(parentPhone, messageBody, 'bus_boarded');
+        }
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Student successfully logged as ${direction}.`,
+      log: logEntry
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
+  }
+}
+
+// ========== LIVE BUS TRACKING — GET ACTIVE BUSES ==========
+export async function getLiveBuses(req: Request, res: Response) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('buses')
+      .select(`
+        id, vehicle_number, current_lat, current_lng,
+        last_location_at, is_active, speed_kmh,
+        bus_routes ( name, route_number )
+      `)
+      .eq('institution_id', req.user?.institution_id)
+      .eq('is_active', true);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, buses: data || [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Internal server error fetching live buses.' });
+  }
+}
+
+// ========== LIVE BUS TRACKING — GET MY ASSIGNED BUSES (DRIVER) ==========
+export async function getMyBuses(req: Request, res: Response) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('buses')
+      .select(`id, vehicle_number, bus_routes ( name, route_number )`)
+      .eq('driver_id', req.user?.id)
+      .eq('institution_id', req.user?.institution_id);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, buses: data || [] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Internal server error fetching driver buses.' });
+  }
+}

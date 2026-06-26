@@ -1,7 +1,16 @@
 import cron from 'node-cron';
 import { supabaseAdmin, isSupabaseOffline } from './supabase';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is required and must be at least 32 characters in length to prevent brute-force signature forgery!');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
+
 import logger from './logger';
 import { generatePDFKitFallback, uploadReportToSupabase } from '../services/pdfGenerator';
+import { generateRotatingQrToken } from '../controllers/campusCore';
 
 // Safeguard background tasks: skip database-dependent cron runs when Supabase is offline
 const originalSchedule = cron.schedule;
@@ -1145,6 +1154,20 @@ cron.schedule('* * * * *', async () => {
             .eq('id', session.id);
 
           logger.info(`Session ${session.id} auto-closed. ${absentRecords.length} students auto-marked absent.`);
+        } else {
+          // Verify if session has an active QR token
+          const { data: activeToken } = await supabaseAdmin
+            .from('qr_tokens')
+            .select('id')
+            .eq('session_id', session.id)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (!activeToken) {
+            logger.info(`QR Rotation: Generating new rotating QR token for active session ${session.id}`);
+            const rotateInterval = session.qr_rotate_interval || 5;
+            await generateRotatingQrToken(session.id, session.institution_id, rotateInterval);
+          }
         }
       }
     }
@@ -1684,4 +1707,266 @@ cron.schedule('0 */2 * * *', async () => {
     logger.error('Error running exam result parent notification: ' + err.message);
   }
 });
+
+/**
+ * MODULE: QR Token Auto-Rotation Cron Job
+ * Runs every minute to auto-rotate tokens for active attendance sessions
+ */
+cron.schedule('* * * * *', async () => {
+  logger.info('Running QR Token Auto-Rotation cron job...');
+  try {
+    // Fetch all active sessions
+    const { data: activeSessions } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('id, institution_id, qr_rotate_interval')
+      .eq('is_active', true);
+      
+    if (!activeSessions || activeSessions.length === 0) return;
+    
+    for (const session of activeSessions) {
+      // Fetch active token for this session
+      const { data: activeToken } = await supabaseAdmin
+        .from('qr_tokens')
+        .select('*')
+        .eq('session_id', session.id)
+        .eq('is_active', true)
+        .maybeSingle();
+        
+      // If there is no active token or it has expired, rotate it!
+      if (!activeToken || new Date(activeToken.expires_at).getTime() <= Date.now()) {
+        logger.info(`Rotating QR token for session ${session.id}...`);
+        
+        const rotateInterval = session.qr_rotate_interval || 5;
+        const expiresAt = new Date(Date.now() + rotateInterval * 60 * 1000).toISOString();
+        
+        const token = jwt.sign(
+          { session_id: session.id, type: 'ATTENDANCE_QR', iat: Math.floor(Date.now() / 1000) },
+          JWT_SECRET,
+          { expiresIn: `${rotateInterval}m` }
+        );
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        
+        // Deactivate old tokens
+        await supabaseAdmin
+          .from('qr_tokens')
+          .update({ is_active: false })
+          .eq('session_id', session.id)
+          .eq('is_active', true);
+          
+        // Insert new token
+        await supabaseAdmin
+          .from('qr_tokens')
+          .insert({
+            institution_id: session.institution_id,
+            session_id: session.id,
+            token_hash: tokenHash,
+            expires_at: expiresAt,
+            is_active: true,
+            rotated_count: activeToken ? activeToken.rotated_count + 1 : 1
+          });
+          
+        // Broadcast new token to Socket.io session room
+        try {
+          const { io } = require('../server');
+          if (io) {
+            io.of('/notifications').to(`session_${session.id}`).emit('qr_rotated', {
+              session_id: session.id,
+              qrToken: token,
+              expires_at: expiresAt
+            });
+            logger.debug(`Broadcasted rotated QR token for session ${session.id} to Socket.io`);
+          }
+        } catch (ioErr) {
+          // Socket.io not available (e.g. in tests)
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error running QR Token Auto-Rotation cron: ' + err.message);
+  }
+});
+
+/**
+ * MODULE: Fees & Finance late fee calculation
+ * Runs daily at 2:00 AM to calculate late fees for overdue student fees
+ */
+cron.schedule('0 2 * * *', async () => {
+  logger.info('Running Daily Late Fee Auto-Calculation cron job...');
+  try {
+    const { data: institutions } = await supabaseAdmin
+      .from('institutions')
+      .select('id')
+      .eq('is_active', true);
+
+    if (!institutions || institutions.length === 0) return;
+
+    for (const inst of institutions) {
+      // Fetch all student fees that are overdue and unpaid/partially paid
+      const { data: studentFees, error: fetchError } = await supabaseAdmin
+        .from('student_fees')
+        .select(`
+          id,
+          amount,
+          paid_amount,
+          due_date,
+          fee_structures(late_fee_per_day, grace_period_days, max_penalty)
+        `)
+        .eq('institution_id', inst.id)
+        .in('payment_status', ['pending', 'partial'])
+        .lt('due_date', new Date().toISOString().split('T')[0]);
+
+      if (fetchError || !studentFees || studentFees.length === 0) continue;
+
+      let updatedCount = 0;
+      for (const sf of studentFees) {
+        const dueDate = new Date(sf.due_date);
+        const now = new Date();
+        const daysDiff = Math.floor((now.getTime() - dueDate.getTime()) / 86400000);
+        const fs = (sf as any).fee_structures;
+
+        if (!fs) continue;
+
+        const gracePeriod = fs.grace_period_days || 0;
+        const daysAfterGrace = Math.max(0, daysDiff - gracePeriod);
+        
+        if (daysAfterGrace <= 0) continue;
+
+        const lateFeePerDay = Number(fs.late_fee_per_day || 0);
+        let lateFee = daysAfterGrace * lateFeePerDay;
+
+        if (Number(fs.max_penalty || 0) > 0 && lateFee > Number(fs.max_penalty)) {
+          lateFee = Number(fs.max_penalty);
+        }
+
+        const { error: updateError } = await supabaseAdmin
+          .from('student_fees')
+          .update({ 
+            late_fee: lateFee,
+            total_amount: sf.amount + lateFee
+          })
+          .eq('id', sf.id);
+
+        if (!updateError) {
+          updatedCount++;
+        }
+      }
+      logger.info(`Updated late fees for ${updatedCount} student fees in institution ${inst.id}.`);
+    }
+  } catch (err: any) {
+    logger.error('Error running daily late fee auto-calculation: ' + err.message);
+  }
+});
+
+// Helper function to calculate fallback end date if subscription_end_date is null
+function getFallbackEndDate(startDateStr: string | null, period: string | null, createdAtStr: string): Date {
+  const startDate = startDateStr ? new Date(startDateStr) : new Date(createdAtStr);
+  const endDate = new Date(startDate);
+  const p = period || 'monthly';
+  if (p === 'yearly') {
+    endDate.setFullYear(startDate.getFullYear() + 1);
+  } else if (p === 'quarterly') {
+    endDate.setMonth(startDate.getMonth() + 3);
+  } else {
+    endDate.setMonth(startDate.getMonth() + 1);
+  }
+  return endDate;
+}
+
+// 23. Plan Expiry Notification Cron Job (Runs daily at 9:00 AM: '0 9 * * *')
+cron.schedule('0 9 * * *', async () => {
+  logger.info('Running Daily Plan Expiry Notification Auditor cron job...');
+  try {
+    // Fetch all active institutions
+    const { data: activeInsts, error: instError } = await supabaseAdmin
+      .from('institutions')
+      .select('id, name, plan_tier, subscription_start_date, subscription_end_date, subscription_period, created_at')
+      .eq('is_active', true);
+
+    if (instError) throw instError;
+    if (!activeInsts || activeInsts.length === 0) return;
+
+    const today = new Date();
+    // Normalize today to start of day for accurate comparison
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    for (const inst of activeInsts) {
+      let expiryDate: Date;
+      if (inst.subscription_end_date) {
+        expiryDate = new Date(inst.subscription_end_date);
+      } else {
+        expiryDate = getFallbackEndDate(inst.subscription_start_date, inst.subscription_period, inst.created_at);
+      }
+
+      // Normalize expiryDate to start of day
+      const expiryStart = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate());
+      
+      const diffTime = expiryStart.getTime() - todayStart.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      logger.debug(`Institution ${inst.name} plan tier ${inst.plan_tier} expires on ${expiryStart.toDateString()} (${diffDays} days remaining)`);
+
+      if (diffDays === 14 || diffDays === 7) {
+        logger.info(`Institution ${inst.name} plan expires in ${diffDays} days. Querying admin users...`);
+        
+        // Fetch active Admin users for this institution
+        const { data: admins, error: adminError } = await supabaseAdmin
+          .from('users')
+          .select('id, name, email')
+          .eq('institution_id', inst.id)
+          .eq('role', 'Admin')
+          .eq('is_active', true);
+
+        if (adminError) {
+          logger.error(`Error fetching Admins for institution ${inst.name}: ${adminError.message}`);
+          continue;
+        }
+
+        if (!admins || admins.length === 0) {
+          logger.warn(`No active Admin users found for institution ${inst.name}. Cannot send notifications.`);
+          continue;
+        }
+
+        const dateStr = expiryStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        for (const admin of admins) {
+          // 1. Insert in-app notification
+          const { error: notifError } = await supabaseAdmin
+            .from('notifications')
+            .insert({
+              institution_id: inst.id,
+              user_id: admin.id,
+              title: `Plan Expiry Notice - ${diffDays} Days Remaining`,
+              body: `Dear ${admin.name}, your campus's subscription plan (${inst.plan_tier}) is set to expire in ${diffDays} days on ${dateStr}. Please renew or contact SuperAdmin to avoid service interruption.`,
+              type: 'Billing',
+              is_read: false
+            });
+
+          if (notifError) {
+            logger.error(`Failed to insert in-app notification for admin ${admin.name}: ${notifError.message}`);
+          } else {
+            logger.info(`Successfully logged in-app expiry warning notification for Admin: ${admin.name} (${inst.name})`);
+          }
+
+          // 2. Trigger push notification
+          try {
+            const { sendPushNotification } = await import('../services/fcm');
+            const pushSuccess = await sendPushNotification(
+              admin.id,
+              `Plan Expiry Notice - ${diffDays} Days Remaining`,
+              `Your subscription plan (${inst.plan_tier}) is set to expire on ${dateStr}.`
+            );
+            if (pushSuccess) {
+              logger.info(`Successfully sent FCM push notification warning for Admin: ${admin.name}`);
+            }
+          } catch (fcmErr: any) {
+            logger.error(`Error sending push notification to admin ${admin.name}: ${fcmErr.message}`);
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.error('Error running plan expiry notification cron: ' + err.message);
+  }
+});
+
 

@@ -10,11 +10,16 @@ import {
   getInsideCount 
 } from '../controllers/hostelGate';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { requireFeature } from '../middleware/permissions';
 
 const router = Router();
 
 // Apply auth middleware to protect all routes
 router.use(authMiddleware);
+
+// Apply feature toggle gates
+router.use('/hostel', requireFeature('hostel'));
+router.use('/gate', requireFeature('gate'));
 
 // Hostel endpoints
 router.get('/hostel/rooms', getRooms);

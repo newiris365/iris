@@ -2,12 +2,13 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Upload, AlertCircle, CheckCircle2, 
+  Upload, FileSpreadsheet, AlertCircle, CheckCircle2, 
   Download, Loader2, ArrowLeft, Users
 } from 'lucide-react';
 import Link from 'next/link';
 import { importStudentProfiles } from '@/lib/api';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 interface ImportError {
   row: number;
@@ -35,31 +36,85 @@ export default function StudentImportPage() {
     setErrors([]);
     setImportResult(null);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const headers = results.meta.fields || [];
-        const rows = results.data as any[];
-        setRawHeaders(headers);
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel';
 
-        // Auto-detect mapping
-        const mapping: Record<string, string> = {};
-        [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS].forEach(col => {
-          const match = headers.find(h =>
-            h.toLowerCase().trim() === col.toLowerCase() ||
-            h.toLowerCase().trim().replace(/[\s-]/g, '_') === col
-          );
-          if (match) mapping[col] = match;
-        });
-        setColumnMapping(mapping);
-        setRawData(rows);
-        setStep('map');
-      },
-      error: (err) => {
-        setErrors([{ row: 0, error: `CSV Parse Error: ${err.message}` }]);
-      }
-    });
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          if (!firstSheetName) {
+            setErrors([{ row: 0, error: 'Excel file is empty (no sheets found)' }]);
+            return;
+          }
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
+          
+          if (rawRows.length === 0) {
+            setErrors([{ row: 0, error: 'Excel sheet is empty' }]);
+            return;
+          }
+
+          const headers = (rawRows[0] || []).map(h => String(h).trim()).filter(h => h !== '');
+          const dataRows = rawRows.slice(1).map(row => {
+            const obj: Record<string, any> = {};
+            headers.forEach((h, index) => {
+              obj[h] = row[index] !== undefined ? String(row[index]).trim() : '';
+            });
+            return obj;
+          }).filter(row => Object.values(row).some(v => v !== ''));
+
+          setRawHeaders(headers);
+          setRawData(dataRows);
+
+          // Auto-detect mapping
+          const mapping: Record<string, string> = {};
+          [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS].forEach(col => {
+            const match = headers.find(h =>
+              h.toLowerCase().trim() === col.toLowerCase() ||
+              h.toLowerCase().trim().replace(/[\s-]/g, '_') === col
+            );
+            if (match) mapping[col] = match;
+          });
+          setColumnMapping(mapping);
+          setStep('map');
+        } catch (err: any) {
+          setErrors([{ row: 0, error: `Excel Parse Error: ${err.message}` }]);
+        }
+      };
+      reader.onerror = () => {
+        setErrors([{ row: 0, error: 'File reading failed' }]);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const headers = results.meta.fields || [];
+          const rows = results.data as any[];
+          setRawHeaders(headers);
+
+          // Auto-detect mapping
+          const mapping: Record<string, string> = {};
+          [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS].forEach(col => {
+            const match = headers.find(h =>
+              h.toLowerCase().trim() === col.toLowerCase() ||
+              h.toLowerCase().trim().replace(/[\s-]/g, '_') === col
+            );
+            if (match) mapping[col] = match;
+          });
+          setColumnMapping(mapping);
+          setRawData(rows);
+          setStep('map');
+        },
+        error: (err) => {
+          setErrors([{ row: 0, error: `CSV Parse Error: ${err.message}` }]);
+        }
+      });
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -197,13 +252,13 @@ export default function StudentImportPage() {
               onClick={() => fileRef.current?.click()}
             >
               <Upload className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-lg text-white font-medium mb-2">Drop your CSV file here</p>
+              <p className="text-lg text-white font-medium mb-2">Drop your CSV or Excel file here</p>
               <p className="text-sm text-gray-400 mb-4">or click to browse</p>
-              <p className="text-xs text-gray-500">Supports .csv files with headers</p>
+              <p className="text-xs text-gray-500">Supports .csv, .xlsx, .xls files with headers</p>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,.tsv,.txt"
+                accept=".csv,.tsv,.txt,.xlsx,.xls"
                 onChange={handleFileChange}
                 className="hidden"
               />

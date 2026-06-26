@@ -234,7 +234,7 @@ export async function createRoom(req: Request, res: Response) {
 export async function listAllocations(req: Request, res: Response) {
   try {
     const institution_id = req.user?.institution_id;
-    const { studentId } = req.query;
+    const { studentId, roomId } = req.query;
 
     let query = supabaseAdmin
       .from('hostel_allocations')
@@ -243,6 +243,8 @@ export async function listAllocations(req: Request, res: Response) {
 
     if (studentId) {
       query = query.eq('student_id', studentId as string);
+    } else if (roomId) {
+      query = query.eq('room_id', roomId as string);
     } else {
       // General list filter by institution
       const { data: students } = await supabaseAdmin

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { IndianRupee, CreditCard, CheckCircle2, AlertCircle, FileDown, Clock, AlertTriangle, Wallet, Building, Smartphone, Banknote } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import { supabase } from '../../../lib/supabase';
+import { exportToPDF } from '../../../lib/exportUtils';
 
 export default function StudentFeesPage() {
   const [structures, setStructures] = useState<any[]>([]);
@@ -396,7 +397,19 @@ export default function StudentFeesPage() {
                     <div className="text-[9px] text-[#C4B5FD]/40 mt-0.5">{p.method || 'Online'} • {p.payment_date ? new Date(p.payment_date).toLocaleDateString('en-IN') : ''}</div>
                   </div>
                   <button
-                    onClick={() => alert(`Receipt: ${p.transaction_id}`)}
+                    onClick={() => exportToPDF(
+                      "IRIS 365 Official Payment Receipt",
+                      [{
+                        ...p,
+                        amount_paid: `₹${Number(p.amount_paid).toLocaleString('en-IN')}`,
+                        payment_date: p.payment_date ? new Date(p.payment_date).toLocaleDateString('en-IN') : '',
+                        method: p.method || 'Online Card/UPI',
+                        status: p.status || 'Completed'
+                      }],
+                      `Receipt_${p.transaction_id}`,
+                      ["Transaction ID", "Amount Paid", "Date", "Payment Method", "Status"],
+                      ["transaction_id", "amount_paid", "payment_date", "method", "status"]
+                    )}
                     className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#A78BFA] flex items-center gap-1 transition-colors"
                   >
                     <FileDown className="w-3.5 h-3.5" /> Receipt

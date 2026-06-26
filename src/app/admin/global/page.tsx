@@ -28,6 +28,12 @@ interface Institution {
   phone?: string;
   created_at: string;
   subscription_status?: string;
+  subscription_period?: string;
+  subscription_end_date?: string | null;
+  gemini_api_key?: string;
+  openai_api_key?: string;
+  claude_api_key?: string;
+  institute_type?: string;
 }
 
 interface GlobalUser {
@@ -122,8 +128,9 @@ export default function SuperAdminConsole() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInst, setNewInst] = useState({
-    name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true
+    name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: '', institute_type: 'college'
   });
+  const [instTypeFilter, setInstTypeFilter] = useState<'all' | 'college' | 'school'>('all');
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingInst, setEditingInst] = useState<Institution | null>(null);
@@ -452,7 +459,7 @@ export default function SuperAdminConsole() {
       // Re-fetch fresh data from DB to sync everything
       await loadSystemData();
       setShowAddModal(false);
-      setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true });
+      setNewInst({ name: '', type: 'university', email: '', phone: '', plan_tier: 'Campus', is_active: true, subscription_period: 'monthly', password: '', institute_type: 'college' });
     } catch (err: any) {
       alert('Error: ' + (err.message || 'Failed to provision campus'));
     }
@@ -490,6 +497,21 @@ export default function SuperAdminConsole() {
     }
   };
 
+  const updateSubscriptionPeriod = async (id: string, newPeriod: string) => {
+    try {
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, subscription_period: newPeriod }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setInstitutions(prev => prev.map(inst => inst.id === id ? { ...inst, subscription_period: newPeriod } : inst));
+      await loadSystemData();
+    } catch {
+      setInstitutions(institutions.map(inst => inst.id === id ? { ...inst, subscription_period: newPeriod } : inst));
+    }
+  };
+
   const handleEditInstitution = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInst) return;
@@ -502,11 +524,32 @@ export default function SuperAdminConsole() {
           name: editingInst.name, type: editingInst.type, email: editingInst.email,
           phone: editingInst.phone, plan_tier: editingInst.plan_tier, is_active: editingInst.is_active,
           plan_price_monthly: editingInst.plan_price_monthly,
+          subscription_period: editingInst.subscription_period || 'monthly',
+          subscription_status: editingInst.subscription_status || 'active',
+          subscription_end_date: editingInst.subscription_end_date || null,
+          gemini_api_key: editingInst.gemini_api_key || null,
+          openai_api_key: editingInst.openai_api_key || null,
+          claude_api_key: editingInst.claude_api_key || null,
+          institute_type: editingInst.institute_type || 'college',
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to update institution');
       await loadSystemData();
+
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          if (parsed.institution_id === editingInst.id) {
+            parsed.institute_type = editingInst.institute_type || 'college';
+            localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+            window.location.reload();
+            return;
+          }
+        } catch {}
+      }
+
       setShowEditModal(false);
       setEditingInst(null);
     } catch (err: any) {
@@ -672,9 +715,31 @@ export default function SuperAdminConsole() {
         {activeTab === 'tenants' && (
           <>
             <div className="glass-panel rounded-2xl border border-white/5 p-6 flex flex-col gap-4">
-              <div>
-                <h2 className="text-lg font-bold">Campus Instances Directory</h2>
-                <p className="text-[11px] text-[#C4B5FD]/60 mt-0.5">Manage institution tenants, subscription tiers, and activation status.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold">Campus Instances Directory</h2>
+                  <p className="text-[11px] text-[#C4B5FD]/60 mt-0.5">Manage institution tenants, subscription tiers, and activation status.</p>
+                </div>
+                <div className="flex gap-2 p-1 bg-black/40 border border-white/5 rounded-xl self-start">
+                  <button type="button" onClick={() => setInstTypeFilter('all')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      instTypeFilter === 'all' ? 'bg-[#6C2BD9] text-white' : 'text-[#C4B5FD]/60 hover:text-white'
+                    }`}>
+                    All ({institutions.length})
+                  </button>
+                  <button type="button" onClick={() => setInstTypeFilter('college')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      instTypeFilter === 'college' ? 'bg-[#6C2BD9] text-white' : 'text-[#C4B5FD]/60 hover:text-white'
+                    }`}>
+                    Colleges ({institutions.filter(i => (i.institute_type || 'college') === 'college').length})
+                  </button>
+                  <button type="button" onClick={() => setInstTypeFilter('school')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      instTypeFilter === 'school' ? 'bg-[#6C2BD9] text-white' : 'text-[#C4B5FD]/60 hover:text-white'
+                    }`}>
+                    Schools ({institutions.filter(i => i.institute_type === 'school').length})
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto w-full">
                 <table className="w-full text-xs text-left border-collapse">
@@ -683,7 +748,9 @@ export default function SuperAdminConsole() {
                       <th className="py-3 px-4">Campus Name</th>
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Type</th>
+                      <th className="py-3 px-4">Institute Type</th>
                       <th className="py-3 px-4">Plan</th>
+                      <th className="py-3 px-4">Subscription</th>
                       <th className="py-3 px-4">Plan Revenue</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4 text-right">Actions</th>
@@ -691,10 +758,13 @@ export default function SuperAdminConsole() {
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan={7} className="py-10 text-center text-[#C4B5FD]/40 italic">Loading...</td></tr>
+                      <tr><td colSpan={9} className="py-10 text-center text-[#C4B5FD]/40 italic">Loading...</td></tr>
                     ) : institutions.length === 0 ? (
-                      <tr><td colSpan={7} className="py-10 text-center text-[#C4B5FD]/40 italic">No institutions found.</td></tr>
-                    ) : institutions.map(inst => (
+                      <tr><td colSpan={9} className="py-10 text-center text-[#C4B5FD]/40 italic">No institutions found.</td></tr>
+                    ) : institutions.filter(inst => {
+                      if (instTypeFilter === 'all') return true;
+                      return (inst.institute_type || 'college') === instTypeFilter;
+                    }).map(inst => (
                       <tr key={inst.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
                         <td className="py-3.5 px-4 font-semibold text-white">
                           <button
@@ -710,12 +780,29 @@ export default function SuperAdminConsole() {
                         <td className="py-3.5 px-4 text-[#C4B5FD]/80 font-mono">{inst.email || 'N/A'}</td>
                         <td className="py-3.5 px-4 capitalize text-[#C4B5FD]/80">{inst.type}</td>
                         <td className="py-3.5 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                            (inst.institute_type || 'college') === 'school'
+                              ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                              : 'bg-pink-500/10 border-pink-500/20 text-pink-400'
+                          }`}>
+                            {(inst.institute_type || 'college').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
                           <select value={inst.plan_tier} onChange={(e) => updatePlanTier(inst.id, e.target.value)}
                             className="bg-black/30 border border-white/10 rounded px-2.5 py-1 text-white text-[11px] font-medium outline-none focus:border-violet-500">
                             <option value="Seed">Seed</option>
                             <option value="Campus">Campus</option>
                             <option value="University">University</option>
                             <option value="Enterprise">Enterprise</option>
+                          </select>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <select value={inst.subscription_period || 'monthly'} onChange={(e) => updateSubscriptionPeriod(inst.id, e.target.value)}
+                            className="bg-black/30 border border-white/10 rounded px-2.5 py-1 text-white text-[11px] font-medium outline-none focus:border-violet-500">
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
                           </select>
                         </td>
                         <td className="py-3.5 px-4">
@@ -1188,6 +1275,7 @@ export default function SuperAdminConsole() {
         <CampusDetailPanel
           institutionId={selectedCampus.id}
           institutionName={selectedCampus.name}
+          institutionDetails={institutions.find(inst => inst.id === selectedCampus.id)}
           onClose={() => setSelectedCampus(null)}
         />
       )}
@@ -1229,8 +1317,8 @@ export default function SuperAdminConsole() {
 
       {/* Provision Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start p-4 md:p-6 bg-black/70 backdrop-blur-sm">
+          <div className="my-auto w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
             <h3 className="text-lg font-bold text-white mb-4">Provision New Campus</h3>
             <form onSubmit={handleAddInstitution} className="space-y-4 text-xs">
               <div className="flex flex-col gap-1">
@@ -1238,6 +1326,25 @@ export default function SuperAdminConsole() {
                 <input type="text" required placeholder="e.g. Siddharth Institute of Technology"
                   value={newInst.name} onChange={(e) => setNewInst({ ...newInst, name: e.target.value })}
                   className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Institute Type</label>
+                <div className="flex gap-4 p-2.5 bg-black/40 border border-white/10 rounded-xl">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="institute_type" value="college" 
+                      checked={newInst.institute_type === 'college'}
+                      onChange={() => setNewInst({ ...newInst, institute_type: 'college' })}
+                      className="accent-violet-500" />
+                    College
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="institute_type" value="school" 
+                      checked={newInst.institute_type === 'school'}
+                      onChange={() => setNewInst({ ...newInst, institute_type: 'school' })}
+                      className="accent-violet-500" />
+                    School
+                  </label>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
@@ -1262,10 +1369,27 @@ export default function SuperAdminConsole() {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[#C4B5FD] font-semibold">Email</label>
+                <label className="text-[#C4B5FD] font-semibold">Registering Admin Email</label>
                 <input type="email" required placeholder="contact@sit.edu"
                   value={newInst.email} onChange={(e) => setNewInst({ ...newInst, email: e.target.value })}
                   className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription Billing</label>
+                  <select value={newInst.subscription_period} onChange={(e) => setNewInst({ ...newInst, subscription_period: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Admin Password</label>
+                  <input type="password" required placeholder="••••••••"
+                    value={newInst.password} onChange={(e) => setNewInst({ ...newInst, password: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <button type="button" onClick={() => setShowAddModal(false)}
@@ -1282,8 +1406,8 @@ export default function SuperAdminConsole() {
 
       {/* Edit Modal */}
       {showEditModal && editingInst && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start p-4 md:p-6 bg-black/70 backdrop-blur-sm">
+          <div className="my-auto w-full max-w-md bg-[#13102A] border border-violet-500/30 rounded-3xl p-6 shadow-2xl relative">
             <h3 className="text-lg font-bold text-white mb-4">Edit Campus Details</h3>
             <form onSubmit={handleEditInstitution} className="space-y-4 text-xs">
               <div className="flex flex-col gap-1">
@@ -1315,17 +1439,69 @@ export default function SuperAdminConsole() {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Institute Type</label>
+                <div className="flex gap-4 p-2.5 bg-black/40 border border-white/10 rounded-xl">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="edit_institute_type" value="college" 
+                      checked={(editingInst.institute_type || 'college') === 'college'}
+                      onChange={() => setEditingInst({ ...editingInst, institute_type: 'college' })}
+                      className="accent-violet-500" />
+                    College
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-white">
+                    <input type="radio" name="edit_institute_type" value="school" 
+                      checked={editingInst.institute_type === 'school'}
+                      onChange={() => setEditingInst({ ...editingInst, institute_type: 'school' })}
+                      className="accent-violet-500" />
+                    School
+                  </label>
+                </div>
+                <p className="text-[10px] text-yellow-500 mt-0.5 italic">
+                  * Changing type updates your session automatically. Other users of this institute must re-login for changes to take effect.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1">
                 <label className="text-[#C4B5FD] font-semibold">Monthly Price (₹)</label>
                 <input type="number" required
                   value={editingInst.plan_price_monthly || 0}
                   onChange={(e) => setEditingInst({ ...editingInst, plan_price_monthly: Number(e.target.value) })}
                   className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[#C4B5FD] font-semibold">Email</label>
-                <input type="email" required placeholder="contact@sit.edu"
-                  value={editingInst.email || ''} onChange={(e) => setEditingInst({ ...editingInst, email: e.target.value })}
-                  className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Email</label>
+                  <input type="email" required placeholder="contact@sit.edu"
+                    value={editingInst.email || ''} onChange={(e) => setEditingInst({ ...editingInst, email: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription Billing</label>
+                  <select value={editingInst.subscription_period || 'monthly'} onChange={(e) => setEditingInst({ ...editingInst, subscription_period: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription Status</label>
+                  <select value={editingInst.subscription_status || 'active'} onChange={(e) => setEditingInst({ ...editingInst, subscription_status: e.target.value })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500">
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="trial">Trial</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD] font-semibold">Subscription End Date</label>
+                  <input type="date"
+                    value={editingInst.subscription_end_date ? editingInst.subscription_end_date.split('T')[0] : ''}
+                    onChange={(e) => setEditingInst({ ...editingInst, subscription_end_date: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                    className="bg-black/40 border border-white/10 p-2.5 rounded-xl text-white outline-none focus:border-violet-500" />
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <button type="button" onClick={() => { setShowEditModal(false); setEditingInst(null); }}

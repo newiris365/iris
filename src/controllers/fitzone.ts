@@ -493,7 +493,7 @@ export async function initiateMembershipPurchase(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
     }
 
-    const { plan_id } = parseResult.data;
+    const { student_id, plan_id } = parseResult.data;
     const { data: plan, error: planErr } = await supabaseAdmin
       .from('gym_membership_plans')
       .select('*')
@@ -508,7 +508,14 @@ export async function initiateMembershipPurchase(req: Request, res: Response) {
         const order = await rzp.orders.create({
           amount: Math.round(plan.price * 100), // in paise
           currency: 'INR',
-          receipt: `gym_membership_${plan_id}_${Date.now()}`
+          receipt: `gym_membership_${plan_id}_${Date.now()}`,
+          notes: {
+            type: 'gym_membership',
+            student_id,
+            plan_id,
+            amount: String(plan.price),
+            institution_id: req.user?.institution_id || ''
+          }
         });
         return res.status(200).json({
           success: true,
@@ -904,6 +911,22 @@ export async function getMaintenanceDue(req: Request, res: Response) {
 
     if (error) return res.status(500).json({ success: false, error: error.message });
     return res.status(200).json({ success: true, equipment: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getEquipmentMaintenanceLogs(req: Request, res: Response) {
+  try {
+    const { id } = req.params; // equipment_id
+    const { data, error } = await supabaseAdmin
+      .from('equipment_maintenance_logs')
+      .select('*')
+      .eq('equipment_id', id)
+      .order('date', { ascending: false });
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.status(200).json({ success: true, logs: data || [] });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

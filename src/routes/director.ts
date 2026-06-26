@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   getOverview,
   getLiveKPIs,
+  getAnalytics,
+  getModules,
   getActivityFeed,
   getAnalyticsAttendance,
   getAnalyticsFees,
@@ -21,6 +23,7 @@ import {
   getReports,
   generateReportOnDemand,
   downloadReportPDF,
+  generateAndDownloadPDFReport,
   getReportsSchedule,
   getStudentFullProfile,
   getGoals,
@@ -46,12 +49,14 @@ import { authMiddleware, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Apply auth middleware + restrict all routes to Director/SuperAdmin only
+// Apply auth middleware + restrict all routes to Director/SuperAdmin/Admin
 router.use(authMiddleware);
-router.use(requireRole(['Director', 'SuperAdmin']));
+router.use(requireRole(['Director', 'SuperAdmin', 'Admin']));
 
 // --- LIVE KPIs & OVERVIEWS ---
 router.get('/overview', getOverview);
+router.get('/analytics', getAnalytics);
+router.get('/modules', getModules);
 router.get('/kpis/live', getLiveKPIs);
 router.get('/activity-feed', getActivityFeed);
 
@@ -79,6 +84,7 @@ router.get('/insights/fee-risk', getFeeRisk);
 // --- PDF COMPILERS ---
 router.get('/reports', getReports);
 router.post('/reports/generate', generateReportOnDemand);
+router.post('/report/pdf', generateAndDownloadPDFReport);
 router.get('/reports/:id/download', downloadReportPDF);
 router.get('/reports/schedule', getReportsSchedule);
 

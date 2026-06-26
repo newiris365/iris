@@ -6,6 +6,8 @@ import {
   markAttendanceQr,
   markAttendanceBiometric,
   markAttendanceBulk,
+  markSchoolAttendanceBulk,
+  getSchoolAttendanceReport,
   getStudentAttendance,
   getAttendanceReport,
   submitRegularize,
@@ -43,6 +45,8 @@ import {
   getStudentFees,
   getFeesReport,
   createConcession,
+  cloneFeeStructures,
+  processFeeRefund,
   triggerFeeReminders,
   getReminderHistory,
   toggleAutoReminders,
@@ -180,8 +184,25 @@ import {
   getMyHallTickets,
   getHallTicketDetail,
   downloadHallTicketPdf,
+  uploadStudentPhoto,
+  uploadStudentDocument,
+  getStudentDocuments,
+  deleteStudentDocument,
+  getTimetableVersions,
+  saveTimetableVersion,
+  rollbackTimetableVersion,
+  getExamAnalytics,
+  exportGradeSheetPDF,
+  applySupplementary,
+  getSupplementaryApplications,
+  updateSupplementaryStatus,
+  applyReEvaluation,
+  getReEvaluationApplications,
+  updateReEvaluationStatus,
 } from '../controllers/campusCore';
 import { authMiddleware, requireRole } from '../middleware/auth';
+import { requireFeature } from '../middleware/permissions';
+import { getAiConfig, saveAiConfig } from '../controllers/aiConfig';
 
 const router = Router();
 
@@ -189,6 +210,41 @@ const router = Router();
 router.get('/idcards/verify/:studentId', verifyCard); // public check
 
 router.use(authMiddleware);
+
+// Apply feature toggle gates
+router.use('/attendance', requireFeature('attendance'));
+router.use('/students', requireFeature('students'));
+router.use('/timetable', requireFeature('timetable'));
+router.use('/classes', requireFeature('timetable'));
+router.use('/fees', requireFeature('fees'));
+router.use('/notices', requireFeature('notices'));
+router.use('/exams', requireFeature('exams'));
+router.use('/idcards', requireFeature('idcards'));
+router.use('/assignments', requireFeature('students'));
+router.use('/study-materials', requireFeature('students'));
+router.use('/leaves', requireFeature('students'));
+router.use('/wallet', requireFeature('fees'));
+router.use('/transit', requireFeature('transit'));
+router.use('/parent', requireFeature('parent_portal'));
+router.use('/parent-otp', requireFeature('parent_portal'));
+router.use('/parent-verify-otp', requireFeature('parent_portal'));
+router.use('/parent-link-child', requireFeature('parent_portal'));
+router.use('/admissions', requireFeature('admissions'));
+router.use('/calendar', requireFeature('timetable'));
+router.use('/hostel', requireFeature('hostel'));
+router.use('/gate', requireFeature('gate'));
+router.use('/events', requireFeature('events'));
+router.use('/library', requireFeature('library'));
+router.use('/import/attendance', requireFeature('attendance'));
+router.use('/import/students', requireFeature('students'));
+router.use('/faculty/attendance', requireFeature('attendance'));
+router.use('/faculty/leaves', requireFeature('students'));
+router.use('/faculty/timetable', requireFeature('timetable'));
+router.use('/faculty/cia', requireFeature('exams'));
+router.use('/student/cia', requireFeature('exams'));
+router.use('/exam-halls', requireFeature('exams'));
+router.use('/exam-seating', requireFeature('exams'));
+router.use('/reports/defaulters', requireFeature('fees'));
 
 // =========================================================================
 // 1. ATTENDANCE ROUTERS
@@ -199,6 +255,8 @@ router.put('/attendance/session/:id/close', requireRole(['Staff', 'Teacher', 'Ad
 router.post('/attendance/mark/qr', requireRole(['Student']), markAttendanceQr);
 router.post('/attendance/mark/biometric', markAttendanceBiometric);
 router.post('/attendance/mark/bulk', requireRole(['Staff', 'Admin', 'SuperAdmin']), markAttendanceBulk);
+router.post('/attendance/school/mark', requireRole(['Staff', 'Teacher', 'Admin', 'SuperAdmin']), markSchoolAttendanceBulk);
+router.get('/attendance/school/report', requireRole(['Staff', 'Teacher', 'Admin', 'SuperAdmin']), getSchoolAttendanceReport);
 router.get('/attendance/student/:id', getStudentAttendance);
 router.get('/attendance/report/:departmentId', requireRole(['Staff', 'Admin', 'SuperAdmin']), getAttendanceReport);
 router.post('/attendance/regularize', requireRole(['Student']), submitRegularize);
@@ -255,8 +313,10 @@ router.get('/classes', getTimetable);
 // =========================================================================
 router.get('/fees/structures', getFeeStructures);
 router.post('/fees/structures', requireRole(['Admin', 'SuperAdmin']), createFeeStructure);
+router.post('/fees/structures/clone', requireRole(['Admin', 'SuperAdmin']), cloneFeeStructures);
 router.post('/fees/payment/initiate', requireRole(['Student', 'Parent']), initiatePayment);
 router.post('/fees/payment/verify', requireRole(['Student', 'Parent']), verifyPayment);
+router.post('/fees/refund', requireRole(['Admin', 'SuperAdmin']), processFeeRefund);
 router.get('/fees/student/:studentId', getStudentFees);
 router.get('/fees/report', requireRole(['Admin', 'SuperAdmin']), getFeesReport);
 router.post('/fees/concession', requireRole(['Admin', 'SuperAdmin']), createConcession);
@@ -547,5 +607,38 @@ router.post('/hall-tickets/generate', requireRole(['Admin', 'SuperAdmin']), gene
 router.get('/hall-tickets/my', requireRole(['Student']), getMyHallTickets);
 router.get('/hall-tickets/:id', getHallTicketDetail);
 router.get('/hall-tickets/:id/pdf', downloadHallTicketPdf);
+
+// =========================================================================
+// 34. STUDENT DOCUMENTS & PROFILE PHOTO ROUTERS
+// =========================================================================
+router.post('/students/:id/photo', requireRole(['Admin', 'SuperAdmin', 'Student', 'HOD']), uploadStudentPhoto);
+router.post('/students/:id/documents', requireRole(['Admin', 'SuperAdmin', 'Staff', 'Teacher', 'HOD']), uploadStudentDocument);
+router.get('/students/:id/documents', getStudentDocuments);
+router.delete('/students/:id/documents/:docId', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), deleteStudentDocument);
+
+// =========================================================================
+// 35. TIMETABLE HISTORY & ROLLBACK ROUTERS
+// =========================================================================
+router.get('/timetable/history/versions', requireRole(['Admin', 'SuperAdmin', 'Director', 'HOD']), getTimetableVersions);
+router.post('/timetable/history/save', requireRole(['Admin', 'SuperAdmin']), saveTimetableVersion);
+router.post('/timetable/history/rollback', requireRole(['Admin', 'SuperAdmin']), rollbackTimetableVersion);
+
+// =========================================================================
+// 36. EXAM ANALYTICS, SUPPLEMENTARY & RE-EVALUATION ROUTERS
+// =========================================================================
+router.get('/exams/:id/analytics', requireRole(['Admin', 'SuperAdmin', 'Director', 'Teacher', 'HOD']), getExamAnalytics);
+router.get('/exams/gradesheet/:studentId/:examId/pdf', requireRole(['Admin', 'SuperAdmin', 'Director', 'Teacher', 'HOD', 'Student', 'Parent']), exportGradeSheetPDF);
+router.post('/exams/supplementary/apply', requireRole(['Student']), applySupplementary);
+router.get('/exams/supplementary/applications', requireRole(['Admin', 'SuperAdmin', 'Director', 'Staff', 'Teacher', 'HOD']), getSupplementaryApplications);
+router.put('/exams/supplementary/applications/:id/status', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), updateSupplementaryStatus);
+router.post('/exams/re-evaluation/apply', requireRole(['Student']), applyReEvaluation);
+router.get('/exams/re-evaluation/applications', requireRole(['Admin', 'SuperAdmin', 'Director', 'Staff', 'Teacher', 'HOD']), getReEvaluationApplications);
+router.put('/exams/re-evaluation/applications/:id/status', requireRole(['Admin', 'SuperAdmin', 'Staff', 'HOD']), updateReEvaluationStatus);
+
+// =========================================================================
+// 37. AI API CONFIGURATION (Admin only)
+// =========================================================================
+router.get('/ai/config', requireRole(['Admin', 'SuperAdmin']), getAiConfig);
+router.post('/ai/config', requireRole(['Admin', 'SuperAdmin']), saveAiConfig);
 
 export default router;

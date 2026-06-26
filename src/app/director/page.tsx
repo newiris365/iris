@@ -320,13 +320,51 @@ export default function DirectorDashboard() {
             </div>
           </div>
 
-          {/* Quick Notice dispatcher */}
-          <div className="lg:col-span-1 space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-              <MessageSquare className="w-4.5 h-4.5 text-[#A78BFA]" /> Quick Actions
-            </h3>
+          {/* Quick Notice dispatcher & AI Sentiment */}
+          <div className="lg:col-span-1 space-y-6">
+            
+            {/* AI Sentiment & Campus Mood Tracker widget */}
+            <div className="bg-[#13102A]/60 p-6 rounded-3xl border border-[#6C2BD9]/30 shadow-xl space-y-4" id="ai-sentiment-widget">
+              <h3 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider text-[#A78BFA]">
+                <BrainCircuit className="w-4 h-4" /> AI Campus Mood Tracker
+              </h3>
+              
+              <div className="p-4 bg-black/40 rounded-2xl border border-white/5 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-white/40 block">Overall Vibe</span>
+                  <strong className="text-sm font-bold text-emerald-400">😊 Positive Mood</strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-white/40 block">Sentiment Score</span>
+                  <strong className="text-sm font-bold text-white">74%</strong>
+                </div>
+              </div>
 
+              <div className="space-y-2">
+                <span className="text-[9px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider block">Today's Escalated Keywords</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['wifi offline', 'canteen queue', 'mess late', 'water pressure'].map(tag => (
+                    <span key={tag} className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-lg capitalize font-mono">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#6C2BD9]/10 border border-[#6C2BD9]/20 rounded-xl text-[10px] text-[#C4B5FD] leading-relaxed">
+                <strong>IRIS AI Insights:</strong> Negative queries spiked by 12% between 8:00-9:30 AM, primary driver identified as "mess delay notice". System auto-broadcasted mess schedule update.
+              </div>
+
+              <Link href="/ai/sentiment" className="block text-center py-2 bg-[#6C2BD9]/20 hover:bg-[#6C2BD9]/35 text-[#A78BFA] border border-[#6C2BD9]/45 text-[10px] font-bold rounded-xl transition-all">
+                View Detailed Sentiment Trends
+              </Link>
+            </div>
+
+            {/* Quick Actions Card */}
             <div className="bg-[#13102A]/60 p-6 rounded-3xl border border-white/5 shadow-xl space-y-5">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <MessageSquare className="w-4.5 h-4.5 text-[#A78BFA]" /> Quick Actions
+              </h3>
               <form onSubmit={handleSendNotice} className="space-y-3.5">
                 <div>
                   <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Campus-wide Notice Dispatch</label>

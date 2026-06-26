@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Users, TrendingUp, DollarSign, Building2, Award, BarChart3, Download } from "lucide-react"
+import { ArrowLeft, Users, TrendingUp, DollarSign, Building2, Award, BarChart3, Download, RefreshCw } from "lucide-react"
 import Link from "next/link"
 
-import { apiGet } from "../../../../lib/api"
+import { apiGet, apiFetchBlob } from "../../../../lib/api"
 import Skeleton from "../../../../components/Skeleton"
 
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, AreaChart, Area } from '../../../../lib/charts'
@@ -66,15 +66,38 @@ export default function AdminPlacementStats() {
 
 
 
+  const [downloadingReport, setDownloadingReport] = useState(false)
+
   useEffect(() => {
     setLoading(true)
-    apiGet("/api/v1/placements/analytics/dashboard")
+    apiGet("/placements/analytics/dashboard")
       .then((res: any) => {
         if (res && res.total_eligible) setData(res)
       })
       .catch(() => {})
       .finally(() => setTimeout(() => setLoading(false), 600))
   }, [year])
+
+  const handleDownloadAnnualReport = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    setDownloadingReport(true)
+    try {
+      const blob = await apiFetchBlob("/placements/reports/annual")
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'SIET_Placement_Brochure_2026.pdf'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to download placement annual report.')
+    } finally {
+      setDownloadingReport(false)
+    }
+  }
 
   const placedPercent = Math.round((data.total_placed / data.total_eligible) * 100)
 
@@ -201,14 +224,14 @@ export default function AdminPlacementStats() {
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-white">Recent Placements</h3>
             <div className="flex gap-3">
-              <a
-                href="/api/v1/placements/reports/annual"
-                target="_blank"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#6C2BD9] text-white text-sm font-medium hover:bg-[#7d3eea] transition-colors"
+              <button
+                onClick={handleDownloadAnnualReport}
+                disabled={downloadingReport}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#6C2BD9] text-white text-sm font-medium hover:bg-[#7d3eea] transition-colors disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
-                Download Annual Report
-              </a>
+                {downloadingReport ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {downloadingReport ? "Downloading..." : "Download Annual Report"}
+              </button>
               <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-[#C4B5FD] text-sm font-medium hover:bg-white/5 transition-colors">
                 <Download className="w-4 h-4" />
                 Export to Excel

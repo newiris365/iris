@@ -6,6 +6,7 @@ import {
   BrainCircuit, ShieldCheck, Heart, User, Sparkles, Megaphone
 } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
+import Link from 'next/link';
 
 export default function StudentDashboard() {
   const [profile, setProfile] = useState<any>(null);
@@ -303,6 +304,56 @@ export default function StudentDashboard() {
 
           <div className="pt-6 border-t border-[#6C2BD9]/20 text-xs text-[#A78BFA]/75 italic leading-relaxed mt-6">
             &ldquo;{healthScore.recommendation}&rdquo;
+          </div>
+        </div>
+      </div>
+
+      {/* AI Study Planner Dashboard Widget */}
+      <div className="bg-[#13102A]/80 backdrop-blur-md rounded-3xl p-6 border border-[#6C2BD9]/30 flex flex-col gap-4" id="ai-study-planner-widget">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <BrainCircuit className="w-5 h-5 text-[#A78BFA]" />
+            <h3 className="font-bold text-base md:text-lg">AI Exam Study Planner</h3>
+          </div>
+          <Link href="/ai/study-plan" className="text-xs font-bold text-[#A78BFA] hover:text-white transition-colors">
+            Manage Study Plan &rarr;
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
+          {/* Progress Tracker Card */}
+          <div className="bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] text-[#A78BFA]/50 uppercase tracking-widest font-bold">Study Plan Progress</span>
+              <div className="text-2xl font-extrabold text-white mt-1">45% Complete</div>
+            </div>
+            <div className="mt-4">
+              <div className="w-full bg-[#0D0A1A] rounded-full h-2 border border-white/5 mb-1.5">
+                <div className="bg-[#6C2BD9] h-full rounded-full" style={{ width: '45%' }}></div>
+              </div>
+              <span className="text-[9px] text-[#C4B5FD]/40">Active period: Sem 4 Term Finals</span>
+            </div>
+          </div>
+
+          {/* Today's Focus Blocks */}
+          <div className="md:col-span-2 bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col gap-3">
+            <span className="text-[10px] text-[#A78BFA]/50 uppercase tracking-widest font-bold">Today's Focus Study Blocks</span>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center p-2 bg-[#6C2BD9]/10 border border-[#6C2BD9]/20 rounded-xl">
+                <div>
+                  <span className="font-bold text-white block">06:00 - 08:00 AM · Mathematics</span>
+                  <span className="text-[10px] text-[#C4B5FD]/75">Linear algebra proofs & eigen vectors review</span>
+                </div>
+                <span className="text-[9px] font-bold px-2 py-0.5 bg-[#6C2BD9]/20 text-[#A78BFA] rounded-md uppercase font-mono">Focus</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-[#06B6D4]/10 border border-[#06B6D4]/20 rounded-xl">
+                <div>
+                  <span className="font-bold text-white block">04:00 - 05:30 PM · Computer Science</span>
+                  <span className="text-[10px] text-[#C4B5FD]/75">Compiler parser trees & syntax validation practice</span>
+                </div>
+                <span className="text-[9px] font-bold px-2 py-0.5 bg-[#06B6D4]/20 text-[#06B6D4] rounded-md uppercase font-mono">Practice</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

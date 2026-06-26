@@ -30,6 +30,8 @@ import {
   getReportsNirf,
   getAlumniList,
   bookMentorshipSession,
+  registerAlumni,
+  updateAlumniProfile,
   getInternships,
   generateInternshipNoc,
   logCompanyVisit,
@@ -87,6 +89,8 @@ router.get('/reports/nirf', requireRole(['Admin', 'SuperAdmin', 'TPO']), getRepo
 
 // ──── ALUMNI NETWORK ───────────────────────────────────────────
 router.get('/alumni', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Student']), getAlumniList);
+router.post('/alumni/register', requireRole(['Admin', 'SuperAdmin', 'TPO']), registerAlumni);
+router.put('/alumni/:id', requireRole(['Admin', 'SuperAdmin', 'TPO', 'Alumni']), updateAlumniProfile);
 router.post('/alumni/book', requireRole(['Student']), bookMentorshipSession);
 
 // ──── INTERNSHIPS ──────────────────────────────────────────────

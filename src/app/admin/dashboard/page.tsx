@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Users, GraduationCap, Building2, CheckCircle, IndianRupee, AlertTriangle,
   CalendarDays, DoorOpen, Activity, TrendingUp, FileText, LogOut,
@@ -64,6 +65,7 @@ export default function AdminDashboard() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [modules, setModules] = useState<ModuleUsage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
@@ -80,6 +82,13 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    let fetchedOverview = null;
+    let fetchedAttendanceTrend = [];
+    let fetchedFeeByMonth = [];
+    let fetchedCanteenRevenue = 0;
+    let fetchedAlerts = [];
+    let fetchedModules = null;
+
     try {
       // Fetch all dashboard data in parallel
       const [overviewRes, analyticsRes, alertsRes, modulesRes] = await Promise.all([
@@ -94,19 +103,32 @@ export default function AdminDashboard() {
       const alertsData = await alertsRes.json();
       const modulesData = await modulesRes.json();
 
-      if (overviewData.success) setOverview(overviewData.overview);
+      if (overviewData.success) {
+        fetchedOverview = overviewData.overview;
+        setOverview(overviewData.overview);
+      }
       if (analyticsData.success) {
+        fetchedAttendanceTrend = analyticsData.analytics.attendance_trend;
+        fetchedFeeByMonth = analyticsData.analytics.fee_collection_by_month;
+        fetchedCanteenRevenue = analyticsData.analytics.canteen_revenue_this_month;
+
         setAttendanceTrend(analyticsData.analytics.attendance_trend);
         setFeeByMonth(analyticsData.analytics.fee_collection_by_month);
         setCanteenRevenue(analyticsData.analytics.canteen_revenue_this_month);
       }
-      if (alertsData.success) setAlerts(alertsData.alerts);
-      if (modulesData.success) setModules(modulesData.modules);
+      if (alertsData.success) {
+        fetchedAlerts = alertsData.alerts;
+        setAlerts(alertsData.alerts);
+      }
+      if (modulesData.success) {
+        fetchedModules = modulesData.modules;
+        setModules(modulesData.modules);
+      }
     } catch (err) {
       console.warn('Backend not reachable, loading sandbox demo data:', err);
     } finally {
       // Always load sandbox fallback data for empty states
-      if (!overview) {
+      if (!fetchedOverview) {
         setOverview({
           total_students: 1247,
           total_staff: 89,
@@ -122,7 +144,7 @@ export default function AdminDashboard() {
           gate_entries_today: 342,
         });
       }
-      if (attendanceTrend.length === 0) {
+      if (fetchedAttendanceTrend.length === 0) {
         const trend: AttendanceTrend[] = [];
         for (let i = 29; i >= 0; i--) {
           const d = new Date(Date.now() - i * 86400000);
@@ -137,7 +159,7 @@ export default function AdminDashboard() {
         }
         setAttendanceTrend(trend);
       }
-      if (feeByMonth.length === 0) {
+      if (fetchedFeeByMonth.length === 0) {
         setFeeByMonth([
           { month: 'Jan', amount: 3200000 },
           { month: 'Feb', amount: 2800000 },
@@ -153,8 +175,8 @@ export default function AdminDashboard() {
           { month: 'Dec', amount: 0 },
         ]);
       }
-      if (canteenRevenue === 0) setCanteenRevenue(485000);
-      if (alerts.length === 0) {
+      if (fetchedCanteenRevenue === 0) setCanteenRevenue(485000);
+      if (fetchedAlerts.length === 0) {
         setAlerts([
           { type: 'attendance', severity: 'high', title: 'Low Attendance — CS Sem 6', detail: '18 students below 60% attendance in Computer Science Semester 6. Immediate action required.', created_at: new Date().toISOString() },
           { type: 'fee', severity: 'high', title: 'Fee Defaulters — ₹12.5L Pending', detail: '47 students have overdue fee payments totaling ₹12,50,000. Escalation stage 3 reached.', created_at: new Date().toISOString() },
@@ -162,7 +184,7 @@ export default function AdminDashboard() {
           { type: 'library', severity: 'low', title: '12 Books Overdue > 30 Days', detail: 'Library has 12 books overdue by more than 30 days. Total fine accrued: ₹4,800.', created_at: new Date().toISOString() },
         ]);
       }
-      if (!modules) {
+      if (!fetchedModules) {
         setModules({
           canteen: { orders_today: 312 },
           fitzone: { bookings_this_week: 87 },
@@ -177,17 +199,24 @@ export default function AdminDashboard() {
   };
 
   const handleDownloadReport = async () => {
+    setDownloading(true);
     try {
       const response = await fetch('/api/v1/director/report/pdf', {
         method: 'POST',
         headers: getAuthHeaders()
       });
       const result = await response.json();
-      if (result.success) {
-        alert(`Report Generated:\n\n${result.report.title}\nInstitution: ${result.report.institution}\nGenerated: ${result.report.generated_at}\n\nStudents: ${result.report.summary.total_students}\nStaff: ${result.report.summary.total_staff}\nFees Collected: ${result.report.summary.fee_collected}\nPending Complaints: ${result.report.summary.pending_complaints}`);
+      if (result.success && result.report.pdf_url) {
+        const token = localStorage.getItem('iris_jwt_token');
+        const downloadUrl = `${result.report.pdf_url}?token=${encodeURIComponent(token || '')}`;
+        window.location.href = downloadUrl;
+      } else {
+        alert('Failed to generate report.');
       }
     } catch (err) {
-      alert('Failed to generate report.');
+      alert('Failed to download report.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -225,9 +254,10 @@ export default function AdminDashboard() {
 
         <button
           onClick={handleDownloadReport}
-          className="ml-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-sm shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+          disabled={downloading}
+          className="ml-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-sm shadow-lg hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
         >
-          <FileText className="w-4 h-4" /> Download Report
+          <FileText className="w-4 h-4" /> {downloading ? 'Downloading...' : 'Download Report'}
         </button>
       </div>
 
@@ -244,16 +274,16 @@ export default function AdminDashboard() {
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: 'Total Students', value: overview.total_students, icon: GraduationCap, color: '#6C2BD9' },
-              { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6' },
-              { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444' },
-              { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B' },
-              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981' },
-              { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6' },
-              { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4' },
-              { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA' }
+              { label: 'Total Students', value: overview.total_students, icon: GraduationCap, color: '#6C2BD9', href: '/admin/students' },
+              { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6', href: '/admin/hr' },
+              { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444', href: '/admin/attendance' },
+              { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B', href: '/admin/fees' },
+              { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/complaints' },
+              { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6', href: '/admin/events' },
+              { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4', href: '/admin/hostel' },
+              { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' }
             ].map((kpi, idx) => (
-              <div key={idx} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all">
+              <Link key={idx} href={kpi.href} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all cursor-pointer">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">{kpi.label}</span>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${kpi.color}15`, border: `1px solid ${kpi.color}30` }}>
@@ -261,7 +291,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <h3 className="font-extrabold text-2xl text-white">{kpi.value}</h3>
-              </div>
+              </Link>
             ))}
           </div>
 
@@ -414,14 +444,14 @@ export default function AdminDashboard() {
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { label: 'Canteen Orders', sublabel: 'Today', value: modules.canteen.orders_today, icon: ShoppingBag, color: '#F59E0B' },
-              { label: 'FitZone Bookings', sublabel: 'This Week', value: modules.fitzone.bookings_this_week, icon: Dumbbell, color: '#EF4444' },
-              { label: 'Gate Entries', sublabel: 'Today', value: modules.gate.entries_today, icon: Shield, color: '#6C2BD9' },
-              { label: 'Library Issues', sublabel: 'This Week', value: modules.library.issues_this_week, icon: BookOpen, color: '#8B5CF6' },
-              { label: 'Event Registrations', sublabel: 'This Week', value: modules.events.registrations_this_week, icon: CalendarDays, color: '#06B6D4' },
-              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981' }
+              { label: 'Canteen Orders', sublabel: 'Today', value: modules.canteen.orders_today, icon: ShoppingBag, color: '#F59E0B', href: '/admin/canteen' },
+              { label: 'FitZone Bookings', sublabel: 'This Week', value: modules.fitzone.bookings_this_week, icon: Dumbbell, color: '#EF4444', href: '/admin/gym' },
+              { label: 'Gate Entries', sublabel: 'Today', value: modules.gate.entries_today, icon: Shield, color: '#6C2BD9', href: '/admin/gate' },
+              { label: 'Library Issues', sublabel: 'This Week', value: modules.library.issues_this_week, icon: BookOpen, color: '#8B5CF6', href: '/admin/library/bookclubs' },
+              { label: 'Event Registrations', sublabel: 'This Week', value: modules.events.registrations_this_week, icon: CalendarDays, color: '#06B6D4', href: '/admin/events' },
+              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981', href: '/admin/transit' }
             ].map((mod, idx) => (
-              <div key={idx} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all">
+              <Link key={idx} href={mod.href} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all cursor-pointer">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${mod.color}15`, border: `1px solid ${mod.color}30` }}>
                     <mod.icon className="w-5 h-5" style={{ color: mod.color }} />
@@ -432,7 +462,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <h3 className="font-extrabold text-3xl text-white">{mod.value}</h3>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

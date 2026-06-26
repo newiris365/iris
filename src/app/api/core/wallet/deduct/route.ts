@@ -1,11 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+function getScopedSupabase(req: NextRequest): any {
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.replace('Bearer ', '');
+  const jwtSecret = process.env.JWT_SECRET;
+  
+  if (token && jwtSecret && token !== 'mock-sandbox-jwt-token-value') {
+    try {
+      const decodedClaims = jwt.verify(token, jwtSecret) as any;
+      if (decodedClaims && decodedClaims.supabase_token) {
+        return createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '', {
+          auth: { persistSession: false, autoRefreshToken: false },
+          global: { headers: { Authorization: `Bearer ${decodedClaims.supabase_token}` } }
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  return createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
+}
 
 export async function POST(req: NextRequest) {
+  const supabase = getScopedSupabase(req);
   try {
     const body = await req.json();
     const { amount, description, module: moduleName } = body;

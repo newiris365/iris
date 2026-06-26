@@ -115,7 +115,12 @@ router.post('/meal-selection', selectDailyMeal);
 // ──── AI MENU ─────────────────────────────────────────────────
 router.post('/ai-menu/generate', requireRole(['Admin', 'SuperAdmin', 'Vendor']), generateAIMenu);
 router.get('/ai-menu/current', getCurrentAIMenu);
+router.put('/ai-menu/approve', requireRole(['Admin', 'SuperAdmin', 'Vendor']), approveAIMenu);
 router.put('/ai-menu/:id/approve', requireRole(['Admin', 'SuperAdmin', 'Vendor']), approveAIMenu);
+
+// ──── FEEDBACK ────────────────────────────────────────────────
+router.post('/feedback', submitFeedback);
+router.get('/feedback/all', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getAllFeedback);
 
 // ──── ANALYTICS ───────────────────────────────────────────────
 router.get('/analytics', requireRole(['Admin', 'SuperAdmin', 'Vendor']), getAnalytics);

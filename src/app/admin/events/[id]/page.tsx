@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, MapPin, Clock, Users, Ticket, DollarSign, 
   Trash2, Plus, Megaphone, Image as ImageIcon, Star, Download, Edit3, 
-  CheckCircle, PlusCircle, UserPlus, AlertCircle, Sparkles, Send, FileText 
+  CheckCircle, PlusCircle, UserPlus, AlertCircle, Sparkles, Send, FileText,
+  RefreshCw
 } from 'lucide-react';
-import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, apiFetchBlob } from '../../../../lib/api';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -322,10 +323,28 @@ export default function ManageEventPage() {
     }
   };
 
-  const handleDownloadPdf = () => {
-    // Open standard PDF download route
-    window.open(`http://localhost:4000/api/v1/events/events/${eventId}/report/pdf`, '_blank');
-    showToast('Triggering PDF report generation...');
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setDownloadingReport(true);
+    showToast('Compiling PDF report...');
+    try {
+      const blob = await apiFetchBlob(`/events/events/${eventId}/report/pdf`);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `event-report-${eventId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast('PDF report downloaded successfully.');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to compile PDF report.');
+    } finally {
+      setDownloadingReport(false);
+    }
   };
 
   const showToast = (msg: string) => {
@@ -417,9 +436,11 @@ export default function ManageEventPage() {
               {/* PDF download */}
               <button
                 onClick={handleDownloadPdf}
-                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white transition-all flex items-center gap-2"
+                disabled={downloadingReport}
+                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white transition-all flex items-center gap-2 disabled:opacity-50"
               >
-                <FileText className="w-4 h-4 text-[#A78BFA]" /> Report PDF
+                {downloadingReport ? <RefreshCw className="w-4 h-4 animate-spin text-[#A78BFA]" /> : <FileText className="w-4 h-4 text-[#A78BFA]" />}
+                {downloadingReport ? 'Downloading...' : 'Report PDF'}
               </button>
 
               {/* Edit */}

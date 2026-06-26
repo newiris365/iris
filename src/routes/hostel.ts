@@ -63,7 +63,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // ========== 0. OVERVIEW ==========
-router.get('/overview', requireRole(['Warden']), getOverview);
+router.get('/overview', requireRole(['Warden', 'Staff', 'Admin', 'SuperAdmin']), getOverview);
 
 // ========== 1. ROOMS & BLOCKS ==========
 router.get('/blocks', listBlocks);

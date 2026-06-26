@@ -6,6 +6,7 @@ import {
   Upload, Sparkles, Check, RefreshCw, Plus, X 
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
+import * as XLSX from 'xlsx';
 
 interface DishItem {
   id: string;
@@ -102,12 +103,54 @@ export default function VendorMenuPage() {
 
       if (parsedDishes.length > 0) {
         setDishes(prev => [...prev, ...parsedDishes]);
-        alert(`Successfully imported ${parsedDishes.length} items from CSV!`);
+        alert(`Successfully imported ${parsedDishes.length} items from CSV/Excel!`);
       }
       setShowImport(false);
       setCsvContent('');
     } catch (e) {
       alert("Error parsing CSV format. Please review guidelines.");
+    }
+  };
+
+  const handleCanteenFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel';
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          if (!firstSheetName) {
+            alert('Excel file is empty');
+            return;
+          }
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
+          
+          // Convert sheet rows into CSV string
+          // Assume columns: Name, Category, Price, isVeg, Calories, PrepTime
+          const lines = rawRows.map(row => {
+            return row.map((cell: any) => String(cell).replace(/,/g, '')).join(',');
+          }).filter(line => line.trim().length > 0);
+
+          setCsvContent(lines.join('\n'));
+        } catch (err: any) {
+          alert(`Excel Parse Error: ${err.message}`);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      try {
+        const text = await file.text();
+        setCsvContent(text);
+      } catch (err: any) {
+        alert(`CSV Read Error: ${err.message}`);
+      }
     }
   };
 
@@ -129,7 +172,7 @@ export default function VendorMenuPage() {
             onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#13102A] border border-[#6C2BD9]/30 text-xs font-semibold text-[#A78BFA] hover:bg-[#6C2BD9]/20 transition-all"
           >
-            <Upload className="w-4 h-4" /> Import Excel CSV
+            <Upload className="w-4 h-4" /> Import CSV/Excel
           </button>
           
           <button 
@@ -209,15 +252,25 @@ export default function VendorMenuPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowImport(false)}>
           <div className="w-full max-w-lg glass-panel rounded-2xl border border-white/10 p-6 flex flex-col gap-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-white">Import Spreadsheet Dishes (CSV)</h3>
+              <h3 className="font-bold text-base text-white">Import Spreadsheet Dishes (CSV/Excel)</h3>
               <button onClick={() => setShowImport(false)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-[#C4B5FD]/50 hover:text-white transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-3 bg-[#6C2BD9]/10 border border-[#6C2BD9]/30 rounded-xl text-[10px] text-[#A78BFA] leading-relaxed">
-              <strong>Instructions</strong>: Paste raw spreadsheet columns. Ensure one dish per line formatted as: <br />
+              <strong>Instructions</strong>: Paste raw spreadsheet columns or upload a spreadsheet file. Ensure one dish per line formatted as: <br />
               <code>Dish Name, Category, Price, isVeg(true/false), Calories, PrepMinutes</code>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-[#C4B5FD]/60 uppercase tracking-wider font-bold">Upload CSV or Excel File</label>
+              <input 
+                type="file" 
+                accept=".csv,.xlsx,.xls"
+                onChange={handleCanteenFileChange}
+                className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2 text-xs text-white file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-[#6C2BD9]/20 file:text-[#C4B5FD] file:text-xs file:font-semibold hover:file:bg-[#6C2BD9]/40 file:transition-all"
+              />
             </div>
 
             <textarea 

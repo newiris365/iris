@@ -20,7 +20,13 @@ export default function AdminBlocksSetupPage() {
     total_rooms: 0,
     total_floors: 1,
     warden_id: '',
-    amenities: [] as string[]
+    amenities: [] as string[],
+    autoGenerateRooms: false,
+    roomsPerFloor: 10,
+    bedsPerRoom: 2,
+    roomType: 'double' as 'single' | 'double' | 'triple' | 'dormitory',
+    monthlyRent: 6500,
+    roomAmenities: [] as string[]
   });
 
   const [roomForm, setRoomForm] = useState({
@@ -82,29 +88,123 @@ export default function AdminBlocksSetupPage() {
     }
     setSubmitting(true);
     setErrorMsg('');
+
+    const calculatedTotalRooms = blockForm.autoGenerateRooms 
+      ? blockForm.total_floors * blockForm.roomsPerFloor 
+      : blockForm.total_rooms;
+
+    const payload: any = {
+      name: blockForm.name,
+      type: blockForm.type,
+      total_rooms: calculatedTotalRooms,
+      total_floors: blockForm.total_floors,
+      amenities: blockForm.amenities
+    };
+    if (blockForm.warden_id) {
+      payload.warden_id = blockForm.warden_id;
+    }
+
     try {
-      const res = await apiPost('/hostel/blocks', blockForm);
+      const res = await apiPost('/hostel/blocks', payload);
       if (res.success) {
-        setSuccessMsg('Hostel block configured and registered.');
+        const blockId = res.block.id;
+        
+        // Auto-generate rooms if enabled
+        if (blockForm.autoGenerateRooms) {
+          const promises = [];
+          for (let f = 1; f <= blockForm.total_floors; f++) {
+            for (let r = 1; r <= blockForm.roomsPerFloor; r++) {
+              const roomNum = f * 100 + r;
+              const prefix = blockForm.type === 'boys' ? 'A-' : blockForm.type === 'girls' ? 'B-' : 'R-';
+              promises.push(
+                apiPost('/hostel/rooms', {
+                  block_id: blockId,
+                  room_number: `${prefix}${roomNum}`,
+                  floor: f,
+                  capacity: blockForm.bedsPerRoom,
+                  room_type: blockForm.roomType,
+                  amenities: blockForm.roomAmenities,
+                  monthly_rent: blockForm.monthlyRent
+                })
+              );
+            }
+          }
+          await Promise.all(promises);
+        }
+
+        setSuccessMsg(blockForm.autoGenerateRooms 
+          ? `Hostel block and ${calculatedTotalRooms} rooms successfully configured and registered.`
+          : 'Hostel block configured and registered.'
+        );
         setShowBlockModal(false);
-        setBlockForm({ name: '', type: 'boys', total_rooms: 0, total_floors: 1, warden_id: '', amenities: [] });
+        setBlockForm({
+          name: '',
+          type: 'boys',
+          total_rooms: 0,
+          total_floors: 1,
+          warden_id: '',
+          amenities: [],
+          autoGenerateRooms: false,
+          roomsPerFloor: 10,
+          bedsPerRoom: 2,
+          roomType: 'double',
+          monthlyRent: 6500,
+          roomAmenities: []
+        });
         loadData();
       } else {
         setErrorMsg(res.error || 'Failed to configure block.');
       }
     } catch {
-      // Mock setup
+      // Mock setup fallback
+      const mockBlockId = 'mock-b-' + Math.random();
       const mockBlock = {
-        id: 'mock-b-' + Math.random(),
+        id: mockBlockId,
         name: blockForm.name,
         type: blockForm.type,
-        total_rooms: blockForm.total_rooms,
+        total_rooms: calculatedTotalRooms,
         total_floors: blockForm.total_floors
       };
       setBlocks([...blocks, mockBlock]);
-      setSuccessMsg('Hostel block configured and registered. (Mock)');
+
+      if (blockForm.autoGenerateRooms) {
+        const generatedMockRooms = [];
+        for (let f = 1; f <= blockForm.total_floors; f++) {
+          for (let r = 1; r <= blockForm.roomsPerFloor; r++) {
+            const roomNum = f * 100 + r;
+            const prefix = blockForm.type === 'boys' ? 'A-' : blockForm.type === 'girls' ? 'B-' : 'R-';
+            generatedMockRooms.push({
+              id: 'mock-r-' + Math.random(),
+              room_number: `${prefix}${roomNum}`,
+              capacity: blockForm.bedsPerRoom,
+              room_type: blockForm.roomType,
+              monthly_rent: blockForm.monthlyRent,
+              hostel_blocks: { name: blockForm.name }
+            });
+          }
+        }
+        setRooms(prev => [...prev, ...generatedMockRooms]);
+      }
+
+      setSuccessMsg(blockForm.autoGenerateRooms
+        ? `Hostel block and ${calculatedTotalRooms} rooms successfully configured and registered. (Mock)`
+        : 'Hostel block configured and registered. (Mock)'
+      );
       setShowBlockModal(false);
-      setBlockForm({ name: '', type: 'boys', total_rooms: 0, total_floors: 1, warden_id: '', amenities: [] });
+      setBlockForm({
+        name: '',
+        type: 'boys',
+        total_rooms: 0,
+        total_floors: 1,
+        warden_id: '',
+        amenities: [],
+        autoGenerateRooms: false,
+        roomsPerFloor: 10,
+        bedsPerRoom: 2,
+        roomType: 'double',
+        monthlyRent: 6500,
+        roomAmenities: []
+      });
     } finally {
       setSubmitting(false);
     }
@@ -276,6 +376,99 @@ export default function AdminBlocksSetupPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* Toggle Room Auto Generation */}
+                <div className="border-t border-white/5 pt-4">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={blockForm.autoGenerateRooms}
+                      onChange={e => setBlockForm({ ...blockForm, autoGenerateRooms: e.target.checked })}
+                      className="rounded bg-[#0D0A1A] border-white/10 text-[#6C2BD9] focus:ring-0 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-white">Auto-generate rooms in this block</span>
+                  </label>
+                </div>
+
+                {blockForm.autoGenerateRooms && (
+                  <div className="space-y-4 border-t border-white/5 pt-4 mt-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Rooms per Floor</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={40}
+                          value={blockForm.roomsPerFloor}
+                          onChange={e => setBlockForm({ ...blockForm, roomsPerFloor: Math.min(40, parseInt(e.target.value) || 1) })}
+                          className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Beds per Room</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={8}
+                          value={blockForm.bedsPerRoom}
+                          onChange={e => setBlockForm({ ...blockForm, bedsPerRoom: Math.min(8, parseInt(e.target.value) || 1) })}
+                          className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Sharing Type</label>
+                        <select
+                          value={blockForm.roomType}
+                          onChange={e => setBlockForm({ ...blockForm, roomType: e.target.value as any })}
+                          className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
+                        >
+                          <option value="single">Single Sharing</option>
+                          <option value="double">Double Sharing</option>
+                          <option value="triple">Triple Sharing</option>
+                          <option value="dormitory">Dormitory</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Monthly Rent (₹)</label>
+                        <input
+                          type="number"
+                          value={blockForm.monthlyRent}
+                          onChange={e => setBlockForm({ ...blockForm, monthlyRent: parseInt(e.target.value) || 0 })}
+                          className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Room Amenities</label>
+                      <div className="flex flex-wrap gap-2">
+                        {amenitiesPresets.map(am => (
+                          <button
+                            type="button"
+                            key={am}
+                            onClick={() => {
+                              if (blockForm.roomAmenities.includes(am)) {
+                                setBlockForm({ ...blockForm, roomAmenities: blockForm.roomAmenities.filter(a => a !== am) });
+                              } else {
+                                setBlockForm({ ...blockForm, roomAmenities: [...blockForm.roomAmenities, am] });
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                              blockForm.roomAmenities.includes(am)
+                                ? 'bg-[#6C2BD9]/25 border-[#6C2BD9] text-[#A78BFA]'
+                                : 'bg-white/5 border-white/5 text-[#C4B5FD]/50'
+                            }`}
+                          >
+                            {am}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-2">

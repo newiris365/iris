@@ -77,7 +77,7 @@ describe('authMiddleware', () => {
     expect(next).toHaveBeenCalled();
     expect(req.user).toBeDefined();
     expect(req.user?.id).toBe('user-123');
-    expect(req.user?.role).toBe('student');
+    expect(req.user?.role).toBe('Student');
   });
 });
 

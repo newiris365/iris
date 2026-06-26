@@ -20,9 +20,10 @@ interface CampusDetailPanelProps {
   institutionId: string;
   institutionName: string;
   onClose: () => void;
+  institutionDetails?: any;
 }
 
-export default function CampusDetailPanel({ institutionId, institutionName, onClose }: CampusDetailPanelProps) {
+export default function CampusDetailPanel({ institutionId, institutionName, onClose, institutionDetails }: CampusDetailPanelProps) {
   const [loading, setLoading] = useState(true);
   const [studentCount, setStudentCount] = useState(0);
   const [staffCount, setStaffCount] = useState(0);
@@ -31,19 +32,23 @@ export default function CampusDetailPanel({ institutionId, institutionName, onCl
   const [activeModules, setActiveModules] = useState<string[]>([]);
   const [monthlyActivity, setMonthlyActivity] = useState<{ month: string; count: number }[]>([]);
   const [totalWalletBalance, setTotalWalletBalance] = useState(0);
+  const [instDetails, setInstDetails] = useState<any>(institutionDetails || null);
 
   useEffect(() => { loadDetail(); }, [institutionId]);
 
   const loadDetail = async () => {
     setLoading(true);
     try {
-      const [studentsRes, staffRes, attendanceRes, feesRes, featuresRes, walletRes] = await Promise.all([
+      const [studentsRes, staffRes, attendanceRes, feesRes, featuresRes, walletRes, instRes] = await Promise.all([
         supabase.from('students').select('id', { count: 'exact', head: true }).eq('institution_id', institutionId),
         supabase.from('staff').select('id', { count: 'exact', head: true }).eq('institution_id', institutionId),
         supabase.from('attendance_sessions').select('*').eq('institution_id', institutionId),
         supabase.from('fee_payments').select('amount_paid').eq('institution_id', institutionId),
         supabase.from('institution_features').select('feature_key, enabled').eq('institution_id', institutionId),
         supabase.from('students').select('wallet_balance').eq('institution_id', institutionId),
+        institutionDetails
+          ? Promise.resolve({ data: institutionDetails, error: null })
+          : supabase.from('institutions').select('*').eq('id', institutionId).single(),
       ]);
 
       setStudentCount(studentsRes.count || 0);
@@ -66,6 +71,8 @@ export default function CampusDetailPanel({ institutionId, institutionName, onCl
 
       const totalWB = (walletRes.data || []).reduce((acc, curr) => acc + Number(curr.wallet_balance || 0), 0);
       setTotalWalletBalance(totalWB);
+
+      setInstDetails(instRes.data || null);
 
       const months = [];
       const now = new Date();
@@ -193,20 +200,50 @@ export default function CampusDetailPanel({ institutionId, institutionName, onCl
               </div>
             </div>
 
-            {/* Subscription Info placeholder */}
+            {/* Subscription Info */}
             <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Calendar className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold text-white">Subscription</span>
+                <span className="text-xs font-bold text-white">Subscription Details</span>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-3 gap-4 text-xs">
                 <div>
-                  <span className="text-[#C4B5FD]/50 block">Plan</span>
-                  <span className="text-white font-bold">Loading...</span>
+                  <span className="text-[#C4B5FD]/50 block">Plan Tier</span>
+                  <span className="text-white font-bold">{instDetails?.plan_tier || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="text-[#C4B5FD]/50 block">Status</span>
-                  <span className="text-emerald-400 font-bold">Active</span>
+                  <span className="text-[#C4B5FD]/50 block">Billing Period</span>
+                  <span className="text-white font-bold capitalize">{instDetails?.subscription_period || 'monthly'}</span>
+                </div>
+                <div>
+                  <span className="text-[#C4B5FD]/50 block">Expiry Date</span>
+                  <span className="text-white font-bold">
+                    {instDetails?.subscription_end_date 
+                      ? new Date(instDetails.subscription_end_date).toLocaleDateString('en-IN') 
+                      : 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* AI API Keys */}
+            <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-violet-400" />
+                <span className="text-xs font-bold text-white">AI API Configuration Keys</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-xs">
+                <div className="flex justify-between items-center bg-black/25 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[#C4B5FD]/50">Gemini Key</span>
+                  <span className="text-white font-mono text-[11px]">{instDetails?.gemini_api_key ? '••••' + instDetails.gemini_api_key.slice(-4) : 'Not configured'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-black/25 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[#C4B5FD]/50">OpenAI Key</span>
+                  <span className="text-white font-mono text-[11px]">{instDetails?.openai_api_key ? '••••' + instDetails.openai_api_key.slice(-4) : 'Not configured'}</span>
+                </div>
+                <div className="flex justify-between items-center bg-black/25 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[#C4B5FD]/50">Claude Key</span>
+                  <span className="text-white font-mono text-[11px]">{instDetails?.claude_api_key ? '••••' + instDetails.claude_api_key.slice(-4) : 'Not configured'}</span>
                 </div>
               </div>
             </div>

@@ -47,7 +47,8 @@ import {
   issueClubCertificate,
   createInterlibraryRequest,
   listInterlibraryRequests,
-  updateInterlibraryRequestStatus
+  updateInterlibraryRequestStatus,
+  processReservationQueue
 } from '../controllers/library';
 
 const router = Router();
@@ -130,5 +131,8 @@ router.post('/book-clubs/:id/certificate', issueClubCertificate);
 router.post('/interlibrary/request', createInterlibraryRequest);
 router.get('/interlibrary/requests', listInterlibraryRequests);
 router.put('/interlibrary/requests/:id/status', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), updateInterlibraryRequestStatus);
+
+// --- RESERVATIONS FIFO QUEUE ---
+router.post('/reservations/queue/process', requireRole(['Staff', 'Admin', 'SuperAdmin', 'Librarian']), processReservationQueue);
 
 export default router;

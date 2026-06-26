@@ -11,6 +11,18 @@ interface ApiResponse<T = any> {
   [key: string]: any;
 }
 
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+}
+
 function getAuthHeaders(): Record<string, string> {
   let token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
   const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : null;
@@ -41,18 +53,85 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 function handleAuthError(status: number): void {
-  if ((status === 401 || status === 403) && typeof window !== 'undefined') {
+  if (status === 401 && typeof window !== 'undefined') {
     localStorage.removeItem('iris_jwt_token');
     localStorage.removeItem('iris_user_profile');
+    localStorage.removeItem('iris_refresh_token');
     if (window.location.pathname !== '/login') {
       window.location.href = '/login';
     }
   }
 }
 
+async function request(url: string, options: RequestInit): Promise<Response> {
+  const response = await fetch(url, options);
+
+  if (response.status === 401) {
+    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('iris_refresh_token') : null;
+    if (refreshToken) {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+          });
+
+          if (refreshResponse.ok) {
+            const data = await refreshResponse.json();
+            if (data.success && data.token) {
+              localStorage.setItem('iris_jwt_token', data.token);
+              if (data.refreshToken) {
+                localStorage.setItem('iris_refresh_token', data.refreshToken);
+              }
+              onRefreshed(data.token);
+              isRefreshing = false;
+
+              // Re-run the request with the new token
+              const headers = { ...options.headers } as Record<string, string>;
+              headers['Authorization'] = `Bearer ${data.token}`;
+              return await fetch(url, { ...options, headers });
+            }
+          }
+        } catch (err) {
+          console.error('Failed to auto-refresh token:', err);
+        } finally {
+          isRefreshing = false;
+        }
+      } else {
+        // Wait for current refresh to complete
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((newToken) => {
+            const headers = { ...options.headers } as Record<string, string>;
+            headers['Authorization'] = `Bearer ${newToken}`;
+            resolve(fetch(url, { ...options, headers }));
+          });
+        });
+      }
+    }
+
+    // Refresh failed or no refresh token
+    handleAuthError(response.status);
+  }
+
+  return response;
+}
+
+function dispatchFallbackEvent(endpoint: string) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('iris-api-fallback', { detail: { endpoint, isNetworkError: true } }));
+  }
+}
+
+function getFormattedUrl(endpoint: string): string {
+  const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_BASE}${formattedEndpoint}`;
+}
+
 export async function apiGet<T = any>(endpoint: string, params?: Record<string, string>, cacheSeconds = 0): Promise<ApiResponse<T>> {
   try {
-    const url = new URL(`${API_BASE}${endpoint}`, window.location.origin);
+    const url = new URL(getFormattedUrl(endpoint), typeof window !== 'undefined' ? window.location.origin : undefined);
     if (params) {
       Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
     }
@@ -62,75 +141,63 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
       headers['Cache-Control'] = `public, max-age=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 5}`;
     }
 
-    const response = await fetch(url.toString(), {
+    const response = await request(url.toString(), {
       method: 'GET',
       headers,
       cache: 'no-store', // Disable browser caching to ensure fresh data
     });
 
-    if (!response.ok) {
-      handleAuthError(response.status);
-    }
-
     return await response.json();
   } catch (err: any) {
     console.error(`apiGet failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
 
 export async function apiPost<T = any>(endpoint: string, body: any): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      handleAuthError(response.status);
-    }
-
     return await response.json();
   } catch (err: any) {
     console.error(`apiPost failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
 
 export async function apiPut<T = any>(endpoint: string, body: any): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      handleAuthError(response.status);
-    }
-
     return await response.json();
   } catch (err: any) {
     console.error(`apiPut failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
 
 export async function apiDelete<T = any>(endpoint: string): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
 
-    if (!response.ok) {
-      handleAuthError(response.status);
-    }
-
     return await response.json();
   } catch (err: any) {
     console.error(`apiDelete failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     return { success: false, error: 'Connection failed. Please check if backend is running.' };
   }
 }
@@ -140,20 +207,16 @@ export async function apiDelete<T = any>(endpoint: string): Promise<ApiResponse<
  */
 export async function apiFetchBlob(endpoint: string, body?: any): Promise<Blob> {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await request(getFormattedUrl(endpoint), {
       method: body ? 'POST' : 'GET',
       headers: getAuthHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    if (!response.ok) {
-      handleAuthError(response.status);
-      throw new Error('Failed to download file');
-    }
-
     return await response.blob();
   } catch (err: any) {
     console.error(`apiFetchBlob failed for ${endpoint}:`, err);
+    dispatchFallbackEvent(endpoint);
     throw new Error('Connection failed. Please check if backend is running.');
   }
 }

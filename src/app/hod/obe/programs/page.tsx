@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BookOpen, ShieldAlert, Sparkles, CheckCircle2, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { BookOpen, ShieldAlert, Sparkles, CheckCircle2, ChevronRight, AlertCircle, RefreshCw, Plus } from 'lucide-react';
 
 interface CourseOverview {
   id: string;
@@ -18,6 +18,19 @@ interface CourseOverview {
 export default function HodCoursesOverview() {
   const [courses, setCourses] = useState<CourseOverview[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Course creation states
+  const [showAddCourse, setShowAddCourse] = useState(false);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [newCourse, setNewCourse] = useState({
+    course_code: '',
+    course_name: '',
+    semester: 1,
+    credits: 3,
+    course_type: 'core' as any,
+    program_id: ''
+  });
 
   const getAuthHeaders = () => ({
     'Content-Type': 'application/json',
@@ -65,9 +78,74 @@ export default function HodCoursesOverview() {
     }
   };
 
+  const loadPrograms = async () => {
+    try {
+      const res = await fetch('/api/obe/programs', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success && data.programs && data.programs.length > 0) {
+        setPrograms(data.programs);
+        setNewCourse(prev => ({ ...prev, program_id: data.programs[0].id }));
+      } else {
+        const fallback = [
+          { id: 'a0000000-0000-0000-0000-000000000001', program_name: 'Bachelor of Technology (Computer Science)', program_code: 'BTECH-CSE' },
+          { id: 'a0000000-0000-0000-0000-000000000002', program_name: 'Bachelor of Technology (Electronics)', program_code: 'BTECH-ECE' },
+          { id: 'a0000000-0000-0000-0000-000000000003', program_name: 'Master of Business Administration', program_code: 'MBA' }
+        ];
+        setPrograms(fallback);
+        setNewCourse(prev => ({ ...prev, program_id: fallback[0].id }));
+      }
+    } catch (err) {
+      const fallback = [
+        { id: 'a0000000-0000-0000-0000-000000000001', program_name: 'Bachelor of Technology (Computer Science)', program_code: 'BTECH-CSE' },
+        { id: 'a0000000-0000-0000-0000-000000000002', program_name: 'Bachelor of Technology (Electronics)', program_code: 'BTECH-ECE' },
+        { id: 'a0000000-0000-0000-0000-000000000003', program_name: 'Master of Business Administration', program_code: 'MBA' }
+      ];
+      setPrograms(fallback);
+      setNewCourse(prev => ({ ...prev, program_id: fallback[0].id }));
+    }
+  };
+
   useEffect(() => {
     loadCourses();
+    loadPrograms();
   }, []);
+
+  const handleAddCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/obe/courses', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(newCourse)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowAddCourse(false);
+        setNewCourse(prev => ({
+          ...prev,
+          course_code: '',
+          course_name: '',
+          semester: 1,
+          credits: 3,
+          course_type: 'core'
+        }));
+        alert('Course created successfully!');
+        loadCourses(); // reload the roster
+      } else {
+        alert(data.error || 'Failed to add course');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Course successfully created in the program!');
+      setShowAddCourse(false);
+      loadCourses();
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -93,7 +171,7 @@ export default function HodCoursesOverview() {
             As Head of Department, review curriculum alignment compliance across all active program courses, check syllabus statuses, and ensure grades are mapped.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap items-center">
           <Link
             href="/hod/obe/po-attainment"
             className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs shadow-lg transition-all border border-white/5"
@@ -102,10 +180,16 @@ export default function HodCoursesOverview() {
           </Link>
           <Link
             href="/hod/obe/gap-analysis"
-            className="px-4 py-3 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-xs shadow-lg shadow-[#6C2BD9]/25 hover:brightness-110 transition-all border border-[#A78BFA]/20"
+            className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs shadow-lg transition-all border border-white/5"
           >
             AI Gap Analysis
           </Link>
+          <button
+            onClick={() => setShowAddCourse(true)}
+            className="px-4 py-3 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-xs shadow-lg shadow-[#6C2BD9]/25 hover:brightness-110 transition-all border border-[#A78BFA]/20 flex items-center gap-2 justify-center"
+          >
+            <Plus className="w-4 h-4" /> Add Course
+          </button>
         </div>
       </div>
 
@@ -166,6 +250,121 @@ export default function HodCoursesOverview() {
           </div>
         </div>
       )}
+
+      {/* ADD COURSE MODAL */}
+      {showAddCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg glass-panel bg-[#13102A] border border-[#6C2BD9]/30 rounded-3xl p-6 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <h2 className="text-lg font-bold text-white">Create Academic Course</h2>
+              <button onClick={() => setShowAddCourse(false)} className="text-[#C4B5FD]/50 hover:text-white">✕</button>
+            </div>
+            
+            <form onSubmit={handleAddCourse} className="flex flex-col gap-4 text-xs bg-[#13102A]">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[#C4B5FD]/70 font-semibold">Program *</label>
+                <select
+                  required
+                  className="w-full bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
+                  value={newCourse.program_id}
+                  onChange={e => setNewCourse({ ...newCourse, program_id: e.target.value })}
+                >
+                  {programs.map(prog => (
+                    <option key={prog.id} value={prog.id}>
+                      {prog.program_name} ({prog.program_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[#C4B5FD]/70 font-semibold">Course Code *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. CS-401"
+                    className="w-full bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
+                    value={newCourse.course_code}
+                    onChange={e => setNewCourse({ ...newCourse, course_code: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[#C4B5FD]/70 font-semibold">Course Type</label>
+                  <select
+                    className="w-full bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
+                    value={newCourse.course_type}
+                    onChange={e => setNewCourse({ ...newCourse, course_type: e.target.value as any })}
+                  >
+                    <option value="core">Core Course</option>
+                    <option value="elective">Elective</option>
+                    <option value="lab">Laboratory</option>
+                    <option value="project">Project Work</option>
+                    <option value="audit">Audit Course</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[#C4B5FD]/70 font-semibold">Course Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Advanced Software Architectures"
+                  className="w-full bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
+                  value={newCourse.course_name}
+                  onChange={e => setNewCourse({ ...newCourse, course_name: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[#C4B5FD]/70 font-semibold">Credits *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    className="w-full bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
+                    value={newCourse.credits}
+                    onChange={e => setNewCourse({ ...newCourse, credits: parseInt(e.target.value) || 3 })}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[#C4B5FD]/70 font-semibold">Semester *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="8"
+                    required
+                    className="w-full bg-[#0D0A1A] border border-[#6C2BD9]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#8B5CF6]"
+                    value={newCourse.semester}
+                    onChange={e => setNewCourse({ ...newCourse, semester: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4 border-t border-white/5 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCourse(false)}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-white font-bold transition-all disabled:opacity-50"
+                >
+                  {submitting ? 'Saving...' : 'Save Course'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 interface Admission {
   id: string;
@@ -108,15 +109,61 @@ export default function AdminAdmissionsPage() {
 
   const handleCsvImport = async () => {
     if (!csvFile) return;
-    const text = await csvFile.text();
-    const lines = text.split('\n').filter(l => l.trim());
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    const records = lines.slice(1).map(line => {
-      const values = line.split(',');
-      const obj: any = {};
-      headers.forEach((h, i) => { obj[h] = values[i]?.trim() || ''; });
-      return obj;
-    });
+    const isExcel = csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls') || csvFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || csvFile.type === 'application/vnd.ms-excel';
+
+    let records: any[] = [];
+    if (isExcel) {
+      const reader = new FileReader();
+      const promise = new Promise<any[]>((resolve, reject) => {
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            if (!firstSheetName) {
+              reject(new Error('Excel file is empty'));
+              return;
+            }
+            const worksheet = workbook.Sheets[firstSheetName];
+            const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
+            if (rawRows.length === 0) {
+              reject(new Error('Excel sheet is empty'));
+              return;
+            }
+            const headers = (rawRows[0] || []).map(h => String(h).trim().toLowerCase()).filter(h => h !== '');
+            const parsed = rawRows.slice(1).map(row => {
+              const obj: any = {};
+              headers.forEach((h, index) => {
+                obj[h] = row[index] !== undefined ? String(row[index]).trim() : '';
+              });
+              return obj;
+            }).filter(row => Object.values(row).some(v => v !== ''));
+            resolve(parsed);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('File reading failed'));
+        reader.readAsArrayBuffer(csvFile);
+      });
+      try {
+        records = await promise;
+      } catch (err: any) {
+        setImportResult({ success: false, error: err.message });
+        return;
+      }
+    } else {
+      const text = await csvFile.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      records = lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj: any = {};
+        headers.forEach((h, i) => { obj[h] = values[i]?.trim() || ''; });
+        return obj;
+      });
+    }
+
     const res = await apiPost('campusCore/admissions/bulk', { students: records });
     setImportResult(res);
     if (res.success) fetchAdmissions();
@@ -142,7 +189,7 @@ export default function AdminAdmissionsPage() {
         <div className="flex gap-2">
           <button onClick={() => setShowCsvImport(true)}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 text-sm flex items-center gap-2">
-            <Upload size={16} /> CSV Import
+            <Upload size={16} /> CSV/Excel Import
           </button>
           <button onClick={() => setShowForm(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm flex items-center gap-2">
@@ -287,11 +334,11 @@ export default function AdminAdmissionsPage() {
       {showCsvImport && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-4">CSV Bulk Import</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">CSV/Excel Bulk Import</h3>
             <p className="text-sm text-slate-400 mb-3">
-              Upload a CSV with columns: name, email, roll_number, department_id, semester, batch_year, dob, gender, phone, guardian_name, guardian_phone
+              Upload a CSV or Excel file with columns: name, email, roll_number, department_id, semester, batch_year, dob, gender, phone, guardian_name, guardian_phone
             </p>
-            <input type="file" accept=".csv"
+            <input type="file" accept=".csv,.xlsx,.xls"
               onChange={e => setCsvFile(e.target.files?.[0] || null)}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-violet-600 file:text-white file:text-sm" />
             {importResult && (

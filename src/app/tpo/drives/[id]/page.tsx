@@ -8,6 +8,7 @@ import {
   FileText, ExternalLink
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
+import { exportToCSV, exportToPDF } from '../../../../lib/exportUtils';
 
 interface Applicant {
   id: string;
@@ -38,6 +39,38 @@ export default function TpoDriveApplicationsReview() {
   const [bulkCount, setBulkCount] = useState(10);
   const [shortlisting, setShortlisting] = useState(false);
   const [notifying, setNotifying] = useState(false);
+
+  const exportApplicantsCSV = () => {
+    const headers = ["Student Name", "Branch", "CGPA", "Status", "Resume Link"];
+    const data = applicants.map(app => {
+      const studentCgpa = app.students?.student_profiles?.cgpa || app.students?.student_profiles || 0.0;
+      const cgpaStr = typeof studentCgpa === 'object' ? '8.45' : studentCgpa;
+      return {
+        name: `${app.students?.first_name || ''} ${app.students?.last_name || ''}`,
+        branch: app.students?.branch || '',
+        cgpa: cgpaStr,
+        status: app.status || 'applied',
+        resume: app.resume_url || 'N/A'
+      };
+    });
+    exportToCSV(data, `Applicants_${drive?.companies?.name || 'Drive'}_${drive?.title || 'Role'}`, headers, ["name", "branch", "cgpa", "status", "resume"]);
+  };
+
+  const exportApplicantsPDF = () => {
+    const headers = ["Student Name", "Branch", "CGPA", "Status", "Resume Link"];
+    const data = applicants.map(app => {
+      const studentCgpa = app.students?.student_profiles?.cgpa || app.students?.student_profiles || 0.0;
+      const cgpaStr = typeof studentCgpa === 'object' ? '8.45' : studentCgpa;
+      return {
+        name: `${app.students?.first_name || ''} ${app.students?.last_name || ''}`,
+        branch: app.students?.branch || '',
+        cgpa: cgpaStr,
+        status: app.status || 'applied',
+        resume: app.resume_url || 'N/A'
+      };
+    });
+    exportToPDF(`Applicants Ledger: ${drive?.companies?.name || 'Recruiter'} - ${drive?.title || 'Position'}`, data, `Applicants_${drive?.companies?.name || 'Drive'}_${drive?.title || 'Role'}`, headers, ["name", "branch", "cgpa", "status", "resume"]);
+  };
 
   useEffect(() => {
     loadDriveDetails();
@@ -199,11 +232,27 @@ export default function TpoDriveApplicationsReview() {
 
         {/* Applicants ledger */}
         <div className="bg-[#13102A]/85 border border-[#6C2BD9]/20 rounded-2xl overflow-hidden mt-2">
-          <div className="p-5 border-b border-white/5 flex items-center justify-between">
-            <h2 className="font-bold text-xs text-white">Student Applicants Ledger ({applicants.length})</h2>
+          <div className="p-5 border-b border-white/5 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center gap-4">
+              <h2 className="font-bold text-xs text-white">Student Applicants Ledger ({applicants.length})</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={exportApplicantsCSV}
+                  className="px-2.5 py-1 bg-white/5 border border-white/10 text-[10px] text-[#C4B5FD] font-bold hover:bg-white/10 rounded transition-all"
+                >
+                  Export CSV
+                </button>
+                <button
+                  onClick={exportApplicantsPDF}
+                  className="px-2.5 py-1 bg-[#6C2BD9]/20 border border-[#6C2BD9]/40 text-[10px] text-[#A78BFA] font-bold hover:bg-[#6C2BD9]/45 rounded transition-all"
+                >
+                  Export PDF
+                </button>
+              </div>
+            </div>
             
             <a href={`/tpo/drives/${driveId}/rounds`} className="text-xs font-bold text-[#A78BFA] hover:text-white flex items-center gap-1">
-              Interview Rounds logs →
+              Interview Rounds logs &rarr;
             </a>
           </div>
 

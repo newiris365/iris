@@ -141,7 +141,7 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
     // Standard mock trigger for spreadsheet import
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv';
+    input.accept = '.csv,.xlsx,.xls';
     input.onchange = async (e: any) => {
       const file = e.target.files[0];
       if (file) {
@@ -158,7 +158,7 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
             }
           })));
           setLoading(false);
-          alert('CSV marks table processed successfully. Updated 5 records.');
+          alert('CSV/Excel marks table processed successfully. Updated 5 records.');
         }, 1200);
       }
     };
@@ -207,7 +207,7 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
             onClick={handleImportCsv}
             className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[#C4B5FD] font-bold text-xs hover:bg-white/10 transition-all flex items-center gap-1.5"
           >
-            <Upload className="w-4 h-4" /> Import CSV Marks
+            <Upload className="w-4 h-4" /> Import CSV/Excel Marks
           </button>
           <button
             onClick={handleSaveMarks}

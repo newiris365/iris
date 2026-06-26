@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Sparkles, Upload, FileText, Send, CheckCircle2, ChevronRight, HelpCircle, RefreshCw } from 'lucide-react';
+import { exportToCSV, exportToPDF } from '../../../../lib/exportUtils';
 
 interface Metric {
   id: string;
@@ -24,6 +25,16 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
   // AI draft states
   const [aiDraft, setAiDraft] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+
+  const exportMetricsCSV = () => {
+    const headers = ["Metric Code", "Metric Name", "Type", "Data Value", "Status", "Notes"];
+    exportToCSV(metrics, `NAAC_Criterion_${criterionNumber}_Metrics`, headers, ["metric_code", "metric_name", "metric_type", "data_value", "status", "notes"]);
+  };
+
+  const exportMetricsPDF = () => {
+    const headers = ["Metric Code", "Metric Name", "Type", "Data Value", "Status", "Notes"];
+    exportToPDF(`NAAC SSR Report: ${getCriterionTitle()}`, metrics, `NAAC_Criterion_${criterionNumber}_Metrics`, headers, ["metric_code", "metric_name", "metric_type", "data_value", "status", "notes"]);
+  };
 
   const getAuthHeaders = () => ({
     'Content-Type': 'application/json',
@@ -163,6 +174,21 @@ export default function IqacCriterionDetails({ params }: { params: { number: str
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-[#A78BFA] font-bold uppercase tracking-widest font-mono">Self-Study Report Metrics Form</span>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">{getCriterionTitle()}</h1>
+        </div>
+
+        <div className="flex gap-2">
+          <button 
+            onClick={exportMetricsCSV}
+            className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-[#C4B5FD] font-bold hover:bg-white/10 transition-all"
+          >
+            Export CSV
+          </button>
+          <button 
+            onClick={exportMetricsPDF}
+            className="px-3.5 py-2 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs text-white font-bold transition-all shadow-lg shadow-[#6C2BD9]/20"
+          >
+            Export PDF
+          </button>
         </div>
       </div>
 

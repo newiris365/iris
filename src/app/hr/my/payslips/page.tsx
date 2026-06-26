@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Download, FileText, RefreshCw } from 'lucide-react';
+import { exportToCSV, exportToPDF } from '../../../../lib/exportUtils';
 
 interface PayslipRow {
   id: string;
@@ -45,9 +46,54 @@ export default function EmployeePayslipHistory() {
     loadData();
   }, []);
 
-  const handleDownload = (id: string) => {
-    // Direct stream download trigger
-    window.open(`/api/v1/hr/payslips/download/${id}`, '_blank');
+  const handleDownload = async (slip: PayslipRow) => {
+    try {
+      const token = localStorage.getItem('iris_jwt_token');
+      const res = await fetch(`/api/v1/hr/payslips/download/${slip.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Payslip_${slip.month_name}_${slip.year}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      throw new Error('API download failed');
+    } catch (err) {
+      // Local fallback using exportToPDF
+      const mockSlipDetails = [
+        { label: 'Employee Name', value: 'Khushal Gehlot' },
+        { label: 'Designation', value: 'Assistant Professor' },
+        { label: 'Department', value: 'Computer Science' },
+        { label: 'Salary Month', value: `${slip.month_name} ${slip.year}` },
+        { label: 'Gross Earnings', value: `₹${slip.gross_earnings.toLocaleString('en-IN')}` },
+        { label: 'Total Deductions', value: `₹${slip.total_deductions.toLocaleString('en-IN')}` },
+        { label: 'Net Take-Home Salary', value: `₹${slip.net_salary.toLocaleString('en-IN')}` }
+      ];
+      exportToPDF(
+        `IRIS 365 Monthly Payslip - ${slip.month_name} ${slip.year}`,
+        mockSlipDetails,
+        `Payslip_${slip.month_name}_${slip.year}`,
+        ["Earnings/Deductions Parameter", "Amount/Details"],
+        ["label", "value"]
+      );
+    }
+  };
+
+  const exportHistoryCSV = () => {
+    const headers = ["Month", "Year", "Gross Earnings", "Total Deductions", "Net Salary"];
+    const data = payslips.map(s => ({
+      month: s.month_name,
+      year: s.year,
+      gross: `₹${s.gross_earnings.toLocaleString('en-IN')}`,
+      deductions: `₹${s.total_deductions.toLocaleString('en-IN')}`,
+      net: `₹${s.net_salary.toLocaleString('en-IN')}`
+    }));
+    exportToCSV(data, 'payslips_history', headers, ["month", "year", "gross", "deductions", "net"]);
   };
 
   return (
@@ -77,14 +123,22 @@ export default function EmployeePayslipHistory() {
         </div>
       ) : (
         <div className="glass-panel border border-[#6C2BD9]/20 rounded-2xl overflow-hidden bg-[#13102A]/40">
-          <div className="p-6 border-b border-white/5 flex justify-between items-center">
+          <div className="p-6 border-b border-white/5 flex flex-wrap justify-between items-center gap-3">
             <h3 className="font-extrabold text-sm text-white">Monthly Payslips</h3>
-            <button
-              onClick={() => window.open('/api/v1/hr/payroll/reports/form16/d0000000-0000-0000-0000-000000000003', '_blank')}
-              className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-[#A78BFA] font-bold hover:bg-white/10 transition-all flex items-center gap-1.5"
-            >
-              <FileText className="w-4 h-4" /> Download Form 16 (FY26)
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={exportHistoryCSV}
+                className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-[#C4B5FD] font-bold hover:bg-white/10 transition-all"
+              >
+                Export History (CSV)
+              </button>
+              <button
+                onClick={() => window.open('/api/v1/hr/payroll/reports/form16/d0000000-0000-0000-0000-000000000003', '_blank')}
+                className="px-3.5 py-2 rounded-xl bg-[#6C2BD9]/20 hover:bg-[#6C2BD9]/45 border border-[#6C2BD9]/40 text-xs text-[#A78BFA] font-bold hover:bg-white/10 transition-all flex items-center gap-1.5"
+              >
+                <FileText className="w-4 h-4" /> Download Form 16 (FY26)
+              </button>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
@@ -110,7 +164,7 @@ export default function EmployeePayslipHistory() {
                     <td className="py-4 px-6 font-extrabold text-emerald-400">₹{slip.net_salary.toLocaleString('en-IN')}</td>
                     <td className="py-4 px-6 text-center">
                       <button
-                        onClick={() => handleDownload(slip.id)}
+                        onClick={() => handleDownload(slip)}
                         className="px-3 py-1.5 rounded-lg bg-[#6C2BD9]/20 hover:bg-[#6C2BD9]/45 border border-[#6C2BD9]/40 text-[#A78BFA] text-[10px] font-bold transition-all inline-flex items-center gap-1.5"
                       >
                         <Download className="w-3.5 h-3.5" /> Download Payslip PDF

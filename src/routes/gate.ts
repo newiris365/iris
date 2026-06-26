@@ -43,7 +43,11 @@ import {
   logParkingEntry,
   logParkingExit,
   getPersonDetails,
-  searchPerson
+  searchPerson,
+  toggleLockdown,
+  getLockdownStatus,
+  getGateAnalytics,
+  checkinVisitorQR
 } from '../controllers/gate';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -121,5 +125,15 @@ router.get('/person/:person_id', requireRole(['Security', 'Admin', 'SuperAdmin']
 
 // --- PERSON SEARCH (for visitor pass host lookup) ---
 router.get('/search', requireRole(['Security', 'Admin', 'SuperAdmin']), searchPerson);
+
+// --- EMERGENCY LOCKDOWN CONTROL ---
+router.post('/lockdown/toggle', requireRole(['Security', 'Admin', 'SuperAdmin']), toggleLockdown);
+router.get('/lockdown/status', getLockdownStatus);
+
+// --- GATE ANALYTICS ---
+router.get('/analytics/summary', requireRole(['Security', 'Admin', 'SuperAdmin']), getGateAnalytics);
+
+// --- QR VISITOR PASS CHECK-IN ---
+router.post('/visitors/checkin-qr', requireRole(['Security', 'Admin', 'SuperAdmin']), checkinVisitorQR);
 
 export default router;

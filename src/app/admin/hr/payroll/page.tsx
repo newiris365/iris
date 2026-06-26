@@ -106,6 +106,46 @@ export default function AdminPayrollConsole() {
     }
   };
 
+  const [downloadingEcr, setDownloadingEcr] = useState(false);
+
+  const handleDownloadEcr = async () => {
+    setDownloadingEcr(true);
+    try {
+      const res = await fetch('/api/v1/hr/payroll/reports/ecr', {
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success && data.ecr) {
+        const headers = ['UAN', 'Name', 'Gross', 'Basic', 'Employee Share', 'Employer Share'];
+        const rows = data.ecr.map((row: any) => [
+          row.uan,
+          row.name,
+          String(row.gross),
+          String(row.basic),
+          String(row.employee_share),
+          String(row.employer_share)
+        ]);
+        const csv = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'PF_ECR_Report_June_2026.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Failed to generate ECR Report.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error downloading ECR report.');
+    } finally {
+      setDownloadingEcr(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'disbursed':
@@ -175,10 +215,12 @@ export default function AdminPayrollConsole() {
           <div className="p-6 border-b border-white/5 flex justify-between items-center">
             <h3 className="font-extrabold text-sm text-white">Salary Runs Log</h3>
             <button
-              onClick={() => window.open('/api/v1/hr/payroll/reports/ecr', '_blank')}
-              className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] text-[#A78BFA] font-bold hover:bg-white/10 transition-all flex items-center gap-1.5"
+              onClick={handleDownloadEcr}
+              disabled={downloadingEcr}
+              className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] text-[#A78BFA] font-bold hover:bg-white/10 transition-all flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Download className="w-3.5 h-3.5" /> Download PF ECR (June)
+              {downloadingEcr ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {downloadingEcr ? 'Downloading...' : 'Download PF ECR (June)'}
             </button>
           </div>
           

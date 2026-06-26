@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, TrendingUp, AlertTriangle, Download, Filter, Calendar, ChevronDown, BarChart3, CheckCircle, XCircle } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
+import { exportToCSV, exportToPDF } from '../../../lib/exportUtils';
 
 const mockStudents = [
   { id: 1, name: "Aarav Mehta", rollNo: "CS2024001", subjects: { Mathematics: 92, Physics: 88, Chemistry: 95 }, overall: 91.7 },
@@ -72,19 +73,32 @@ export default function HodAttendancePage() {
 
   const maxBar = Math.max(...subjectStats.map((s) => s.average));
 
-  const exportReport = () => {
+  const exportReportCSV = () => {
+    const headers = ["Name", "Roll No", "Mathematics", "Physics", "Chemistry", "Overall (%)", "Status"];
+    const data = filtered.map(s => ({
+      name: s.name,
+      rollNo: s.rollNo,
+      math: s.subjects.Mathematics,
+      phys: s.subjects.Physics,
+      chem: s.subjects.Chemistry,
+      overall: `${s.overall.toFixed(1)}%`,
+      status: getStatus(s.overall).label
+    }));
+    exportToCSV(data, `attendance_report_${new Date().toISOString().split("T")[0]}`, headers, ["name", "rollNo", "math", "phys", "chem", "overall", "status"]);
+  };
+
+  const exportReportPDF = () => {
     const headers = ["Name", "Roll No", "Mathematics", "Physics", "Chemistry", "Overall", "Status"];
-    const rows = filtered.map((s) => [
-      s.name, s.rollNo, s.subjects.Mathematics, s.subjects.Physics, s.subjects.Chemistry, s.overall.toFixed(1), getStatus(s.overall).label,
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `attendance_report_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const data = filtered.map(s => ({
+      name: s.name,
+      rollNo: s.rollNo,
+      math: `${s.subjects.Mathematics}%`,
+      phys: `${s.subjects.Physics}%`,
+      chem: `${s.subjects.Chemistry}%`,
+      overall: `${s.overall.toFixed(1)}%`,
+      status: getStatus(s.overall).label
+    }));
+    exportToPDF("Department Attendance Performance Report", data, `attendance_report_${new Date().toISOString().split("T")[0]}`, headers, ["name", "rollNo", "math", "phys", "chem", "overall", "status"]);
   };
 
   if (isLoading) {
@@ -102,9 +116,14 @@ export default function HodAttendancePage() {
           <h1 className="text-2xl font-bold">Department Attendance Reports</h1>
           <p className="text-gray-400 text-sm mt-1">Monitor and analyze attendance across all subjects and batches</p>
         </div>
-        <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-[#0891B2] hover:bg-[#0E7490] rounded-lg text-sm font-medium transition-colors">
-          <Download size={16} /> Export Report
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportReportCSV} className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg text-sm font-medium transition-colors">
+            <Download size={16} /> Export CSV
+          </button>
+          <button onClick={exportReportPDF} className="flex items-center gap-2 px-4 py-2 bg-[#0891B2] hover:bg-[#0E7490] rounded-lg text-sm font-medium transition-colors">
+            <Download size={16} /> Export PDF
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

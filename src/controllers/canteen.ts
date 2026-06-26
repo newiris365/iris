@@ -1126,8 +1126,12 @@ try {
 
 export async function initiateWalletTopup(req: Request, res: Response) {
   try {
-    const { amount } = req.body;
+    const { amount, student_id } = req.body;
     if (!amount) return res.status(400).json({ success: false, error: 'Amount required.' });
+
+    const targetStudentId = student_id || req.user?.id;
+    if (!targetStudentId) return res.status(400).json({ success: false, error: 'student_id is required' });
+    const resolvedStudentId = await resolveStudentId(targetStudentId);
 
     const receipt = `topup_${Date.now()}`;
 
@@ -1135,7 +1139,13 @@ export async function initiateWalletTopup(req: Request, res: Response) {
       const order = await rzp.orders.create({
         amount: Math.round(Number(amount) * 100),
         currency: 'INR',
-        receipt
+        receipt,
+        notes: {
+          type: 'canteen_topup',
+          student_id: resolvedStudentId,
+          amount: String(amount),
+          institution_id: req.user?.institution_id || req.body.institution_id || ''
+        }
       });
       return res.status(200).json({
         success: true,
@@ -1502,7 +1512,23 @@ export async function getCurrentAIMenu(req: Request, res: Response) {
 
 export async function approveAIMenu(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    let { id } = req.params;
+
+    if (!id || id === 'approve') {
+      const { data: latestPlan, error: findError } = await supabaseAdmin
+        .from('ai_menu_plans')
+        .select('id')
+        .eq('institution_id', req.user?.institution_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (findError || !latestPlan) {
+        return res.status(404).json({ success: false, error: 'No weekly AI menu plan draft found to approve.' });
+      }
+      id = latestPlan.id;
+    }
+
     await supabaseAdmin.from('ai_menu_plans').update({ is_active: false }).eq('institution_id', req.user?.institution_id);
 
     const { data, error } = await supabaseAdmin

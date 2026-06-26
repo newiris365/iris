@@ -916,10 +916,12 @@ export async function getSalarySummaryReport(req: Request, res: Response) {
 
 export async function getLeaveLiabilityReport(req: Request, res: Response) {
   try {
-    const liability = {
-      pending_el_days: 284,
-      estimated_encashment_liability: 384000
-    };
+    const liability = [
+      { department: 'Computer Science', pending_days: 42, estimated_cost: 84000 },
+      { department: 'Mechanical Eng.', pending_days: 28, estimated_cost: 56000 },
+      { department: 'Civil Eng.', pending_days: 18, estimated_cost: 36000 },
+      { department: 'Administration', pending_days: 15, estimated_cost: 22500 }
+    ];
     return res.status(200).json({ success: true, report: liability });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -928,11 +930,14 @@ export async function getLeaveLiabilityReport(req: Request, res: Response) {
 
 export async function getAttritionReport(req: Request, res: Response) {
   try {
-    const stats = {
-      attrition_rate: '4.2%',
-      new_joins_ytd: 8,
-      separations_ytd: 2
-    };
+    const stats = [
+      { month: 'Jan 2026', joined: 3, exited: 1, net: 2 },
+      { month: 'Feb 2026', joined: 1, exited: 0, net: 1 },
+      { month: 'Mar 2026', joined: 2, exited: 2, net: 0 },
+      { month: 'Apr 2026', joined: 4, exited: 1, net: 3 },
+      { month: 'May 2026', joined: 0, exited: 1, net: -1 },
+      { month: 'Jun 2026', joined: 2, exited: 0, net: 2 }
+    ];
     return res.status(200).json({ success: true, report: stats });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
