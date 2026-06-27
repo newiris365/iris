@@ -62,8 +62,22 @@ export default function AdminAdmissionsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const deptRes = await apiGet('departments');
-      if (deptRes.success) setDepartments(deptRes.departments || []);
+      let data = null;
+      let error = null;
+      try {
+        const deptRes = await apiGet('campusCore/users/departments', { 
+          institution_id: JSON.parse(localStorage.getItem('iris_user_profile') || '{}').institution_id 
+        });
+        data = deptRes;
+        if (!deptRes.success) {
+          error = deptRes.error || 'Failed response';
+        }
+        setDepartments(deptRes.departments || []);
+      } catch (err: any) {
+        error = err;
+        setDepartments([]);
+      }
+      console.log('Departments fetched:', data, 'Error:', error);
     };
     load();
   }, []);

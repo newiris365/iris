@@ -49,9 +49,9 @@ export default function HodAttendancePage() {
     const fetchData = async () => {
       try {
         const res = await apiGet("/campusCore/attendance/report");
-        if (res?.students) setStudents(res.students);
-        if (res?.subjects) setSubjectStats(res.subjects);
-        if (res?.trend) setTrendData(res.trend);
+        if (res?.students && Array.isArray(res.students)) setStudents(res.students);
+        if (res?.subjects && Array.isArray(res.subjects)) setSubjectStats(res.subjects);
+        if (res?.trend && Array.isArray(res.trend)) setTrendData(res.trend);
       } catch {
         // using mock data
       } finally {
@@ -61,17 +61,17 @@ export default function HodAttendancePage() {
     fetchData();
   }, []);
 
-  const filtered = students.filter((s) => {
+  const filtered = Array.isArray(students) ? students.filter((s) => {
     if (searchTerm && !s.name.toLowerCase().includes(searchTerm.toLowerCase()) && !s.rollNo.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
-  });
+  }) : [];
 
-  const overallAvg = students.length ? (students.reduce((a, s) => a + s.overall, 0) / students.length).toFixed(1) : "0";
-  const atRisk = students.filter((s) => s.overall < 75);
-  const good = students.filter((s) => s.overall >= 85);
-  const critical = students.filter((s) => s.overall < 65);
+  const overallAvg = Array.isArray(students) && students.length ? (students.reduce((a, s) => a + s.overall, 0) / students.length).toFixed(1) : "0";
+  const atRisk = Array.isArray(students) ? students.filter((s) => s.overall < 75) : [];
+  const good = Array.isArray(students) ? students.filter((s) => s.overall >= 85) : [];
+  const critical = Array.isArray(students) ? students.filter((s) => s.overall < 65) : [];
 
-  const maxBar = Math.max(...subjectStats.map((s) => s.average));
+  const maxBar = Array.isArray(subjectStats) && subjectStats.length ? Math.max(...subjectStats.map((s) => s.average)) : 1;
 
   const exportReportCSV = () => {
     const headers = ["Name", "Roll No", "Mathematics", "Physics", "Chemistry", "Overall (%)", "Status"];

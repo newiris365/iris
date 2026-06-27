@@ -55,7 +55,7 @@ export default function HodGapAnalysis() {
         body: JSON.stringify({ po_data: {} })
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.recommendations)) {
         setRecommendations(data.recommendations);
       }
     } catch (err) {

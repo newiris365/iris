@@ -3641,10 +3641,12 @@ export async function gradeAssignment(req: Request, res: Response) {
 // =========================================================================
 export async function getStudyMaterials(req: Request, res: Response) {
   try {
+    console.log('getStudyMaterials called, user:', req.user?.id, req.user?.institution_id);
     const { departmentId, semester, category } = req.query;
     let query = supabaseAdmin
       .from('study_materials')
-      .select('*, users!uploaded_by(full_name)')
+      .select('*, users!uploaded_by(name)')
+      .eq('institution_id', req.user?.institution_id)
       .eq('is_published', true)
       .order('created_at', { ascending: false });
 
@@ -3657,7 +3659,7 @@ export async function getStudyMaterials(req: Request, res: Response) {
 
     const materials = (data || []).map((m: any) => ({
       ...m,
-      uploaded_by_name: m.users?.full_name || 'Unknown',
+      uploaded_by_name: m.users?.name || 'Unknown',
     }));
     return res.status(200).json({ success: true, materials });
   } catch (err: any) {
@@ -3667,6 +3669,7 @@ export async function getStudyMaterials(req: Request, res: Response) {
 
 export async function createStudyMaterial(req: Request, res: Response) {
   try {
+    console.log('createStudyMaterial called with body:', req.body);
     const { title, description, subject, department_id, file_url, file_name, file_type, file_size_kb, category, semester, batch_year } = req.body;
     if (!title || !file_url) {
       return res.status(400).json({ success: false, error: 'title and file_url required.' });

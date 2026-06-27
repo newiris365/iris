@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n \"next,express\" -c \"cyan,magenta\" \"next dev\" \"ts-node-dev --project tsconfig.server.json --respawn --transpile-only --no-notify --ignore-watch src/app --ignore-watch src/components --ignore-watch src/lib --ignore-watch .next --ignore-watch node_modules src/server.ts\"",
+    "fresh": "rm -rf .next && npm run dev",
     "build:frontend": "next build",
     "build:backend": "tsc --project tsconfig.server.json",
     "build": "next build",

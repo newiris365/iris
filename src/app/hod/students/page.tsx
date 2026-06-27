@@ -52,7 +52,12 @@ const HODStudentsPage = () => {
   const fetchStudents = async () => {
     try {
       const data = await apiGet('/campusCore/faculty/students');
-      setStudents(data as any);
+      // Guard: API may return {data: [...]} or a non-array on error
+      const list = Array.isArray(data) ? data
+        : Array.isArray(data?.data) ? data.data
+        : Array.isArray(data?.students) ? data.students
+        : null;
+      setStudents(list ?? mockStudents);
     } catch {
       setStudents(mockStudents);
     } finally {
@@ -61,7 +66,7 @@ const HODStudentsPage = () => {
   };
 
   const applyFilters = () => {
-    let result = [...students];
+    let result = Array.isArray(students) ? [...students] : [];
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(s =>
@@ -93,7 +98,7 @@ const HODStudentsPage = () => {
     atRisk: filteredStudents.filter(s => s.attendance < 60 || s.cgpa < 5.0).length,
   };
 
-  const uniqueBatches = Array.from(new Set(students.map(s => s.batch))).sort();
+  const uniqueBatches = Array.isArray(students) ? Array.from(new Set(students.map(s => s.batch))).sort() : [];
 
   const getAttendanceColor = (attendance: number) => {
     if (attendance >= 85) return 'text-emerald-400';

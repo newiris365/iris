@@ -3,6 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Upload, FileText, Download, Trash2, Plus, X, Filter, BookOpen, Video, Presentation, FileQuestion } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface Material {
   id: string;
@@ -81,7 +87,24 @@ export default function TeacherStudyMaterialsPage() {
     if (!uploadForm.title || !uploadForm.subject || !uploadForm.file) return;
     setUploading(true);
     try {
-      const res = await apiPost('/core/study-materials/upload', {
+      const fileExt = uploadForm.file.name.split('.').pop();
+      const fileName = `study-materials/${Date.now()}_${uploadForm.file.name}`;
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('study-materials')
+        .upload(fileName, uploadForm.file);
+
+      console.log('Storage upload result:', storageData, storageError);
+
+      if (storageError) throw new Error('File upload failed: ' + storageError.message);
+
+      const { data: urlData } = supabase.storage
+        .from('study-materials')
+        .getPublicUrl(fileName);
+
+      const file_url = urlData.publicUrl;
+      console.log('Public URL:', file_url);
+
+      const res = await apiPost('campusCore/study-materials', {
         title: uploadForm.title,
         subject: uploadForm.subject,
         category: uploadForm.category,
@@ -89,14 +112,19 @@ export default function TeacherStudyMaterialsPage() {
         semester: parseInt(uploadForm.semester),
         file_name: uploadForm.file.name,
         file_size_kb: Math.round(uploadForm.file.size / 1024),
-        file_type: uploadForm.file.name.split('.').pop(),
+        file_type: fileExt,
+        file_url: file_url,
       });
+
+      console.log('API response:', res);
+
       if (res.success) {
         loadData();
         setShowUploadModal(false);
         setUploadForm({ title: '', subject: '', category: 'Notes', description: '', semester: '3', file: null });
       }
-    } catch {
+    } catch (err: any) {
+      console.error(err);
       const newMaterial: Material = {
         id: Date.now().toString(),
         title: uploadForm.title,
@@ -207,7 +235,19 @@ export default function TeacherStudyMaterialsPage() {
                     </div>
                   ) : (
                     <>
-                      <button onClick={() => alert(`Downloading: ${m.file_url}`)}
+                      <button onClick={() => {
+                        if (!m.file_url || m.file_url === '#') {
+                          alert('No file available for download.');
+                          return;
+                        }
+                        const link = document.createElement('a');
+                        link.href = m.file_url;
+                        link.download = m.title || 'download';
+                        link.target = '_blank';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
                         className="p-2 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 text-[#A78BFA] hover:bg-[#6C2BD9]/30 transition-all">
                         <Download className="w-4 h-4" />
                       </button>

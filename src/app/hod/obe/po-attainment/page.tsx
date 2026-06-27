@@ -28,7 +28,7 @@ export default function HodPoAttainment() {
         headers: getAuthHeaders()
       });
       const data = await res.json();
-      if (data.success && data.attainments) {
+      if (data.success && Array.isArray(data.attainments)) {
         setPoAttainments(data.attainments);
       } else {
         // Fallback mock

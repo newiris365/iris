@@ -83,6 +83,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const [instituteType, setInstituteType] = useState<string>('college');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const authorizedRef = React.useRef<boolean | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -109,6 +110,15 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // Instant redirect if no token — avoids stuck "Checking access..." after sign out
+    const token = localStorage.getItem('iris_jwt_token');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+
+    let redirectTimeout: ReturnType<typeof setTimeout> | null = null;
+
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
       try {
@@ -125,11 +135,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         }
 
         setAuthorized(true);
+        authorizedRef.current = true;
         applySidebar(role, instType);
 
-        const token = localStorage.getItem('iris_jwt_token');
-        if (token) {
-          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+        const t = localStorage.getItem('iris_jwt_token');
+        if (t) {
+          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${t}` } })
             .then(r => r.json())
             .then(data => {
               if (data.success && data.profile) {
@@ -147,10 +158,23 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error('Failed parsing profile for admin auth check:', e);
         setAuthorized(false);
+        authorizedRef.current = false;
       }
     } else {
       window.location.href = '/login';
+      return;
     }
+
+    // 3-second safety timeout — redirect to login if auth never resolves
+    redirectTimeout = setTimeout(() => {
+      if (authorizedRef.current !== true) {
+        window.location.href = '/login';
+      }
+    }, 3000);
+
+    return () => {
+      if (redirectTimeout) clearTimeout(redirectTimeout);
+    };
   }, []);
 
   if (!hasMounted || authorized !== true) {

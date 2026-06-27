@@ -202,8 +202,20 @@ export default function PortalShell({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleSignOut = () => {
-    localStorage.clear();
+  const handleSignOut = async () => {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Supabase signOut error (non-critical):', e);
+    }
+    localStorage.removeItem('iris_jwt_token');
+    localStorage.removeItem('iris_refresh_token');
+    localStorage.removeItem('iris_user_profile');
     window.location.href = '/login';
   };
 
