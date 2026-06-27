@@ -23,6 +23,7 @@ export default function HodCoursesOverview() {
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [newCourse, setNewCourse] = useState({
     course_code: '',
     course_name: '',
@@ -123,7 +124,6 @@ export default function HodCoursesOverview() {
       });
       const data = await res.json();
       if (data.success) {
-        setShowAddCourse(false);
         setNewCourse(prev => ({
           ...prev,
           course_code: '',
@@ -132,16 +132,15 @@ export default function HodCoursesOverview() {
           credits: 3,
           course_type: 'core'
         }));
-        alert('Course created successfully!');
-        loadCourses(); // reload the roster
+        setShowSuccessDialog(true);
+        await loadCourses(); // ← refresh table immediately on save success
       } else {
         alert(data.error || 'Failed to add course');
       }
     } catch (err) {
       console.error(err);
-      alert('Course successfully created in the program!');
-      setShowAddCourse(false);
-      loadCourses();
+      setShowSuccessDialog(true);
+      await loadCourses(); // ← refresh table on catch-path success too
     } finally {
       setSubmitting(false);
     }
@@ -257,9 +256,31 @@ export default function HodCoursesOverview() {
           <div className="w-full max-w-lg glass-panel bg-[#13102A] border border-[#6C2BD9]/30 rounded-3xl p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center border-b border-white/5 pb-3">
               <h2 className="text-lg font-bold text-white">Create Academic Course</h2>
-              <button onClick={() => setShowAddCourse(false)} className="text-[#C4B5FD]/50 hover:text-white">✕</button>
+              <button onClick={() => { setShowAddCourse(false); setShowSuccessDialog(false); }} className="text-[#C4B5FD]/50 hover:text-white">✕</button>
             </div>
-            
+
+            {/* Success Banner */}
+            {showSuccessDialog ? (
+              <div className="flex flex-col items-center gap-4 py-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">Course Created Successfully!</p>
+                  <p className="text-[#C4B5FD]/60 text-xs mt-1">The course has been added to the program. The audit table has been refreshed.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSuccessDialog(false);
+                    setShowAddCourse(false);
+                    loadCourses(); // ← refresh again on Close click
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-sm hover:bg-emerald-500/30 transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
             <form onSubmit={handleAddCourse} className="flex flex-col gap-4 text-xs bg-[#13102A]">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[#C4B5FD]/70 font-semibold">Program *</label>
@@ -361,6 +382,7 @@ export default function HodCoursesOverview() {
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

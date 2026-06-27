@@ -11,7 +11,13 @@ export default function ProfilePage() {
   useEffect(() => {
     const saved = localStorage.getItem('iris_user_profile');
     if (saved) {
-      try { setProfile(JSON.parse(saved)); } catch {}
+      try { 
+        setProfile(JSON.parse(saved)); 
+      } catch {
+        window.location.href = '/login';
+      }
+    } else {
+      window.location.href = '/login';
     }
   }, []);
 

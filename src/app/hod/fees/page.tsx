@@ -30,7 +30,7 @@ const feeCollectionSummary = {
 };
 
 export default function FeeDefaultersPage() {
-  const [defaulters, setDefaulters] = useState([]);
+  const [defaulters, setDefaulters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
@@ -51,7 +51,10 @@ export default function FeeDefaultersPage() {
     setLoading(true);
     try {
       const data = await apiGet('/campusCore/fees/defaulters');
-      setDefaulters(data.defaulters || data);
+      const list = Array.isArray(data) ? data
+        : Array.isArray(data?.defaulters) ? data.defaulters
+        : null;
+      setDefaulters(list ?? mockDefaulters);
     } catch {
       setDefaulters(mockDefaulters);
     } finally {
@@ -59,7 +62,7 @@ export default function FeeDefaultersPage() {
     }
   };
 
-  const filteredDefaulters = defaulters.filter((d) => {
+  const filteredDefaulters = Array.isArray(defaulters) ? defaulters.filter((d) => {
     if (filterAmountMin && d.amountDue < Number(filterAmountMin)) return false;
     if (filterAmountMax && d.amountDue > Number(filterAmountMax)) return false;
     if (filterSemester !== 'all' && d.semester !== Number(filterSemester)) return false;
@@ -69,7 +72,7 @@ export default function FeeDefaultersPage() {
       if (!d.name.toLowerCase().includes(q) && !d.rollNo.toLowerCase().includes(q)) return false;
     }
     return true;
-  });
+  }) : [];
 
   const sorted = [...filteredDefaulters].sort((a, b) => {
     const dir = sortConfig.direction === 'asc' ? 1 : -1;
@@ -86,7 +89,7 @@ export default function FeeDefaultersPage() {
     }));
   };
 
-  const totalPending = defaulters.reduce((sum, d) => sum + d.amountDue, 0);
+  const totalPending = Array.isArray(defaulters) ? defaulters.reduce((sum, d) => sum + d.amountDue, 0) : 0;
 
   const handleSendReminder = async (defaulter) => {
     setSendingReminder(defaulter.id);

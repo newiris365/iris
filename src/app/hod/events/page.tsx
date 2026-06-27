@@ -133,7 +133,7 @@ export default function HodEventsPage() {
     const loadEvents = async () => {
       try {
         const res = await apiGet('/events/events');
-        if (res.success && res.events?.length) {
+        if (res.success && Array.isArray(res.events) && res.events.length) {
           setEvents(res.events);
         } else {
           setEvents(mockEvents);
@@ -147,19 +147,19 @@ export default function HodEventsPage() {
     loadEvents();
   }, []);
 
-  const filtered = events.filter(e => {
+  const filtered = Array.isArray(events) ? events.filter(e => {
     const matchesCategory = activeCategory === 'All' || e.category === activeCategory;
     const matchesSearch =
       e.title.toLowerCase().includes(search.toLowerCase()) ||
       e.description.toLowerCase().includes(search.toLowerCase()) ||
       e.organizer.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
-  });
+  }) : [];
 
   const stats = {
-    upcoming: events.filter(e => e.status === 'upcoming').length,
-    completed: events.filter(e => e.status === 'completed').length,
-    total: events.length,
+    upcoming: Array.isArray(events) ? events.filter(e => e.status === 'upcoming').length : 0,
+    completed: Array.isArray(events) ? events.filter(e => e.status === 'completed').length : 0,
+    total: Array.isArray(events) ? events.length : 0,
   };
 
   const handleCreateEvent = () => {

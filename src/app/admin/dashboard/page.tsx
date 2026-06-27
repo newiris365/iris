@@ -89,14 +89,18 @@ export default function AdminDashboard() {
     let fetchedAlerts = [];
     let fetchedModules = null;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     try {
-      // Fetch all dashboard data in parallel
+      // Fetch all dashboard data in parallel with a 5-second safety timeout
       const [overviewRes, analyticsRes, alertsRes, modulesRes] = await Promise.all([
-        fetch('/api/v1/director/overview', { headers: getAuthHeaders() }),
-        fetch('/api/v1/director/analytics', { headers: getAuthHeaders() }),
-        fetch('/api/v1/director/alerts', { headers: getAuthHeaders() }),
-        fetch('/api/v1/director/modules', { headers: getAuthHeaders() })
+        fetch('/api/v1/director/overview', { headers: getAuthHeaders(), signal: controller.signal }),
+        fetch('/api/v1/director/analytics', { headers: getAuthHeaders(), signal: controller.signal }),
+        fetch('/api/v1/director/alerts', { headers: getAuthHeaders(), signal: controller.signal }),
+        fetch('/api/v1/director/modules', { headers: getAuthHeaders(), signal: controller.signal })
       ]);
+      clearTimeout(timeoutId);
 
       const overviewData = await overviewRes.json();
       const analyticsData = await analyticsRes.json();

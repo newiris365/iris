@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Shield, Lock, Mail, Loader2, Sparkles, Terminal } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // Input Zod validator schema matching backend checks
 const loginSchema = z.object({
@@ -195,24 +196,117 @@ const getMockProfile = (email: string, role: string) => {
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [useOfflineBypass, setUseOfflineBypass] = useState(true);
 
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema)
+  });
+
+  const handleForgotPasswordSubmit = async () => {
+    if (!resetEmail || !resetEmail.includes('@')) {
+      setResetError('Please enter a valid institutional email address');
+      return;
+    }
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      });
+      if (error) {
+        throw new Error(error.message);
+      }
+      setResetSuccess(true);
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to send reset link. Please try again.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setSubmitError(null);
+    try {
+      const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') || '' : '';
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?device_id=${encodeURIComponent(deviceId)}`
+        }
+      });
+      if (error) {
+        throw new Error(error.message);
+      }
+    } catch (err: any) {
+      setSubmitError(err.message || 'An error occurred initiating Google sign-in.');
+      setIsLoading(false);
+    }
+  };
+
   React.useEffect(() => {
+    let active = true;
+    const timeout = setTimeout(() => {
+      if (active) setIsCheckingSession(false);
+    }, 2000);
+
     if (typeof window !== 'undefined') {
       let id = localStorage.getItem('iris_client_device_id');
       if (!id) {
         id = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         localStorage.setItem('iris_client_device_id', id);
       }
+
+      // Parse URL parameters to check for OAuth callback errors
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (err) {
+        setSubmitError(decodeURIComponent(err));
+      }
+
+      // Check if a session already exists to auto-redirect
+      const token = localStorage.getItem('iris_jwt_token');
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (token && savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          if (parsed && parsed.role) {
+            window.location.href = getRedirectPath(parsed.role);
+            return;
+          }
+        } catch (e) {
+          console.error('Error parsing session on mount:', e);
+        }
+      }
     }
+
+    if (active) setIsCheckingSession(false);
+    clearTimeout(timeout);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
   }, []);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema)
-  });
+  if (isCheckingSession) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-4 bg-[#0D0A1A]">
+        <div className="text-center flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-[#8B5CF6]" />
+          <p className="text-slate-400 text-sm">Loading session...</p>
+        </div>
+      </main>
+    );
+  }
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
@@ -428,6 +522,28 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div className="relative my-5 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10"></div>
+          </div>
+          <span className="relative px-3 bg-[#0D0A1A] text-[10px] text-[#C4B5FD]/50 font-bold uppercase tracking-wider">or</span>
+        </div>
+
+        <button 
+          type="button" 
+          disabled={isLoading}
+          onClick={handleGoogleSignIn}
+          className="w-full py-3 rounded-xl bg-white text-gray-900 font-heading font-bold text-sm shadow-lg hover:bg-gray-100 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+
         {/* Instant Login - All Roles */}
         <div className="mt-6 pt-6 border-t border-white/10">
           <div className="flex items-center justify-between mb-3">
@@ -514,17 +630,68 @@ export default function LoginPage() {
       {showForgotModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-[#13102A] border border-[#6C2BD9]/30 rounded-2xl p-6 shadow-2xl relative">
-            <h3 className="font-heading font-bold text-base text-white mb-2">Password Reset Parameters</h3>
-            <p className="text-xs text-[#C4B5FD]/70 leading-relaxed mb-5">
-              To protect institutional data integrity and device fingerprint signatures, self-service password recovery is disabled. Please contact your campus **IT Helpdesk** or Registrar to request a credentials reset token.
+            <h3 className="font-heading font-bold text-base text-white mb-2">Reset Password</h3>
+            <p className="text-xs text-[#C4B5FD]/70 leading-relaxed mb-4">
+              Enter your institutional email address to receive a secure password reset link.
             </p>
-            <button 
-              type="button"
-              onClick={() => setShowForgotModal(false)} 
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white text-xs font-bold transition-all shadow-md shadow-[#6C2BD9]/20"
-            >
-              Acknowledge & Close
-            </button>
+            
+            {resetSuccess ? (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+                Password reset link sent to your email.
+              </div>
+            ) : (
+              <>
+                {resetError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
+                    {resetError}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5 mb-5">
+                  <label className="text-[10px] font-semibold text-[#C4B5FD] uppercase tracking-wider">Institutional Email</label>
+                  <input 
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="w-full bg-white/5 border border-[#6C2BD9]/30 focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#8B5CF6] px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/20 outline-none transition-all"
+                    placeholder="name@institution.edu"
+                    disabled={resetLoading}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3">
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowForgotModal(false);
+                  setResetEmail('');
+                  setResetSuccess(false);
+                  setResetError(null);
+                }} 
+                className="flex-1 py-2.5 rounded-xl border border-white/10 text-white text-xs font-bold transition-all hover:bg-white/5"
+              >
+                Close
+              </button>
+              {!resetSuccess && (
+                <button 
+                  type="button"
+                  disabled={resetLoading}
+                  onClick={handleForgotPasswordSubmit}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-[#6C2BD9]/20 flex items-center justify-center gap-1.5"
+                >
+                  {resetLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <span>Send Link</span>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

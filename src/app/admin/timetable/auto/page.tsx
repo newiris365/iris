@@ -49,12 +49,19 @@ export default function TimetableAutoPage() {
 
   useEffect(() => {
     const load = async () => {
-      const [deptRes, staffRes] = await Promise.all([
-        apiGet('departments'),
-        apiGet('staff'),
-      ]);
-      if (deptRes.success) setDepartments(deptRes.departments || []);
-      if (staffRes.success) setStaff(staffRes.staff || []);
+      try {
+        const [deptRes, staffRes] = await Promise.all([
+          apiGet('campusCore/users/departments', { 
+            institution_id: JSON.parse(localStorage.getItem('iris_user_profile') || '{}').institution_id 
+          }),
+          apiGet('staff'),
+        ]);
+        setDepartments(deptRes.departments || []);
+        if (staffRes.success) setStaff(staffRes.staff || []);
+      } catch (err) {
+        console.error(err);
+        setDepartments([]);
+      }
     };
     load();
     loadConstraints();

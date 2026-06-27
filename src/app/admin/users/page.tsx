@@ -85,9 +85,13 @@ export default function AdminUsersPage() {
 
   const fetchDepartments = async () => {
     try {
-      const res = await apiGet('campusCore/users/departments');
-      if (res.success) setDepartments(res.departments || []);
-    } catch {}
+      const res = await apiGet('campusCore/users/departments', { 
+        institution_id: JSON.parse(localStorage.getItem('iris_user_profile') || '{}').institution_id 
+      });
+      setDepartments(res.departments || []);
+    } catch {
+      setDepartments([]);
+    }
   };
 
   const fetchStats = async () => {
