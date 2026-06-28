@@ -247,8 +247,9 @@ export default function LoginPage() {
       if (error) {
         throw new Error(error.message);
       }
-    } catch (err: any) {
-      setSubmitError(err.message || 'An error occurred initiating Google sign-in.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred initiating Google sign-in.';
+      setSubmitError(errorMessage);
       setIsLoading(false);
     }
   };
@@ -269,7 +270,9 @@ export default function LoginPage() {
       // Parse URL parameters to check for OAuth callback errors
       const params = new URLSearchParams(window.location.search);
       const err = params.get('error');
-      if (err) {
+      if (err === 'user_not_found') {
+        setSubmitError('User not found. Contact your administrator.');
+      } else if (err) {
         setSubmitError(decodeURIComponent(err));
       }
 

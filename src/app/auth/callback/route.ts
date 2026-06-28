@@ -259,29 +259,17 @@ export async function GET(request: NextRequest) {
       isActive = userProfile.is_active;
       profileId = userProfile.id;
     } else {
-      console.warn(`[OAuth Callback] Platform profile record not found for email: ${email}. Resolving fallbacks...`);
-      
-      // Fallback checks: metadata or sandbox email lookup
-      if (authUser.user_metadata?.role) {
-        resolvedRole = authUser.user_metadata.role;
-      } else {
-        // Map sandbox emails manually
-        if (normalizedEmail === 'siddharth@sin.education') resolvedRole = 'SuperAdmin';
-        else if (normalizedEmail === 'director@siet.edu.in' || normalizedEmail === 'admin@siet.edu.in') resolvedRole = 'Admin';
-        else if (normalizedEmail === 'warden@siet.edu.in') resolvedRole = 'Warden';
-        else if (normalizedEmail === 'security@siet.edu.in') resolvedRole = 'Security';
-        else if (normalizedEmail === 'rajesh.driver@siet.edu.in') resolvedRole = 'Driver';
-        else if (normalizedEmail === 'alok.vyas@siet.edu.in') resolvedRole = 'Staff';
-        else if (normalizedEmail === 'madanlal@gmail.com') resolvedRole = 'Parent';
-        else if (normalizedEmail === 'canteen@siet.edu.in') resolvedRole = 'Vendor';
-        else if (normalizedEmail === 'hod@sin.education') resolvedRole = 'HOD';
-        else if (normalizedEmail === 'teacher@sin.education') resolvedRole = 'Teacher';
-        else if (normalizedEmail === 'librarian@sin.education') resolvedRole = 'Librarian';
+      // Security: email not found in our users table — sign out and reject.
+      console.warn(`[OAuth Callback] Email not found in users table: ${email}. Signing out and rejecting.`);
+      // Sign out from Supabase auth so the OAuth session is cleaned up
+      try {
+        await supabaseAnon.auth.signOut();
+      } catch (signOutErr) {
+        console.error('[OAuth Callback] signOut error (non-critical):', signOutErr);
       }
-      
-      if (authUser.user_metadata?.institution_id) {
-        resolvedInstitutionId = authUser.user_metadata.institution_id;
-      }
+      return NextResponse.redirect(
+        new URL('/login?error=user_not_found', requestUrl.origin)
+      );
     }
 
     if (!isActive) {
