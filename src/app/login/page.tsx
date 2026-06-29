@@ -280,6 +280,49 @@ export default function LoginPage() {
 
       // Parse URL parameters to check for OAuth callback errors
       const params = new URLSearchParams(window.location.search);
+
+      // ─── OAuth Token Ingestion ────────────────────────────────────────────────
+      // The auth/callback route redirects here with token, refresh, profile, and
+      // path as query params. We store them in localStorage here — in a trusted
+      // first-party context — then navigate to the dashboard.
+      // ─────────────────────────────────────────────────────────────────────────
+      const oauthToken = params.get('token');
+      const oauthRefresh = params.get('refresh');
+      const oauthProfile = params.get('profile');
+      const oauthPath = params.get('path');
+
+      if (oauthToken && oauthProfile && oauthPath) {
+        try {
+          console.log('[Login] OAuth token received from callback — storing in localStorage');
+          console.log('[Login] Token type:', oauthToken.startsWith('eyJ') ? 'REAL JWT ✓' : 'UNEXPECTED FORMAT ✗');
+          console.log('[Login] Token prefix:', oauthToken.substring(0, 30));
+
+          localStorage.setItem('iris_jwt_token', oauthToken);
+          if (oauthRefresh) {
+            localStorage.setItem('iris_refresh_token', oauthRefresh);
+          }
+          localStorage.setItem('iris_user_profile', oauthProfile);
+
+          const stored = localStorage.getItem('iris_jwt_token');
+          if (!stored) {
+            throw new Error('Failed to persist JWT in localStorage after OAuth callback.');
+          }
+
+          console.log('[Login] Token stored successfully. Redirecting to:', oauthPath);
+
+          // Remove token from URL before navigating so it's not cached or bookmarked
+          window.history.replaceState({}, '', '/login');
+          window.location.href = oauthPath;
+          return;
+        } catch (e: any) {
+          console.error('[Login] Error storing OAuth token:', e.message);
+          setSubmitError('Authentication succeeded but session could not be saved. Please try again.');
+          if (active) setIsCheckingSession(false);
+          clearTimeout(timeout);
+          return;
+        }
+      }
+
       const err = params.get('error');
       if (err === 'user_not_found') {
         setSubmitError('User not found. Contact your administrator.');
@@ -294,7 +337,7 @@ export default function LoginPage() {
       var isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
 
       if (token && token.startsWith('mock-sandbox') && isProduction) {
-        console.warn('[Login] Mock sandbox token detected on production login mount. Clearing stale session.');
+        console.warn('[Login] Stale mock sandbox token on production — clearing.');
         localStorage.removeItem('iris_jwt_token');
         localStorage.removeItem('iris_user_profile');
         localStorage.removeItem('iris_refresh_token');

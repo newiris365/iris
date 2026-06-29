@@ -288,19 +288,17 @@ export async function GET(request: NextRequest) {
       institution_id: resolvedInstitutionId,
       role: normalizedRole,
       email,
-      // NOTE: fingerprint intentionally REMOVED — it was computed on Vercel's serverless IP/UA
-      // which will never match what Render Express recomputes from browser requests → causes 403
+      // fingerprint intentionally omitted — computed on Vercel serverless IP/UA, never matches Render
       supabase_token: authSession.access_token,
       supabase_refresh_token: authSession.refresh_token,
       institute_type: resolvedInstituteType
     };
 
-    const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });
+    const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '7d' });
 
-    // DEBUG: Log the signed token header+payload (NOT signature) and first 20 chars
+    // DEBUG: Log the signed token (safe — only header + payload prefix, no full signature)
     const tokenParts = token.split('.');
     console.log('[auth/callback] Token signed — header:', Buffer.from(tokenParts[0], 'base64').toString(), '| payload preview:', Buffer.from(tokenParts[1], 'base64').toString().substring(0, 120), '| token prefix:', token.substring(0, 20));
-
 
     const profileData = {
       id: profileId,
@@ -315,54 +313,24 @@ export async function GET(request: NextRequest) {
 
     const redirectPath = getRedirectPath(normalizedRole);
 
-    // Client-side bridge writes auth tokens to localStorage then redirects
-    const htmlResponse = `
-      <!DOCTYPE html>
-      <html>
-      <head><title>Authenticating User...</title></head>
-      <body style="background-color:#0D0A1A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-        <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
-          <div style="width:40px;height:40px;border:3px solid rgba(124,58,237,0.3);border-top-color:#7C3AED;border-radius:50%;animation:spin 1s infinite linear;"></div>
-          <p style="font-size:14px;font-weight:500;color:#C4B5FD;">Finalizing platform authentication...</p>
-        </div>
-        <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
-        <script>
-          (function(){
-            try{
-              var token = ${JSON.stringify(token)};
-              var refreshToken = ${JSON.stringify(authSession.refresh_token)};
-              var profile = ${JSON.stringify(profileData)};
+    // ─── Reliable token delivery via URL redirect ─────────────────────────────
+    // The previous HTML bridge approach (inline <script> writing localStorage)
+    // was silently failing — browser security policies (CSP, ITP, incognito mode)
+    // can block inline script execution or localStorage access in third-party contexts.
+    //
+    // New approach: redirect to /login with the token embedded as a URL query param.
+    // The login page React code reads it, writes localStorage, then navigates to the
+    // correct dashboard — this always runs in a trusted first-party page context.
+    // ─────────────────────────────────────────────────────────────────────────────
+    const loginRedirectUrl = new URL('/login', requestUrl.origin);
+    loginRedirectUrl.searchParams.set('token', token);
+    loginRedirectUrl.searchParams.set('refresh', authSession.refresh_token);
+    loginRedirectUrl.searchParams.set('profile', JSON.stringify(profileData));
+    loginRedirectUrl.searchParams.set('path', redirectPath);
 
-              // DEBUG: Log token details to browser console
-              console.log('[IRIS Auth Callback] Token type:', token.startsWith('eyJ') ? 'REAL JWT' : 'UNEXPECTED FORMAT');
-              console.log('[IRIS Auth Callback] Token prefix (first 30 chars):', token.substring(0, 30));
-              console.log('[IRIS Auth Callback] Token length:', token.length);
-              console.log('[IRIS Auth Callback] Profile role:', profile.role);
-              console.log('[IRIS Auth Callback] Storing to localStorage key: iris_jwt_token');
+    console.log('[auth/callback] Redirecting to login with token for role:', normalizedRole, '→', redirectPath);
 
-              localStorage.setItem('iris_jwt_token', token);
-              localStorage.setItem('iris_refresh_token', refreshToken);
-              localStorage.setItem('iris_user_profile', JSON.stringify(profile));
-              
-              var stored = localStorage.getItem('iris_jwt_token');
-              console.log('[IRIS Auth Callback] Verified stored token prefix:', stored ? stored.substring(0, 30) : 'NULL - STORAGE FAILED');
-
-              if (!stored) {
-                throw new Error('JWT token could not be verified in localStorage.');
-              }
-              
-              window.location.href=${JSON.stringify(redirectPath)};
-            }catch(e){
-              console.error('[IRIS Auth Callback] Error:', e.message);
-              window.location.href='/login?error='+encodeURIComponent('Failed to store session locally: ' + e.message);
-            }
-          })();
-        </script>
-      </body>
-      </html>
-    `;
-
-    return new NextResponse(htmlResponse, { headers: { 'Content-Type': 'text/html' } });
+    return NextResponse.redirect(loginRedirectUrl);
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'OAuth authentication failed.';
