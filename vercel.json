@@ -1,0 +1,90 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "devCommand": "next dev",
+
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" }
+      ]
+    },
+    {
+      "source": "/auth/callback",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
+    }
+  ],
+
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/v1/:path*"
+    },
+    {
+      "source": "/api/canteen/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/canteen/:path*"
+    },
+    {
+      "source": "/api/transit/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/transit/:path*"
+    },
+    {
+      "source": "/api/hostel/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/hostel/:path*"
+    },
+    {
+      "source": "/api/gate/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/gate/:path*"
+    },
+    {
+      "source": "/api/library/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/library/:path*"
+    },
+    {
+      "source": "/api/parent/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/parent/:path*"
+    },
+    {
+      "source": "/api/admissions/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/admissions/:path*"
+    },
+    {
+      "source": "/api/placements/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/placements/:path*"
+    },
+    {
+      "source": "/api/hr/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/hr/:path*"
+    },
+    {
+      "source": "/api/gym/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/gym/:path*"
+    },
+    {
+      "source": "/api/fitzone/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/fitzone/:path*"
+    },
+    {
+      "source": "/api/obe/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/obe/:path*"
+    },
+    {
+      "source": "/api/naac/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/naac/:path*"
+    },
+    {
+      "source": "/api/grievances/:path*",
+      "destination": "https://iris-backend-hkjv.onrender.com/api/grievances/:path*"
+    }
+  ]
+}
