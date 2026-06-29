@@ -103,7 +103,10 @@ export default function SubscriptionDetailPage() {
         {!subscription ? (
           <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center bg-[#13102A]/20">
             <h3 className="text-sm font-bold text-white">No active subscription found</h3>
-            <p className="text-xs text-[#C4B5FD]/50 mt-1">Please browse available routes to enroll.</p>
+            <p className="text-xs text-[#C4B5FD]/50 mt-1 mb-6">Please browse available routes to enroll.</p>
+            <Link href="/transit/routes" className="px-5 py-3 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold transition-all shadow-md">
+              Browse Available Routes
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
