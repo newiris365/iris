@@ -60,6 +60,13 @@ function getAuthHeaders(): Record<string, string> {
   if (deviceId) {
     headers['X-Client-Device-ID'] = deviceId;
   }
+
+  // DEBUG: Log what token is being sent (safe — only shows prefix, not full token)
+  console.log('[API getAuthHeaders] isProduction:', isProduction,
+    '| token type:', !token ? 'NONE' : token.startsWith('mock-sandbox') ? 'MOCK' : token.startsWith('eyJ') ? 'REAL_JWT' : 'UNKNOWN',
+    '| token prefix:', token ? token.substring(0, 30) : 'null',
+    '| Authorization present:', !!headers['Authorization']);
+
   return headers;
 }
 

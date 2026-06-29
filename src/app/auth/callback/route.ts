@@ -13,6 +13,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || '';
 
+// DEBUG: Log JWT_SECRET presence at module load time (shows in Vercel function logs)
+console.log('[auth/callback] MODULE INIT — JWT_SECRET present:', !!JWT_SECRET, '| length:', JWT_SECRET.length, '| prefix:', JWT_SECRET.substring(0, 8));
+
+
 // Create a service-role supabase client to fetch profiles bypassed RLS
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
@@ -276,22 +280,27 @@ export async function GET(request: NextRequest) {
     }
 
     const normalizedRole = normalizeRole(resolvedRole);
-    const fingerprintHash = computeFingerprint(request, deviceId);
 
-    console.log('[auth/callback] Resolved role:', normalizedRole);
+    console.log('[auth/callback] JWT_SECRET at sign time — present:', !!JWT_SECRET, '| length:', JWT_SECRET.length, '| prefix:', JWT_SECRET.substring(0, 8));
 
     const tokenClaims = {
       id: profileId,
       institution_id: resolvedInstitutionId,
       role: normalizedRole,
       email,
-      fingerprint: fingerprintHash,
+      // NOTE: fingerprint intentionally REMOVED — it was computed on Vercel's serverless IP/UA
+      // which will never match what Render Express recomputes from browser requests → causes 403
       supabase_token: authSession.access_token,
       supabase_refresh_token: authSession.refresh_token,
       institute_type: resolvedInstituteType
     };
 
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });
+
+    // DEBUG: Log the signed token header+payload (NOT signature) and first 20 chars
+    const tokenParts = token.split('.');
+    console.log('[auth/callback] Token signed — header:', Buffer.from(tokenParts[0], 'base64').toString(), '| payload preview:', Buffer.from(tokenParts[1], 'base64').toString().substring(0, 120), '| token prefix:', token.substring(0, 20));
+
 
     const profileData = {
       id: profileId,
@@ -320,16 +329,31 @@ export async function GET(request: NextRequest) {
         <script>
           (function(){
             try{
-              localStorage.setItem('iris_jwt_token',${JSON.stringify(token)});
-              localStorage.setItem('iris_refresh_token',${JSON.stringify(authSession.refresh_token)});
-              localStorage.setItem('iris_user_profile',JSON.stringify(${JSON.stringify(profileData)}));
+              var token = ${JSON.stringify(token)};
+              var refreshToken = ${JSON.stringify(authSession.refresh_token)};
+              var profile = ${JSON.stringify(profileData)};
+
+              // DEBUG: Log token details to browser console
+              console.log('[IRIS Auth Callback] Token type:', token.startsWith('eyJ') ? 'REAL JWT' : 'UNEXPECTED FORMAT');
+              console.log('[IRIS Auth Callback] Token prefix (first 30 chars):', token.substring(0, 30));
+              console.log('[IRIS Auth Callback] Token length:', token.length);
+              console.log('[IRIS Auth Callback] Profile role:', profile.role);
+              console.log('[IRIS Auth Callback] Storing to localStorage key: iris_jwt_token');
+
+              localStorage.setItem('iris_jwt_token', token);
+              localStorage.setItem('iris_refresh_token', refreshToken);
+              localStorage.setItem('iris_user_profile', JSON.stringify(profile));
               
-              if (!localStorage.getItem('iris_jwt_token')) {
+              var stored = localStorage.getItem('iris_jwt_token');
+              console.log('[IRIS Auth Callback] Verified stored token prefix:', stored ? stored.substring(0, 30) : 'NULL - STORAGE FAILED');
+
+              if (!stored) {
                 throw new Error('JWT token could not be verified in localStorage.');
               }
               
               window.location.href=${JSON.stringify(redirectPath)};
             }catch(e){
+              console.error('[IRIS Auth Callback] Error:', e.message);
               window.location.href='/login?error='+encodeURIComponent('Failed to store session locally: ' + e.message);
             }
           })();
