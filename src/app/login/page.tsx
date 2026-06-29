@@ -200,7 +200,13 @@ export default function LoginPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [useOfflineBypass, setUseOfflineBypass] = useState(true);
+  const [useOfflineBypass, setUseOfflineBypass] = useState(() => {
+    if (typeof window !== 'undefined') {
+      var isProd = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
+      return !isProd;
+    }
+    return false;
+  });
 
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -237,6 +243,11 @@ export default function LoginPage() {
     setIsLoading(true);
     setSubmitError(null);
     try {
+      // Clear any stale local sessions before starting OAuth redirect
+      localStorage.removeItem('iris_jwt_token');
+      localStorage.removeItem('iris_user_profile');
+      localStorage.removeItem('iris_refresh_token');
+
       const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') || '' : '';
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -279,7 +290,15 @@ export default function LoginPage() {
       // Check if a session already exists to auto-redirect
       const token = localStorage.getItem('iris_jwt_token');
       const savedProfile = localStorage.getItem('iris_user_profile');
-      if (token && savedProfile) {
+      
+      var isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
+
+      if (token && token.startsWith('mock-sandbox') && isProduction) {
+        console.warn('[Login] Mock sandbox token detected on production login mount. Clearing stale session.');
+        localStorage.removeItem('iris_jwt_token');
+        localStorage.removeItem('iris_user_profile');
+        localStorage.removeItem('iris_refresh_token');
+      } else if (token && savedProfile) {
         try {
           const parsed = JSON.parse(savedProfile);
           if (parsed && parsed.role) {
@@ -346,47 +365,51 @@ export default function LoginPage() {
       window.location.href = getRedirectPath(result.profile.role);
 
     } catch (err: any) {
-      console.warn('Backend login request failed. Checking local sandbox credentials fallback...');
+      console.warn('Backend login request failed:', err);
       
-      // Automatic client-side bypass for sandbox testing profiles on connection failure
-      const sandboxEmails = [
-        'siddharth@sin.education',
-        'khushal@gmail.com',
-        'director@siet.edu.in',
-        'admin@siet.edu.in',
-        'warden@siet.edu.in',
-        'security@siet.edu.in',
-        'rajesh.driver@siet.edu.in',
-        'alok.vyas@siet.edu.in',
-        'madanlal@gmail.com',
-        'canteen@siet.edu.in',
-        'hod@sin.education',
-        'teacher@sin.education',
-        'librarian@sin.education'
-      ];
-      if (sandboxEmails.includes(data.email)) {
-        let role = 'Student';
-        if (data.email === 'siddharth@sin.education') role = 'SuperAdmin';
-        else if (data.email === 'director@siet.edu.in' || data.email === 'admin@siet.edu.in') role = 'Admin';
-        else if (data.email === 'warden@siet.edu.in') role = 'Warden';
-        else if (data.email === 'security@siet.edu.in') role = 'Security';
-        else if (data.email === 'rajesh.driver@siet.edu.in') role = 'Driver';
-        else if (data.email === 'alok.vyas@siet.edu.in') role = 'Staff';
-        else if (data.email === 'madanlal@gmail.com') role = 'Parent';
-        else if (data.email === 'canteen@siet.edu.in') role = 'Vendor';
-        else if (data.email === 'hod@sin.education') role = 'HOD';
-        else if (data.email === 'teacher@sin.education') role = 'Teacher';
-        else if (data.email === 'librarian@sin.education') role = 'Librarian';
+      var isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
 
-        const mockProfile = getMockProfile(data.email, role);
-        const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
-        const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
+      if (!isProduction) {
+        // Automatic client-side bypass for sandbox testing profiles on connection failure (local dev only)
+        const sandboxEmails = [
+          'siddharth@sin.education',
+          'khushal@gmail.com',
+          'director@siet.edu.in',
+          'admin@siet.edu.in',
+          'warden@siet.edu.in',
+          'security@siet.edu.in',
+          'rajesh.driver@siet.edu.in',
+          'alok.vyas@siet.edu.in',
+          'madanlal@gmail.com',
+          'canteen@siet.edu.in',
+          'hod@sin.education',
+          'teacher@sin.education',
+          'librarian@sin.education'
+        ];
+        if (sandboxEmails.includes(data.email)) {
+          let role = 'Student';
+          if (data.email === 'siddharth@sin.education') role = 'SuperAdmin';
+          else if (data.email === 'director@siet.edu.in' || data.email === 'admin@siet.edu.in') role = 'Admin';
+          else if (data.email === 'warden@siet.edu.in') role = 'Warden';
+          else if (data.email === 'security@siet.edu.in') role = 'Security';
+          else if (data.email === 'rajesh.driver@siet.edu.in') role = 'Driver';
+          else if (data.email === 'alok.vyas@siet.edu.in') role = 'Staff';
+          else if (data.email === 'madanlal@gmail.com') role = 'Parent';
+          else if (data.email === 'canteen@siet.edu.in') role = 'Vendor';
+          else if (data.email === 'hod@sin.education') role = 'HOD';
+          else if (data.email === 'teacher@sin.education') role = 'Teacher';
+          else if (data.email === 'librarian@sin.education') role = 'Librarian';
 
-        localStorage.setItem('iris_jwt_token', mockToken);
-        localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+          const mockProfile = getMockProfile(data.email, role);
+          const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+          const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
 
-        window.location.href = getRedirectPath(mockProfile.role);
-        return;
+          localStorage.setItem('iris_jwt_token', mockToken);
+          localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+
+          window.location.href = getRedirectPath(mockProfile.role);
+          return;
+        }
       }
 
       setSubmitError(err.message || 'An unexpected error occurred during sign-in.');
@@ -448,16 +471,26 @@ export default function LoginPage() {
         throw new Error(result.error || 'Quick login backend auth failed');
       }
     } catch (err: any) {
-      console.warn('Quick login backend failed. Activating instant client fallback:', err);
-      const mockProfile = getMockProfile(email, role);
-      const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
-      const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
+      console.warn('Quick login backend failed:', err);
 
-      localStorage.setItem('iris_jwt_token', mockToken);
-      localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+      var isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
 
+      if (!isProduction) {
+        console.log('Activating instant client fallback for quick login (local dev only)');
+        const mockProfile = getMockProfile(email, role);
+        const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+        const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
+
+        localStorage.setItem('iris_jwt_token', mockToken);
+        localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+
+        setIsLoading(false);
+        window.location.href = getRedirectPath(mockProfile.role);
+        return;
+      }
+
+      setSubmitError(err.message || 'Quick login backend authentication failed.');
       setIsLoading(false);
-      window.location.href = getRedirectPath(mockProfile.role);
     }
   };
 
