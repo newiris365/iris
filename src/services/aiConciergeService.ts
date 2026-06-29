@@ -187,14 +187,14 @@ export async function askClaude(
   history: ChatMessage[],
   keys?: { gemini_api_key?: string; openai_api_key?: string; claude_api_key?: string }
 ): Promise<string> {
-  // 1. Check custom institution keys
+  // 1. Check custom institution keys (OpenAI first)
   if (keys) {
-    if (keys.gemini_api_key && !isPlaceholderKey(keys.gemini_api_key)) {
-      const res = await askGemini(userMessage, userContext, history, keys.gemini_api_key);
-      if (res) return res;
-    }
     if (keys.openai_api_key && !isPlaceholderKey(keys.openai_api_key)) {
       const res = await askOpenAI(userMessage, userContext, history, keys.openai_api_key);
+      if (res) return res;
+    }
+    if (keys.gemini_api_key && !isPlaceholderKey(keys.gemini_api_key)) {
+      const res = await askGemini(userMessage, userContext, history, keys.gemini_api_key);
       if (res) return res;
     }
     if (keys.claude_api_key && !isPlaceholderKey(keys.claude_api_key)) {
@@ -203,16 +203,16 @@ export async function askClaude(
     }
   }
 
-  // 2. Fallback to process.env keys
-  const envGemini = process.env.GEMINI_API_KEY;
-  if (envGemini && !isPlaceholderKey(envGemini)) {
-    const res = await askGemini(userMessage, userContext, history, envGemini);
-    if (res) return res;
-  }
-
+  // 2. Fallback to process.env keys (OpenAI first)
   const envOpenAI = process.env.OPENAI_API_KEY;
   if (envOpenAI && !isPlaceholderKey(envOpenAI)) {
     const res = await askOpenAI(userMessage, userContext, history, envOpenAI);
+    if (res) return res;
+  }
+
+  const envGemini = process.env.GEMINI_API_KEY;
+  if (envGemini && !isPlaceholderKey(envGemini)) {
+    const res = await askGemini(userMessage, userContext, history, envGemini);
     if (res) return res;
   }
 
