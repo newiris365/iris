@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
@@ -14,11 +15,6 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     persistSession: false
   }
 });
-
-const supabaseAnon = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 // Standardized mapping of lowercased role strings to their official capitalized casings
 const ROLE_CASING_MAP: Record<string, string> = {
@@ -173,70 +169,6 @@ function renderClientHashBridge() {
   });
 }
 
-function renderClientPKCEBridge(code: string, deviceId: string) {
-  const htmlBridge = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Authenticating...</title>
-    </head>
-    <body style="background-color: #0D0A1A; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-      <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;">
-        <div style="width: 40px; height: 40px; border: 3px solid rgba(124, 58, 237, 0.3); border-top-color: #7C3AED; border-radius: 50%; animation: spin 1s infinite linear;"></div>
-        <p style="font-size: 14px; font-weight: 500; color: #C4B5FD;">Completing PKCE authentication handshake...</p>
-      </div>
-      <style>
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      </style>
-      <script>
-        (function() {
-          try {
-            let codeVerifier = null;
-            
-            // Search localStorage
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && key.endsWith('-code-verifier')) {
-                codeVerifier = localStorage.getItem(key);
-                break;
-              }
-            }
-            
-            // Fallback to sessionStorage
-            if (!codeVerifier) {
-              for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && key.endsWith('-code-verifier')) {
-                  codeVerifier = sessionStorage.getItem(key);
-                  break;
-                }
-              }
-            }
-
-            if (codeVerifier) {
-              const currentUrl = new URL(window.location.href);
-              currentUrl.searchParams.set('code_verifier', codeVerifier);
-              window.location.href = currentUrl.toString();
-            } else {
-              window.location.href = '/login?error=' + encodeURIComponent('Could not retrieve PKCE code verifier from browser storage.');
-            }
-          } catch (e) {
-            console.error('PKCE flow client bridge exception:', e);
-            window.location.href = '/login?error=' + encodeURIComponent('Authentication PKCE routing error.');
-          }
-        })();
-      </script>
-    </body>
-    </html>
-  `;
-  return new NextResponse(htmlBridge, {
-    headers: { 'Content-Type': 'text/html' }
-  });
-}
-
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
@@ -259,39 +191,32 @@ export async function GET(request: NextRequest) {
     let authUser = null;
     let authSession = null;
 
+    // We build a mutable response so createServerClient can set/delete cookies
+    const response = NextResponse.next();
+
     if (code) {
-      const codeVerifier = requestUrl.searchParams.get('code_verifier');
-      if (!codeVerifier) {
-        return renderClientPKCEBridge(code, deviceId);
-      }
-
-      // Pre-populate code verifier in the in-memory storage of the Supabase client
-      const inMemoryStorage: Record<string, string> = {};
-      const storageKey = 'supabase.auth.token';
-      inMemoryStorage[`${storageKey}-code-verifier`] = codeVerifier;
-
-      const customStorage = {
-        getItem: (key: string) => inMemoryStorage[key] || null,
-        setItem: (key: string, value: string) => { inMemoryStorage[key] = value; },
-        removeItem: (key: string) => { delete inMemoryStorage[key]; }
-      };
-
-      const localSupabaseAnon = createClient(
+      // createServerClient from @supabase/ssr reads the PKCE code_verifier from
+      // cookies automatically — no manual bridging required.
+      const supabaseSSR = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
         {
-          auth: {
-            storage: customStorage,
-            storageKey,
-            flowType: 'pkce',
-            persistSession: false,
-            autoRefreshToken: false
+          cookies: {
+            getAll() {
+              return request.cookies.getAll();
+            },
+            setAll(cookiesToSet) {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                response.cookies.set(name, value, options);
+              });
+            }
           }
         }
       );
 
-      // Exchange oauth authorization code for Supabase auth session using Anon client (PKCE flow)
-      const { data: authData, error: authError } = await localSupabaseAnon.auth.exchangeCodeForSession(code);
+      // Exchange oauth authorization code for Supabase auth session (PKCE flow)
+      // @supabase/ssr reads the code_verifier from the request cookies automatically
+      const { data: authData, error: authError } = await supabaseSSR.auth.exchangeCodeForSession(code);
       if (authError || !authData.session || !authData.user) {
         throw new Error(authError?.message || 'Failed to exchange auth session code');
       }
@@ -299,7 +224,7 @@ export async function GET(request: NextRequest) {
       authSession = authData.session;
     } else if (accessToken) {
       // Use client-redirected access token directly (Implicit flow fallback)
-      const { data: userData, error: userError } = await supabaseAnon.auth.getUser(accessToken);
+      const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
       if (userError || !userData.user) {
         throw new Error(userError?.message || 'Failed to retrieve user from access token');
       }
@@ -355,12 +280,6 @@ export async function GET(request: NextRequest) {
     } else {
       // Security: email not found in our users table — sign out and reject.
       console.warn(`[OAuth Callback] Email not found in users table: ${email}. Signing out and rejecting.`);
-      // Sign out from Supabase auth so the OAuth session is cleaned up
-      try {
-        await supabaseAnon.auth.signOut();
-      } catch (signOutErr) {
-        console.error('[OAuth Callback] signOut error (non-critical):', signOutErr);
-      }
       return NextResponse.redirect(
         new URL('/login?error=user_not_found', requestUrl.origin)
       );
@@ -438,9 +357,15 @@ export async function GET(request: NextRequest) {
       </html>
     `;
 
-    return new NextResponse(htmlResponse, {
+    // Copy any SSR-set cookies (cleared code_verifier cookie etc.) onto the HTML response
+    const htmlNextResponse = new NextResponse(htmlResponse, {
       headers: { 'Content-Type': 'text/html' }
     });
+    response.cookies.getAll().forEach(cookie => {
+      htmlNextResponse.cookies.set(cookie.name, cookie.value);
+    });
+
+    return htmlNextResponse;
 
   } catch (err: any) {
     console.error('OAuth Callback Route error:', err);

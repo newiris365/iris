@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -28,39 +29,32 @@ function getSupabaseTokenFromJWT(): string | null {
   return token;
 }
 
-let currentToken: string | null = null;
 let supabaseInstance: SupabaseClient | null = null;
 
 function getSupabase(): SupabaseClient {
-  const token = typeof window !== 'undefined' ? (getSupabaseTokenFromJWT() || 'anon') : 'anon';
-  
-  if (!supabaseInstance || currentToken !== token) {
-    currentToken = token;
-    
+  if (!supabaseInstance) {
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Supabase URL or Anon Key is missing. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are configured.');
     }
-    
-    const headers: Record<string, string> = {};
-    if (token && token !== 'anon') {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    supabaseInstance = createClient(
-      supabaseUrl || 'https://placeholder.supabase.co', 
-      supabaseAnonKey || 'placeholder',
-      {
-        auth: {
-          flowType: 'pkce',
-          persistSession: true,
-          detectSessionInUrl: true
-        },
-        global: {
-          headers
-        }
-      }
+
+    // createBrowserClient from @supabase/ssr stores the PKCE code_verifier in cookies
+    // so it is accessible server-side during the OAuth callback exchange.
+    supabaseInstance = createBrowserClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey || 'placeholder'
     );
   }
+
+  // Inject iris JWT into Supabase auth headers so RLS policies are satisfied
+  const irisToken = getSupabaseTokenFromJWT();
+  if (irisToken && typeof (supabaseInstance as any).rest !== 'undefined') {
+    try {
+      (supabaseInstance as any).rest.headers['Authorization'] = `Bearer ${irisToken}`;
+    } catch {
+      // Ignore header injection failure — falls back to anon key
+    }
+  }
+
   return supabaseInstance;
 }
 
