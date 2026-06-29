@@ -7,6 +7,10 @@
   "installCommand": "npm install",
   "devCommand": "next dev",
 
+  "env": {
+    "NEXT_PUBLIC_ENV": "production"
+  },
+
   "headers": [
     {
       "source": "/(.*)",

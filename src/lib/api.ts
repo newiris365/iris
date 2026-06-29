@@ -32,9 +32,17 @@ function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  
-  if (typeof window !== 'undefined') {
-    // Only inject a fallback sandbox token when no real token exists
+
+  // Only inject sandbox fallback mock tokens in LOCAL DEVELOPMENT.
+  // In production (Vercel), the Express middleware explicitly blocks mock tokens with a 403.
+  // If no real token exists in production, we send no Authorization header — the backend
+  // returns 401 and handleAuthError() redirects to /login correctly.
+  const isProduction =
+    process.env.NEXT_PUBLIC_ENV === 'production' ||
+    process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
+
+  if (typeof window !== 'undefined' && !isProduction) {
+    // Only inject a fallback sandbox token when no real token exists (local dev only)
     if (!token) {
       if (window.location.pathname.includes('/warden')) {
         // Warden fallback token

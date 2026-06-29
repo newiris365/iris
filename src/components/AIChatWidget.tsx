@@ -59,8 +59,10 @@ export default function AIChatWidget() {
 
   const loadHistory = async (sessId: string) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
-    if (!token || token.startsWith('mock-sandbox-jwt-token-value')) {
-      // Sandbox fallback history directly without making API calls when unauthorized
+    const isMockToken = token && token.startsWith('mock-sandbox-jwt-token-value');
+    
+    // In local dev with mock tokens or when no token at all, skip the API call
+    if (!token || isMockToken) {
       setMessages([
         {
           role: 'assistant',
@@ -70,18 +72,27 @@ export default function AIChatWidget() {
       ]);
       return;
     }
+
     try {
       const res = await apiGet(`/ai/chat/history/${sessId}`);
-      if (res.success && res.conversation?.messages) {
+      if (res.success && res.conversation?.messages?.length > 0) {
         const msgs = res.conversation.messages.map((m: any, idx: number) => ({
           role: m.role,
           content: m.content,
           timestamp: new Date(Date.now() - (res.conversation.messages.length - idx) * 60000).toISOString()
         }));
         setMessages(msgs);
+      } else {
+        // No previous history — show welcome message
+        setMessages([
+          {
+            role: 'assistant',
+            content: `Hi! I am IRIS, your AI campus concierge. How can I assist you with your campus queries today?`,
+            timestamp: new Date().toISOString()
+          }
+        ]);
       }
     } catch {
-      // Sandbox fallback history
       setMessages([
         {
           role: 'assistant',
