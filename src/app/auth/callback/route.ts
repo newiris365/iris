@@ -161,19 +161,38 @@ function renderClientHashBridge() {
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
+
+  // ─── STEP 1: Log the incoming request ─────────────────────────────────────
+  console.log('════════════════════════════════════════════════════════════');
+  console.log('[auth/callback] ▶ ROUTE HIT');
+  console.log('[auth/callback] Full URL:', request.url);
+  console.log('[auth/callback] Origin:', requestUrl.origin);
+  console.log('[auth/callback] Pathname:', requestUrl.pathname);
+  console.log('[auth/callback] All query params:', Object.fromEntries(requestUrl.searchParams.entries()));
+  console.log('[auth/callback] Cookies present:', request.cookies.getAll().map(c => c.name));
+  console.log('════════════════════════════════════════════════════════════');
+
   const code = requestUrl.searchParams.get('code');
   const accessToken = requestUrl.searchParams.get('access_token');
   const refreshToken = requestUrl.searchParams.get('refresh_token');
   const deviceId = requestUrl.searchParams.get('device_id') || 'unknown-device';
 
-  console.log('[auth/callback] code:', code ? '[PRESENT]' : '[MISSING]', 'access_token:', accessToken ? '[PRESENT]' : '[MISSING]');
+  // ─── STEP 2: Check for auth params ────────────────────────────────────────
+  console.log('[auth/callback] STEP 2 — Auth params:');
+  console.log('  code:', code ? `PRESENT (${code.substring(0, 12)}...)` : 'MISSING');
+  console.log('  access_token:', accessToken ? 'PRESENT' : 'MISSING');
+  console.log('  device_id:', deviceId);
 
   // If no server-side query params exist, check client-side hash fragment (Implicit flow)
   if (!code && !accessToken) {
+    console.log('[auth/callback] STEP 2 — No code or access_token. Rendering hash bridge for implicit flow.');
     return renderClientHashBridge();
   }
 
+  // ─── STEP 3: JWT_SECRET check ──────────────────────────────────────────────
+  console.log('[auth/callback] STEP 3 — JWT_SECRET present:', !!JWT_SECRET, '| length:', JWT_SECRET.length);
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    console.error('[auth/callback] STEP 3 — JWT_SECRET MISSING or too short! Cannot sign token.');
     return renderErrorPage('JWT Secret key is missing or invalid on the server.');
   }
 
@@ -182,10 +201,13 @@ export async function GET(request: NextRequest) {
     let authSession: { access_token: string; refresh_token: string } | null = null;
 
     if (code) {
-      // Use next/headers cookieStore for maximum compatibility with Netlify SSR.
-      // createServerClient reads code_verifier from the cookie set by createBrowserClient
-      // on the frontend, completing the PKCE exchange without any manual bridging.
+      // ─── STEP 4: PKCE code exchange ──────────────────────────────────────
+      console.log('[auth/callback] STEP 4 — Attempting PKCE code exchange...');
       const cookieStore = await cookies();
+      const allCookieNames = cookieStore.getAll().map(c => c.name);
+      console.log('[auth/callback] STEP 4 — Available cookies:', allCookieNames);
+      const pkceVerifierCookie = allCookieNames.find(n => n.includes('code_verifier') || n.includes('pkce'));
+      console.log('[auth/callback] STEP 4 — PKCE verifier cookie found:', pkceVerifierCookie || 'NONE (this will cause exchange to fail!)');
 
       const supabaseSSR = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -202,30 +224,42 @@ export async function GET(request: NextRequest) {
                 });
               } catch {
                 // setAll may throw in read-only contexts (edge middleware).
-                // Not critical for the callback route — the exchange already succeeded.
               }
             }
           }
         }
       );
 
-      // Exchange the OAuth authorization code for a Supabase session.
-      // @supabase/ssr automatically retrieves the code_verifier from the cookie.
       const { data: authData, error: authError } = await supabaseSSR.auth.exchangeCodeForSession(code);
-      if (authError || !authData.session || !authData.user) {
-        throw new Error(authError?.message || 'Failed to exchange auth session code');
+
+      // ─── STEP 5: Log exchange result ─────────────────────────────────────
+      if (authError) {
+        console.error('[auth/callback] STEP 5 — exchangeCodeForSession FAILED:', authError.message, '| status:', authError.status);
+        throw new Error(authError.message || 'Failed to exchange auth session code');
       }
+      if (!authData.session || !authData.user) {
+        console.error('[auth/callback] STEP 5 — exchangeCodeForSession returned no session or user. Data:', JSON.stringify({ hasSession: !!authData.session, hasUser: !!authData.user }));
+        throw new Error('Failed to exchange auth session code');
+      }
+      console.log('[auth/callback] STEP 5 — exchangeCodeForSession SUCCESS:');
+      console.log('  user.id:', authData.user.id);
+      console.log('  user.email:', authData.user.email);
+      console.log('  session.expires_at:', authData.session.expires_at);
+
       authUser = authData.user;
       authSession = {
         access_token: authData.session.access_token,
         refresh_token: authData.session.refresh_token
       };
     } else if (accessToken) {
-      // Implicit flow fallback — use access token directly
+      // Implicit flow fallback
+      console.log('[auth/callback] STEP 4 — Using implicit flow (access_token directly)');
       const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
       if (userError || !userData.user) {
+        console.error('[auth/callback] STEP 4 — getUser failed:', userError?.message);
         throw new Error(userError?.message || 'Failed to retrieve user from access token');
       }
+      console.log('[auth/callback] STEP 4 — Implicit flow user:', userData.user.email);
       authUser = userData.user;
       authSession = {
         access_token: accessToken,
@@ -237,19 +271,29 @@ export async function GET(request: NextRequest) {
       throw new Error('Authentication session structure is invalid');
     }
 
-    console.log('[auth/callback] Authenticated:', { user_id: authUser.id, email: authUser.email });
-
     const email = authUser.email;
     if (!email) {
       throw new Error('No email returned from Google authentication provider');
     }
 
+    // ─── STEP 6: Fetch user profile from Supabase users table ────────────────
+    console.log('[auth/callback] STEP 6 — Looking up email in users table:', email);
     // Fetch user profile matching the authenticated email
-    const { data: userProfile } = await supabaseAdmin
+    const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('*, institutions(name, plan_tier, type)')
+
       .eq('email', email)
       .single();
+
+    // ─── STEP 6 result ────────────────────────────────────────────────────────
+    if (profileError) {
+      console.error('[auth/callback] STEP 6 — Supabase users table query error:', profileError.message, '| code:', profileError.code);
+    }
+    console.log('[auth/callback] STEP 6 — Profile found:', !!userProfile, '| email queried:', email);
+    if (userProfile) {
+      console.log('[auth/callback] STEP 6 — Profile details: id:', userProfile.id, '| role:', userProfile.role, '| is_active:', userProfile.is_active, '| institution_id:', userProfile.institution_id);
+    }
 
     let resolvedRole = 'Student';
     let resolvedInstitutionId = 'a0000000-0000-0000-0000-000000000001';
@@ -271,7 +315,7 @@ export async function GET(request: NextRequest) {
       profileId = userProfile.id;
     } else {
       // Email not found in users table — reject OAuth login
-      console.warn(`[auth/callback] Email not in users table: ${email}. Rejecting.`);
+      console.warn(`[auth/callback] STEP 6 — Email NOT found in users table: ${email}. Redirecting to /login?error=user_not_found`);
       return NextResponse.redirect(new URL('/login?error=user_not_found', requestUrl.origin));
     }
 
@@ -281,7 +325,10 @@ export async function GET(request: NextRequest) {
 
     const normalizedRole = normalizeRole(resolvedRole);
 
-    console.log('[auth/callback] JWT_SECRET at sign time — present:', !!JWT_SECRET, '| length:', JWT_SECRET.length, '| prefix:', JWT_SECRET.substring(0, 8));
+    // ─── STEP 7: Sign JWT ─────────────────────────────────────────────────────
+    console.log('[auth/callback] STEP 7 — Signing JWT:');
+    console.log('  JWT_SECRET present:', !!JWT_SECRET, '| length:', JWT_SECRET.length, '| prefix:', JWT_SECRET.substring(0, 8));
+    console.log('  Claims: role:', normalizedRole, '| id:', profileId, '| institution_id:', resolvedInstitutionId);
 
     const tokenClaims = {
       id: profileId,
@@ -295,10 +342,8 @@ export async function GET(request: NextRequest) {
     };
 
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '7d' });
-
-    // DEBUG: Log the signed token (safe — only header + payload prefix, no full signature)
     const tokenParts = token.split('.');
-    console.log('[auth/callback] Token signed — header:', Buffer.from(tokenParts[0], 'base64').toString(), '| payload preview:', Buffer.from(tokenParts[1], 'base64').toString().substring(0, 120), '| token prefix:', token.substring(0, 20));
+    console.log('[auth/callback] STEP 7 — Token signed ✓ | starts with eyJ:', token.startsWith('eyJ'), '| prefix:', token.substring(0, 25), '| payload:', Buffer.from(tokenParts[1], 'base64').toString().substring(0, 100));
 
     const profileData = {
       id: profileId,
@@ -328,7 +373,15 @@ export async function GET(request: NextRequest) {
     loginRedirectUrl.searchParams.set('profile', JSON.stringify(profileData));
     loginRedirectUrl.searchParams.set('path', redirectPath);
 
-    console.log('[auth/callback] Redirecting to login with token for role:', normalizedRole, '→', redirectPath);
+    // ─── STEP 8: Final redirect ───────────────────────────────────────────────
+    console.log('[auth/callback] STEP 8 — Final redirect URL (base, no token for security):');
+    console.log('  Origin:', requestUrl.origin);
+    console.log('  Path: /login');
+    console.log('  Params: path=' + redirectPath + ' | role=' + normalizedRole + ' | token present:', !!token);
+    console.log('  Full redirect URL length:', loginRedirectUrl.toString().length, 'chars');
+    console.log('════════════════════════════════════════════════════════════');
+    console.log('[auth/callback] ✅ COMPLETE — redirecting to login for localStorage ingestion');
+    console.log('════════════════════════════════════════════════════════════');
 
     return NextResponse.redirect(loginRedirectUrl);
 
