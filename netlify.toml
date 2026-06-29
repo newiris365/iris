@@ -8,6 +8,13 @@
   NODE_ENV = "production"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
+# @netlify/plugin-nextjs enables full SSR support including:
+# - Server-side cookie access (required for PKCE code_verifier)
+# - API Routes running as Netlify Functions
+# - Incremental Static Regeneration (ISR)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 [[headers]]
   for = "/*"
   [headers.values]

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+
+// Force this route to always be server-rendered (never statically cached).
+// Required for cookie access on Netlify SSR deployments.
+export const dynamic = 'force-dynamic';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -68,7 +73,7 @@ const getRedirectPath = (role: string): string => {
 
 function computeFingerprint(req: NextRequest, deviceId: string): string {
   const userAgent = req.headers.get('user-agent') || 'unknown';
-  
+
   // Try to resolve client IP
   let ip = req.ip || req.headers.get('x-forwarded-for') || 'unknown';
   if (ip.includes(',')) {
@@ -89,84 +94,65 @@ function computeFingerprint(req: NextRequest, deviceId: string): string {
 }
 
 function renderErrorPage(errorMessage: string) {
-  const htmlError = `
+  const html = `
     <!DOCTYPE html>
     <html>
-    <head>
-      <title>Authentication Error</title>
-    </head>
-    <body style="background-color: #0D0A1A; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-      <div style="text-align: center; max-width: 440px; width: 100%; padding: 32px; border: 1px solid rgba(239, 68, 68, 0.25); background-color: #13102A; border-radius: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
-        <div style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-          <svg style="width: 24px; height: 24px; color: #EF4444;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+    <head><title>Authentication Error</title></head>
+    <body style="background-color:#0D0A1A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+      <div style="text-align:center;max-width:440px;width:100%;padding:32px;border:1px solid rgba(239,68,68,0.25);background-color:#13102A;border-radius:24px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">
+        <div style="width:48px;height:48px;border-radius:50%;background-color:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;">
+          <svg style="width:24px;height:24px;color:#EF4444;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
           </svg>
         </div>
-        <h2 style="color: #EF4444; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 8px;">Authentication Failed</h2>
-        <p style="font-size: 13px; color: #C4B5FD; line-height: 1.6; margin-bottom: 24px;">${errorMessage}</p>
-        <a href="/login" style="display: block; width: 100%; box-sizing: border-box; text-align: center; padding: 12px; background: linear-gradient(to right, #6C2BD9, #8B5CF6); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 14px; transition: opacity 0.2s;">Return to Login</a>
+        <h2 style="color:#EF4444;font-size:20px;font-weight:800;margin-top:0;margin-bottom:8px;">Authentication Failed</h2>
+        <p style="font-size:13px;color:#C4B5FD;line-height:1.6;margin-bottom:24px;">${errorMessage}</p>
+        <a href="/login" style="display:block;width:100%;box-sizing:border-box;text-align:center;padding:12px;background:linear-gradient(to right,#6C2BD9,#8B5CF6);color:white;text-decoration:none;border-radius:12px;font-weight:bold;font-size:14px;">Return to Login</a>
       </div>
     </body>
     </html>
   `;
-  return new NextResponse(htmlError, {
-    headers: { 'Content-Type': 'text/html' }
-  });
+  return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
 }
 
 function renderClientHashBridge() {
-  const htmlBridge = `
+  const html = `
     <!DOCTYPE html>
     <html>
-    <head>
-      <title>Authenticating...</title>
-    </head>
-    <body style="background-color: #0D0A1A; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-      <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;">
-        <div style="width: 40px; height: 40px; border: 3px solid rgba(124, 58, 237, 0.3); border-top-color: #7C3AED; border-radius: 50%; animation: spin 1s infinite linear;"></div>
-        <p style="font-size: 14px; font-weight: 500; color: #C4B5FD;">Verifying Google login parameters...</p>
+    <head><title>Authenticating...</title></head>
+    <body style="background-color:#0D0A1A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <div style="width:40px;height:40px;border:3px solid rgba(124,58,237,0.3);border-top-color:#7C3AED;border-radius:50%;animation:spin 1s infinite linear;"></div>
+        <p style="font-size:14px;font-weight:500;color:#C4B5FD;">Verifying Google login parameters...</p>
       </div>
-      <style>
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      </style>
+      <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
       <script>
-        (function() {
-          try {
-            // Check if access_token exists in the URL hash fragment (Implicit Flow)
-            const hash = window.location.hash;
-            if (hash && hash.includes('access_token=')) {
-              const params = new URLSearchParams(hash.substring(1));
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-              if (accessToken) {
-                // Convert client-side hash params to query params for server parsing
-                const currentUrl = new URL(window.location.href);
-                currentUrl.searchParams.set('access_token', accessToken);
-                if (refreshToken) {
-                  currentUrl.searchParams.set('refresh_token', refreshToken);
-                }
-                currentUrl.hash = ''; // clear hash fragment
-                window.location.href = currentUrl.toString();
+        (function(){
+          try{
+            const hash=window.location.hash;
+            if(hash&&hash.includes('access_token=')){
+              const params=new URLSearchParams(hash.substring(1));
+              const at=params.get('access_token');
+              const rt=params.get('refresh_token');
+              if(at){
+                const u=new URL(window.location.href);
+                u.searchParams.set('access_token',at);
+                if(rt)u.searchParams.set('refresh_token',rt);
+                u.hash='';
+                window.location.href=u.toString();
                 return;
               }
             }
-            // Fallback to login with missing param error
-            window.location.href = '/login?error=' + encodeURIComponent('No authorization code or session tokens returned from Google.');
-          } catch (e) {
-            console.error('Implicit flow client bridge exception:', e);
-            window.location.href = '/login?error=' + encodeURIComponent('Authentication routing error');
+            window.location.href='/login?error='+encodeURIComponent('No authorization code or session tokens returned from Google.');
+          }catch(e){
+            window.location.href='/login?error='+encodeURIComponent('Authentication routing error');
           }
         })();
       </script>
     </body>
     </html>
   `;
-  return new NextResponse(htmlBridge, {
-    headers: { 'Content-Type': 'text/html' }
-  });
+  return new NextResponse(html, { headers: { 'Content-Type': 'text/html' } });
 }
 
 export async function GET(request: NextRequest) {
@@ -176,9 +162,9 @@ export async function GET(request: NextRequest) {
   const refreshToken = requestUrl.searchParams.get('refresh_token');
   const deviceId = requestUrl.searchParams.get('device_id') || 'unknown-device';
 
-  console.log('Callback received, code:', code ? '[PRESENT]' : '[MISSING]', 'access_token:', accessToken ? '[PRESENT]' : '[MISSING]', 'URL:', request.url);
+  console.log('[auth/callback] code:', code ? '[PRESENT]' : '[MISSING]', 'access_token:', accessToken ? '[PRESENT]' : '[MISSING]');
 
-  // If no server-side query params exist, try checking the client-side hash fragment first
+  // If no server-side query params exist, check client-side hash fragment (Implicit flow)
   if (!code && !accessToken) {
     return renderClientHashBridge();
   }
@@ -189,41 +175,49 @@ export async function GET(request: NextRequest) {
 
   try {
     let authUser = null;
-    let authSession = null;
-
-    // We build a mutable response so createServerClient can set/delete cookies
-    const response = NextResponse.next();
+    let authSession: { access_token: string; refresh_token: string } | null = null;
 
     if (code) {
-      // createServerClient from @supabase/ssr reads the PKCE code_verifier from
-      // cookies automatically — no manual bridging required.
+      // Use next/headers cookieStore for maximum compatibility with Netlify SSR.
+      // createServerClient reads code_verifier from the cookie set by createBrowserClient
+      // on the frontend, completing the PKCE exchange without any manual bridging.
+      const cookieStore = await cookies();
+
       const supabaseSSR = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
         {
           cookies: {
             getAll() {
-              return request.cookies.getAll();
+              return cookieStore.getAll();
             },
             setAll(cookiesToSet) {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                response.cookies.set(name, value, options);
-              });
+              try {
+                cookiesToSet.forEach(({ name, value, options }) => {
+                  cookieStore.set(name, value, options);
+                });
+              } catch {
+                // setAll may throw in read-only contexts (edge middleware).
+                // Not critical for the callback route — the exchange already succeeded.
+              }
             }
           }
         }
       );
 
-      // Exchange oauth authorization code for Supabase auth session (PKCE flow)
-      // @supabase/ssr reads the code_verifier from the request cookies automatically
+      // Exchange the OAuth authorization code for a Supabase session.
+      // @supabase/ssr automatically retrieves the code_verifier from the cookie.
       const { data: authData, error: authError } = await supabaseSSR.auth.exchangeCodeForSession(code);
       if (authError || !authData.session || !authData.user) {
         throw new Error(authError?.message || 'Failed to exchange auth session code');
       }
       authUser = authData.user;
-      authSession = authData.session;
+      authSession = {
+        access_token: authData.session.access_token,
+        refresh_token: authData.session.refresh_token
+      };
     } else if (accessToken) {
-      // Use client-redirected access token directly (Implicit flow fallback)
+      // Implicit flow fallback — use access token directly
       const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
       if (userError || !userData.user) {
         throw new Error(userError?.message || 'Failed to retrieve user from access token');
@@ -239,21 +233,15 @@ export async function GET(request: NextRequest) {
       throw new Error('Authentication session structure is invalid');
     }
 
-    // Log session object for debugging
-    console.log('OAuth Callback session authenticated:', {
-      user_id: authUser.id,
-      email: authUser.email
-    });
+    console.log('[auth/callback] Authenticated:', { user_id: authUser.id, email: authUser.email });
 
     const email = authUser.email;
     if (!email) {
       throw new Error('No email returned from Google authentication provider');
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-
     // Fetch user profile matching the authenticated email
-    const { data: userProfile, error: profileError } = await supabaseAdmin
+    const { data: userProfile } = await supabaseAdmin
       .from('users')
       .select('*, institutions(name, plan_tier, type)')
       .eq('email', email)
@@ -278,11 +266,9 @@ export async function GET(request: NextRequest) {
       isActive = userProfile.is_active;
       profileId = userProfile.id;
     } else {
-      // Security: email not found in our users table — sign out and reject.
-      console.warn(`[OAuth Callback] Email not found in users table: ${email}. Signing out and rejecting.`);
-      return NextResponse.redirect(
-        new URL('/login?error=user_not_found', requestUrl.origin)
-      );
+      // Email not found in users table — reject OAuth login
+      console.warn(`[auth/callback] Email not in users table: ${email}. Rejecting.`);
+      return NextResponse.redirect(new URL('/login?error=user_not_found', requestUrl.origin));
     }
 
     if (!isActive) {
@@ -292,27 +278,25 @@ export async function GET(request: NextRequest) {
     const normalizedRole = normalizeRole(resolvedRole);
     const fingerprintHash = computeFingerprint(request, deviceId);
 
-    // Log resolved role for debugging
-    console.log('OAuth Callback resolved role:', normalizedRole);
+    console.log('[auth/callback] Resolved role:', normalizedRole);
 
     const tokenClaims = {
       id: profileId,
       institution_id: resolvedInstitutionId,
       role: normalizedRole,
-      email: email,
+      email,
       fingerprint: fingerprintHash,
       supabase_token: authSession.access_token,
       supabase_refresh_token: authSession.refresh_token,
       institute_type: resolvedInstituteType
     };
 
-    // Generate custom platform token signed using identical backend secret
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });
 
     const profileData = {
       id: profileId,
       name: resolvedName,
-      email: email,
+      email,
       role: normalizedRole,
       institution_id: resolvedInstitutionId,
       institution_name: resolvedInstitutionName,
@@ -322,34 +306,26 @@ export async function GET(request: NextRequest) {
 
     const redirectPath = getRedirectPath(normalizedRole);
 
-    // Return HTML client bridge script writing auth variables into local storage
+    // Client-side bridge writes auth tokens to localStorage then redirects
     const htmlResponse = `
       <!DOCTYPE html>
       <html>
-      <head>
-        <title>Authenticating User...</title>
-      </head>
-      <body style="background-color: #0D0A1A; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-        <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px;">
-          <div style="width: 40px; height: 40px; border: 3px solid rgba(124, 58, 237, 0.3); border-top-color: #7C3AED; border-radius: 50%; animation: spin 1s infinite linear;"></div>
-          <p style="font-size: 14px; font-weight: 500; color: #C4B5FD;">Finalizing platform authentication...</p>
+      <head><title>Authenticating User...</title></head>
+      <body style="background-color:#0D0A1A;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;">
+          <div style="width:40px;height:40px;border:3px solid rgba(124,58,237,0.3);border-top-color:#7C3AED;border-radius:50%;animation:spin 1s infinite linear;"></div>
+          <p style="font-size:14px;font-weight:500;color:#C4B5FD;">Finalizing platform authentication...</p>
         </div>
-        <style>
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        </style>
+        <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
         <script>
-          (function() {
-            try {
-              localStorage.setItem('iris_jwt_token', ${JSON.stringify(token)});
-              localStorage.setItem('iris_refresh_token', ${JSON.stringify(authSession.refresh_token)});
-              localStorage.setItem('iris_user_profile', JSON.stringify(${JSON.stringify(profileData)}));
-              window.location.href = ${JSON.stringify(redirectPath)};
-            } catch (e) {
-              console.error('Error writing login local storage details:', e);
-              window.location.href = '/login?error=' + encodeURIComponent('Failed to store session locally');
+          (function(){
+            try{
+              localStorage.setItem('iris_jwt_token',${JSON.stringify(token)});
+              localStorage.setItem('iris_refresh_token',${JSON.stringify(authSession.refresh_token)});
+              localStorage.setItem('iris_user_profile',JSON.stringify(${JSON.stringify(profileData)}));
+              window.location.href=${JSON.stringify(redirectPath)};
+            }catch(e){
+              window.location.href='/login?error='+encodeURIComponent('Failed to store session locally');
             }
           })();
         </script>
@@ -357,18 +333,11 @@ export async function GET(request: NextRequest) {
       </html>
     `;
 
-    // Copy any SSR-set cookies (cleared code_verifier cookie etc.) onto the HTML response
-    const htmlNextResponse = new NextResponse(htmlResponse, {
-      headers: { 'Content-Type': 'text/html' }
-    });
-    response.cookies.getAll().forEach(cookie => {
-      htmlNextResponse.cookies.set(cookie.name, cookie.value);
-    });
+    return new NextResponse(htmlResponse, { headers: { 'Content-Type': 'text/html' } });
 
-    return htmlNextResponse;
-
-  } catch (err: any) {
-    console.error('OAuth Callback Route error:', err);
-    return renderErrorPage(err.message || 'OAuth authentication failed.');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'OAuth authentication failed.';
+    console.error('[auth/callback] Error:', message);
+    return renderErrorPage(message);
   }
 }
