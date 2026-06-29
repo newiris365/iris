@@ -111,10 +111,12 @@ export default function AIChatWidget() {
     setLoading(true);
 
     try {
+      console.log('[AIChatWidget] Sending request to /ai/chat:', { message: text, session_id: sessionId });
       const res = await apiPost('/ai/chat', {
         message: text,
         session_id: sessionId
       });
+      console.log('[AIChatWidget] Received response from /ai/chat:', res);
 
       if (res.success) {
         const assistantMsg: Message = {
