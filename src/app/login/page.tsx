@@ -336,6 +336,12 @@ export default function LoginPage() {
       localStorage.setItem('iris_jwt_token', result.token);
       localStorage.setItem('iris_user_profile', JSON.stringify(result.profile));
 
+      // Verify token exists in localStorage
+      const verifyToken = localStorage.getItem('iris_jwt_token');
+      if (!verifyToken) {
+        throw new Error('Token verification failed: JWT was not correctly saved to localStorage.');
+      }
+
       // Redirect client dashboard based on claims role
       window.location.href = getRedirectPath(result.profile.role);
 
@@ -431,6 +437,12 @@ export default function LoginPage() {
           localStorage.setItem('iris_jwt_token', result.token);
           localStorage.setItem('iris_user_profile', JSON.stringify(result.profile));
           
+          // Verify token exists in localStorage
+          const verifyToken = localStorage.getItem('iris_jwt_token');
+          if (!verifyToken) {
+            throw new Error('Token verification failed: JWT was not correctly saved to localStorage.');
+          }
+
           window.location.href = getRedirectPath(result.profile.role);
         } else {
         throw new Error(result.error || 'Quick login backend auth failed');

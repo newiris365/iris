@@ -115,6 +115,10 @@ export default function MultiStepApplyPage() {
         setAppNumber(data.application_number);
         // Save token to localStorage for later requests
         localStorage.setItem('iris_jwt_token', data.token);
+        const verifyToken = localStorage.getItem('iris_jwt_token');
+        if (!verifyToken) {
+          console.error('Admissions Apply: token verification failed in localStorage.');
+        }
       } else {
         setErrorMsg(data.error);
       }

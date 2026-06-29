@@ -25,6 +25,9 @@ function onRefreshed(token: string) {
 
 function getAuthHeaders(): Record<string, string> {
   let token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
+  if (token === 'undefined' || token === 'null') {
+    token = null;
+  }
   const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -66,7 +69,10 @@ function handleAuthError(status: number): void {
 async function request(url: string, options: RequestInit): Promise<Response> {
   const headers = { ...options.headers } as Record<string, string>;
   if (!headers['Authorization'] && typeof window !== 'undefined') {
-    const token = localStorage.getItem('iris_jwt_token');
+    let token = localStorage.getItem('iris_jwt_token');
+    if (token === 'undefined' || token === 'null') {
+      token = null;
+    }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }

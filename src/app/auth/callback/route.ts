@@ -323,9 +323,14 @@ export async function GET(request: NextRequest) {
               localStorage.setItem('iris_jwt_token',${JSON.stringify(token)});
               localStorage.setItem('iris_refresh_token',${JSON.stringify(authSession.refresh_token)});
               localStorage.setItem('iris_user_profile',JSON.stringify(${JSON.stringify(profileData)}));
+              
+              if (!localStorage.getItem('iris_jwt_token')) {
+                throw new Error('JWT token could not be verified in localStorage.');
+              }
+              
               window.location.href=${JSON.stringify(redirectPath)};
             }catch(e){
-              window.location.href='/login?error='+encodeURIComponent('Failed to store session locally');
+              window.location.href='/login?error='+encodeURIComponent('Failed to store session locally: ' + e.message);
             }
           })();
         </script>
