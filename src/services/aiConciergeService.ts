@@ -19,6 +19,24 @@ export interface ChatMessage {
 }
 
 /**
+ * Helper to check if an API key is a placeholder
+ */
+function isPlaceholderKey(key: string | undefined): boolean {
+  if (!key) return true;
+  const k = key.toLowerCase().trim();
+  return (
+    k === '' ||
+    k === 'demo' ||
+    k === 'placeholder' ||
+    k.startsWith('your-') ||
+    k.startsWith('sk-your-') ||
+    k.startsWith('sk-proj-your-') ||
+    k.includes('placeholder') ||
+    k.includes('mock')
+  );
+}
+
+/**
  * Helper to dispatch to Google Gemini API
  */
 async function askGemini(
@@ -52,7 +70,8 @@ async function askGemini(
           parts: [{ text: systemPrompt }]
         },
         contents
-      })
+      }),
+      signal: AbortSignal.timeout(10000)
     });
 
     if (response.ok) {
@@ -98,7 +117,8 @@ async function askOpenAI(
         model: 'gpt-4o-mini',
         messages,
         max_tokens: 500
-      })
+      }),
+      signal: AbortSignal.timeout(10000)
     });
 
     if (response.ok) {
@@ -141,7 +161,8 @@ async function askClaudeWithKey(
           ...history.slice(-10).map(msg => ({ role: msg.role, content: msg.content })),
           { role: 'user', content: userMessage }
         ]
-      })
+      }),
+      signal: AbortSignal.timeout(10000)
     });
 
     if (response.ok) {
@@ -168,15 +189,15 @@ export async function askClaude(
 ): Promise<string> {
   // 1. Check custom institution keys
   if (keys) {
-    if (keys.gemini_api_key && !keys.gemini_api_key.startsWith('your-')) {
+    if (keys.gemini_api_key && !isPlaceholderKey(keys.gemini_api_key)) {
       const res = await askGemini(userMessage, userContext, history, keys.gemini_api_key);
       if (res) return res;
     }
-    if (keys.openai_api_key && !keys.openai_api_key.startsWith('your-')) {
+    if (keys.openai_api_key && !isPlaceholderKey(keys.openai_api_key)) {
       const res = await askOpenAI(userMessage, userContext, history, keys.openai_api_key);
       if (res) return res;
     }
-    if (keys.claude_api_key && !keys.claude_api_key.startsWith('your-')) {
+    if (keys.claude_api_key && !isPlaceholderKey(keys.claude_api_key)) {
       const res = await askClaudeWithKey(userMessage, userContext, history, keys.claude_api_key);
       if (res) return res;
     }
@@ -184,19 +205,19 @@ export async function askClaude(
 
   // 2. Fallback to process.env keys
   const envGemini = process.env.GEMINI_API_KEY;
-  if (envGemini && !envGemini.startsWith('your-')) {
+  if (envGemini && !isPlaceholderKey(envGemini)) {
     const res = await askGemini(userMessage, userContext, history, envGemini);
     if (res) return res;
   }
 
   const envOpenAI = process.env.OPENAI_API_KEY;
-  if (envOpenAI && !envOpenAI.startsWith('your-')) {
+  if (envOpenAI && !isPlaceholderKey(envOpenAI)) {
     const res = await askOpenAI(userMessage, userContext, history, envOpenAI);
     if (res) return res;
   }
 
   const envClaude = process.env.ANTHROPIC_API_KEY;
-  if (envClaude && !envClaude.startsWith('your-')) {
+  if (envClaude && !isPlaceholderKey(envClaude)) {
     const res = await askClaudeWithKey(userMessage, userContext, history, envClaude);
     if (res) return res;
   }
@@ -246,7 +267,7 @@ Rules:
 export async function getEmbeddings(text: string): Promise<number[]> {
   const openAIKey = process.env.OPENAI_API_KEY;
 
-  if (openAIKey && !openAIKey.startsWith('your-openai')) {
+  if (openAIKey && !isPlaceholderKey(openAIKey)) {
     try {
       const response = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
@@ -257,7 +278,8 @@ export async function getEmbeddings(text: string): Promise<number[]> {
         body: JSON.stringify({
           input: text,
           model: 'text-embedding-ada-002'
-        })
+        }),
+        signal: AbortSignal.timeout(10000)
       });
 
       if (response.ok) {

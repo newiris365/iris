@@ -76,7 +76,7 @@ export async function login(req: Request, res: Response) {
     // Fetch profile records from DB
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
-      .select('*, institutions(name, plan_tier, institute_type)')
+      .select('*, institutions(name, plan_tier, type)')
       .eq('email', email)
       .single();
 
@@ -100,7 +100,7 @@ export async function login(req: Request, res: Response) {
       fingerprint: fingerprintHash,
       supabase_token: authData.session.access_token,
       supabase_refresh_token: authData.session.refresh_token,
-      institute_type: userProfile.institutions?.institute_type || 'college'
+      institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
     };
 
     // Generate stateless JWT valid for 15 minutes
@@ -118,7 +118,7 @@ export async function login(req: Request, res: Response) {
         institution_id: userProfile.institution_id,
         institution_name: userProfile.institutions?.name,
         plan_tier: userProfile.institutions?.plan_tier,
-        institute_type: userProfile.institutions?.institute_type || 'college'
+        institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
       }
     });
 
@@ -137,7 +137,7 @@ export async function getMe(req: Request, res: Response) {
     // Fetch user details from database (bypass RLS as we query via Admin for self context retrieval)
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
-      .select('*, institutions(name, plan_tier, institute_type)')
+      .select('*, institutions(name, plan_tier, type)')
       .eq('id', req.user.id)
       .single();
 
@@ -158,7 +158,7 @@ export async function getMe(req: Request, res: Response) {
         institution_id: userProfile.institution_id,
         institution_name: userProfile.institutions?.name,
         plan_tier: userProfile.institutions?.plan_tier,
-        institute_type: userProfile.institutions?.institute_type || 'college'
+        institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
       }
     });
 
@@ -196,7 +196,7 @@ export async function refresh(req: Request, res: Response) {
 
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
-      .select('*, institutions(name, plan_tier, institute_type)')
+      .select('*, institutions(name, plan_tier, type)')
       .eq('email', email)
       .single();
 
@@ -219,7 +219,7 @@ export async function refresh(req: Request, res: Response) {
       fingerprint: fingerprintHash,
       supabase_token: authData.session.access_token,
       supabase_refresh_token: authData.session.refresh_token,
-      institute_type: userProfile.institutions?.institute_type || 'college'
+      institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
     };
 
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '15m' });
@@ -236,7 +236,7 @@ export async function refresh(req: Request, res: Response) {
         institution_id: userProfile.institution_id,
         institution_name: userProfile.institutions?.name,
         plan_tier: userProfile.institutions?.plan_tier,
-        institute_type: userProfile.institutions?.institute_type || 'college'
+        institute_type: userProfile.institutions?.type === 'school' ? 'school' : 'college'
       }
     });
   } catch (err: any) {

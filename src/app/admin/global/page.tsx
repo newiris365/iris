@@ -120,7 +120,7 @@ export default function SuperAdminConsole() {
 
   const [stats, setStats] = useState({
     totalInstitutions: 0,
-    totalUsers: 0,
+    totalStudents: 0,
     totalRevenue: 0,
     mrr: 0,
     rlsCompliant: true
@@ -173,7 +173,10 @@ export default function SuperAdminConsole() {
     setIsLoading(true);
     try {
       // Fetch institutions from server API (uses service role key)
-      const instRes = await fetch('/api/superadmin/institutions');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
+      const instRes = await fetch('/api/superadmin/institutions', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const instJson = await instRes.json();
       if (!instRes.ok) throw new Error(instJson.error || 'Failed to load institutions');
       const insts: Institution[] = instJson.institutions || [];
@@ -204,7 +207,7 @@ export default function SuperAdminConsole() {
       setGlobalUsers(mappedUsers);
       setStats({
         totalInstitutions: insts.length,
-        totalUsers: mappedUsers.length,
+        totalStudents: mappedUsers.filter((u: any) => u.role === 'Student').length,
         totalRevenue: totalAllTime,
         mrr: totalMRR,
         rlsCompliant: true
@@ -560,7 +563,11 @@ export default function SuperAdminConsole() {
   const handleDeleteInstitution = async (id: string) => {
     if (!confirm('Are you sure you want to delete this campus? This will permanently delete all associated data.')) return;
     try {
-      const res = await fetch(`/api/superadmin/institutions?id=${id}`, { method: 'DELETE' });
+      const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
+      const res = await fetch(`/api/superadmin/institutions?id=${id}`, { 
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to delete institution');
       await loadSystemData();
@@ -687,8 +694,8 @@ export default function SuperAdminConsole() {
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] text-[#C4B5FD]/50 uppercase tracking-wider font-semibold block">Global Users</span>
-              <strong className="text-2xl font-bold block mt-1">{stats.totalUsers}</strong>
+              <span className="text-[10px] text-[#C4B5FD]/50 uppercase tracking-wider font-semibold block">Global Students</span>
+              <strong className="text-2xl font-bold block mt-1">{stats.totalStudents}</strong>
             </div>
           </div>
           <div className="glass-panel rounded-2xl p-5 border border-white/5 flex items-center gap-4">

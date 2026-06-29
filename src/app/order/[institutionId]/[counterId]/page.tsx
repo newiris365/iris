@@ -62,8 +62,11 @@ export default function QrOrderingPage() {
   const fetchMenu = async () => {
     try {
       setLoading(true);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
       // Fetch menu from endpoint
-      const res = await fetch(`/api/canteen/menu`);
+      const res = await fetch(`/api/canteen/menu`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       const data = await res.json();
       if (data.success && data.menu) {
         setMenu(data.menu);
@@ -106,9 +109,13 @@ export default function QrOrderingPage() {
   const handleApplyOffer = async () => {
     if (!offerCode.trim()) return;
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('iris_jwt_token') : null;
       const res = await fetch('/api/canteen/offers/validate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ code: offerCode, amount: totalSub })
       });
       const data = await res.json();

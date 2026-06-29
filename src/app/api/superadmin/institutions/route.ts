@@ -31,7 +31,14 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json({ institutions: data });
+
+    // Dynamically map institute_type from type if not present on schema/record
+    const mapped = (data || []).map(inst => ({
+      ...inst,
+      institute_type: inst.institute_type || (inst.type === 'school' ? 'school' : 'college')
+    }));
+
+    return NextResponse.json({ institutions: mapped });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -166,8 +173,13 @@ export async function PATCH(req: NextRequest) {
       if (allowedColumns.includes(key)) {
         sanitizedUpdates[key] = updates[key];
       } else {
-        skippedColumns.push(key);
-        console.warn(`Column '${key}' does not exist in 'institutions' table. Skipping.`);
+        // If institute_type column is missing from DB, we synchronize it into the type column
+        if (key === 'institute_type' && allowedColumns.includes('type')) {
+          sanitizedUpdates['type'] = updates['institute_type'];
+        } else {
+          skippedColumns.push(key);
+          console.warn(`Column '${key}' does not exist in 'institutions' table. Skipping.`);
+        }
       }
     }
 

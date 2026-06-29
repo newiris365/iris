@@ -9,6 +9,7 @@ export default function WardenAllocationsPage() {
   const [allocations, setAllocations] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string>('');
   
   // Forms overlay state
   const [showAllocateModal, setShowAllocateModal] = useState(false);
@@ -42,6 +43,9 @@ export default function WardenAllocationsPage() {
 
   useEffect(() => {
     loadData();
+    if (typeof window !== 'undefined') {
+      setToken(localStorage.getItem('iris_jwt_token') || '');
+    }
   }, []);
 
   const loadData = async () => {
@@ -515,7 +519,7 @@ export default function WardenAllocationsPage() {
 
                   <div className="flex gap-2">
                     <a
-                      href={`/api/v1/hostel/allocations/${alloc.id}/report/pdf`}
+                      href={`/api/v1/hostel/allocations/${alloc.id}/report/pdf?token=${token}`}
                       target="_blank"
                       className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-[#C4B5FD]/80 hover:text-white transition-all"
                       title="Download Certificate"

@@ -64,6 +64,15 @@ function handleAuthError(status: number): void {
 }
 
 async function request(url: string, options: RequestInit): Promise<Response> {
+  const headers = { ...options.headers } as Record<string, string>;
+  if (!headers['Authorization'] && typeof window !== 'undefined') {
+    const token = localStorage.getItem('iris_jwt_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  options.headers = headers;
+
   const response = await fetch(url, options);
 
   if (response.status === 401) {

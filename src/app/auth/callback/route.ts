@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
     // Fetch user profile matching the authenticated email
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
-      .select('*, institutions(name, plan_tier, institute_type)')
+      .select('*, institutions(name, plan_tier, type)')
       .eq('email', email)
       .single();
 
@@ -255,7 +255,7 @@ export async function GET(request: NextRequest) {
       resolvedName = userProfile.name;
       resolvedInstitutionName = userProfile.institutions?.name || resolvedInstitutionName;
       resolvedPlanTier = userProfile.institutions?.plan_tier || resolvedPlanTier;
-      resolvedInstituteType = userProfile.institutions?.institute_type || resolvedInstituteType;
+      resolvedInstituteType = userProfile.institutions?.type === 'school' ? 'school' : 'college';
       isActive = userProfile.is_active;
       profileId = userProfile.id;
     } else {

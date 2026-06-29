@@ -10,9 +10,13 @@ export default function StudentHostelDashboard() {
   const [roommates, setRoommates] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string>('');
 
   useEffect(() => {
     loadData();
+    if (typeof window !== 'undefined') {
+      setToken(localStorage.getItem('iris_jwt_token') || '');
+    }
   }, []);
 
   const loadData = async () => {
@@ -49,6 +53,7 @@ export default function StudentHostelDashboard() {
     } catch (err) {
       // Mock data fallbacks
       setAllocation({
+        id: 'mock-allocation-id',
         allotted_date: '2025-07-15',
         deposit_amount: 10000,
         deposit_status: 'paid',
@@ -155,7 +160,7 @@ export default function StudentHostelDashboard() {
                   <p className="text-[10px] text-[#C4B5FD]/50 mt-0.5">Allotted on {new Date(allocation.allotted_date).toLocaleDateString()}</p>
                 </div>
                 <Link
-                  href={`/api/v1/hostel/allocations/report/pdf`} // mock / actual path
+                  href={allocation?.id ? `/api/v1/hostel/allocations/${allocation.id}/report/pdf?token=${token}` : '#'}
                   target="_blank"
                   className="px-4 py-2 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold text-white transition-all shadow-md flex items-center gap-1.5"
                 >

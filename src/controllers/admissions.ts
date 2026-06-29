@@ -122,6 +122,7 @@ export async function getInstitutionAdmissions(req: Request, res: Response) {
           id: 'c1111111-1111-1111-1111-111111111111',
           name: 'Fall Admissions 2026',
           academic_year: '2026-27',
+          start_date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
           end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           status: 'open'
         }

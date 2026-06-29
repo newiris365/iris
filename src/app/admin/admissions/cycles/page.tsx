@@ -109,6 +109,12 @@ export default function AdminCyclesPage() {
     }
   };
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
@@ -212,7 +218,7 @@ export default function AdminCyclesPage() {
                     <span className="text-[9px] font-mono text-[#A78BFA] px-1.5 py-0.5 rounded bg-[#6C2BD9]/10 border border-[#6C2BD9]/25">{c.academic_year}</span>
                   </div>
                   <span className="text-[10px] text-[#C4B5FD]/40 font-mono block">
-                    Timeline: {new Date(c.start_date).toLocaleDateString()} to {new Date(c.end_date).toLocaleDateString()}
+                    Timeline: {formatDate(c.start_date)} to {formatDate(c.end_date)}
                   </span>
                 </div>
 

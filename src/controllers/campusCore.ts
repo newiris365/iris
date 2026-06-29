@@ -1131,7 +1131,7 @@ export async function getStudentAttendance(req: Request, res: Response) {
     // Check if the student belongs to a school
     const { data: student, error: studErr } = await supabaseAdmin
       .from('students')
-      .select('*, institutions(institute_type)')
+      .select('*, institutions(type)')
       .eq('id', id)
       .single();
 
@@ -1139,7 +1139,7 @@ export async function getStudentAttendance(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Student details not found.' });
     }
 
-    const isSchool = student.institutions?.institute_type === 'school';
+    const isSchool = student.institutions?.type === 'school';
 
     if (isSchool) {
       const { data: logs, error } = await supabaseAdmin
@@ -3034,10 +3034,10 @@ export async function importStudentProfiles(req: Request, res: Response) {
     // Fetch institution type
     const { data: inst } = await supabaseAdmin
       .from('institutions')
-      .select('institute_type')
+      .select('type')
       .eq('id', institutionId)
       .single();
-    const isSchool = inst?.institute_type === 'school';
+    const isSchool = inst?.type === 'school';
 
     const imported: any[] = [];
     const errors: { row: number; error: string }[] = [];

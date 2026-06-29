@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertOctagon, ShieldAlert, CheckCircle, MapPin, Printer, HelpCircle } from 'lucide-react';
 import { apiPost } from '../../../lib/api';
 
@@ -8,6 +8,21 @@ export default function ParentTransitSosPage() {
   const [loading, setLoading] = useState(false);
   const [triggeredAlert, setTriggeredAlert] = useState<any>(null);
   const [reportText, setReportText] = useState('');
+  const [role, setRole] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  useEffect(() => {
+    const profileStr = localStorage.getItem('iris_user_profile');
+    if (profileStr) {
+      try {
+        const profile = JSON.parse(profileStr);
+        setRole(profile.role);
+      } catch (e) {
+        console.error('Failed to parse user profile:', e);
+      }
+    }
+    setProfileLoading(false);
+  }, []);
 
   const triggerEmergencySos = async () => {
     setLoading(true);
@@ -84,6 +99,30 @@ GENERATED: ${new Date().toLocaleString()}
       printWindow.print();
     }
   };
+
+  if (profileLoading) {
+    return (
+      <main className="min-h-screen bg-[#0D0A1A] flex items-center justify-center text-white">
+        <div className="w-10 h-10 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+      </main>
+    );
+  }
+
+  if (role && role !== 'Parent') {
+    return (
+      <main className="min-h-screen bg-[#0D0A1A] text-white p-6 flex items-center justify-center">
+        <div className="max-w-md w-full rounded-3xl border border-white/5 bg-[#13102A]/85 backdrop-blur-md p-8 text-center flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="font-heading font-extrabold text-xl text-red-400">Access Denied</h2>
+          <p className="text-xs text-[#C4B5FD]/60 leading-relaxed">
+            The Emergency SOS dispatch portal is strictly reserved for parents. Students and staff are not authorized to trigger priority tracking alerts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white p-6 pb-24">

@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState, useEffect } from 'react';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import { LayoutDashboard, MapPin, Route, CreditCard, Car, Leaf, AlertOctagon, UserCircle } from 'lucide-react';
 
@@ -15,11 +16,30 @@ const transitLinks: SidebarLink[] = [
 ];
 
 export default function TransitLayout({ children }: { children: React.ReactNode }) {
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const profileStr = localStorage.getItem('iris_user_profile');
+    if (profileStr) {
+      try {
+        const profile = JSON.parse(profileStr);
+        setRole(profile.role);
+      } catch {}
+    }
+  }, []);
+
+  const filteredLinks = transitLinks.filter(link => {
+    if (link.href === '/transit/sos' && role !== 'Parent') {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <PortalShell
       portalName="Transit GPS"
       portalBadge="Transit"
-      sidebarLinks={transitLinks}
+      sidebarLinks={filteredLinks}
       accentColor="#10B981"
     >
       {children}
