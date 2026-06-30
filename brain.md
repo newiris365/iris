@@ -55,3 +55,19 @@ Supabase native auth | Razorpay webhook verify | FCM push | Cron jobs | Remove s
 - BUG-08 [ADMISSIONS] Admission Cycles "Configured Cycles logs" section empty
   → Data exists (Fall 2026, Spring 2027 visible in screenshot) but section appears empty on load
   → Fix: check cycles fetch on component mount, fix API call or state update
+  BUG-09 [TRANSIT] "Browse Available Routes" button → 404 error
+  → /transit/routes page exist nahi karta ya route missing hai
+  → Fix: create the missing routes page OR fix the navigation link to correct path
+
+BUG-10 [TRANSIT] No Active Bus Subscription — user ko subscription buy karne ka option nahi
+  → "No Active Bus Subscription" state mein buy/subscribe button ya flow missing hai
+  → Fix: add subscription purchase flow on transit page when user has no active subscription
+  BUG-11 [AUTH] Google OAuth - Authentication Failed
+  → Error: "invalid request: both auth code and code verifier should be non-empty"
+  → PKCE flow broken — code_verifier not being passed/stored correctly during OAuth callback
+  → Fix: ensure code_verifier is stored in localStorage/sessionStorage before OAuth redirect
+  and retrieved correctly in /auth/callback/route.ts
+  BUG-16 [CHATBOT] IRIS Concierge giving Student-specific responses (attendance %) to SuperAdmin role
+  → Chatbot should respond based on logged-in user's actual role
+  → SuperAdmin should get institution-wide stats, not personal student attendance
+  → Fix: check role in aiConciergeService.ts and customize response context based on user.role

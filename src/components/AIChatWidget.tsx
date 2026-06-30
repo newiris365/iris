@@ -21,11 +21,46 @@ export default function AIChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMsg, setInputMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState<'student' | 'parent'>('student');
+  const [role, setRole] = useState<string>('student');
   const [sessionId, setSessionId] = useState<string>('');
   const [charCount, setCharCount] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const getWelcomeMessage = (roleName: string) => {
+    const r = roleName.toLowerCase();
+    switch (r) {
+      case 'superadmin':
+        return "Welcome, SuperAdmin. I can provide institution-wide stats including total students, revenue, and campus summaries. How can I help you manage the network today?";
+      case 'admin':
+        return "Welcome, Campus Administrator. I can provide campus-level statistics: student count, staff summaries, overall attendance rate, and fee collection. What would you like to review?";
+      case 'student':
+        return "Hi! I am IRIS, your AI campus concierge. Ask me about your attendance, outstanding fees, today's timetable, or registered courses.";
+      case 'hod':
+        return "Welcome, Head of Department. I can assist you with department-level student statistics, attendance rates, and faculty records. How can I support your department today?";
+      case 'teacher':
+        return "Welcome! I can help you with class-level inquiries: your teaching schedule, student attendance, or lecture timings.";
+      case 'warden':
+      case 'hostelwarden':
+        return "Welcome, Warden. I can provide hostel room occupancy rates, current mess notices, or pending maintenance complaints. How can I help manage the hostel today?";
+      case 'security':
+      case 'gatesecurity':
+        return "Welcome, Security Desk. I can show today's gate visitor logs, RFID entry/exit scans, or trigger gate access alerts.";
+      case 'librarian':
+        return "Welcome, Librarian. I can provide book inventory details, overdue/pending returns, and library operations status. How can I assist you?";
+      case 'parent':
+        return "Hello! I can provide child-level details: child's attendance rate, pending fees, and school transport/bus location. How can I help you today?";
+      case 'driver':
+        return "Welcome. I can provide transit details: your assigned route today, bus schedule, and passenger boardings.";
+      case 'vendor':
+      case 'canteenvendor':
+        return "Welcome to the Canteen Console. I can show today's orders count, active menu items, or current queue status.";
+      case 'staff':
+        return "Welcome! I can provide general staff updates: recent announcements, your assigned tasks, and office hours.";
+      default:
+        return "Hi! I am IRIS, your AI campus concierge. How can I assist you with your campus queries today?";
+    }
+  };
 
   useEffect(() => {
     // Load or generate session_id
@@ -41,8 +76,8 @@ export default function AIChatWidget() {
     if (profileStr) {
       try {
         const prof = JSON.parse(profileStr);
-        if (prof.role?.toLowerCase() === 'parent') {
-          setRole('parent');
+        if (prof.role) {
+          setRole(prof.role.toLowerCase());
         }
       } catch {}
     }
@@ -51,7 +86,7 @@ export default function AIChatWidget() {
     if (savedSession) {
       loadHistory(savedSession);
     }
-  }, []);
+  }, [role]); // Reload if role updates
 
   useEffect(() => {
     scrollToBottom();
@@ -66,7 +101,7 @@ export default function AIChatWidget() {
       setMessages([
         {
           role: 'assistant',
-          content: `Hi! I am IRIS, your AI campus concierge. How can I assist you with your campus queries today?`,
+          content: getWelcomeMessage(role),
           timestamp: new Date().toISOString()
         }
       ]);
@@ -87,7 +122,7 @@ export default function AIChatWidget() {
         setMessages([
           {
             role: 'assistant',
-            content: `Hi! I am IRIS, your AI campus concierge. How can I assist you with your campus queries today?`,
+            content: getWelcomeMessage(role),
             timestamp: new Date().toISOString()
           }
         ]);
@@ -96,7 +131,7 @@ export default function AIChatWidget() {
       setMessages([
         {
           role: 'assistant',
-          content: `Hi! I am IRIS, your AI campus concierge. How can I assist you with your campus queries today?`,
+          content: getWelcomeMessage(role),
           timestamp: new Date().toISOString()
         }
       ]);
@@ -142,12 +177,101 @@ export default function AIChatWidget() {
       // Sandbox fallback response
       setTimeout(() => {
         let responseText = "I encountered an error connecting to IRIS servers. Let me assist you using local metrics details.";
-        if (text.toLowerCase().includes('attendance')) {
-          responseText = "Your current overall attendance rate is 84% (Present 42 out of 50 sessions). Subject breakdown:\n\n* Computer Science: 88%\n* Electronics: 72% (below threshold)\n\nTo raise your Electronics attendance above 75%, please attend the next 3 lab sessions.";
-        } else if (text.toLowerCase().includes('fee') || text.toLowerCase().includes('due')) {
-          responseText = "You have an outstanding balance of **₹2,500** library fines due. Please pay directly using the link: /library/fines";
-        } else if (text.toLowerCase().includes('timetable') || text.toLowerCase().includes('class')) {
-          responseText = "Your timetable for today:\n\n* **CS402**: Systems Engineering (09:00 AM - 10:30 AM, Room 302)\n* **CS405**: Lab Practice (11:00 AM - 01:00 PM, Lab A)";
+        const textLower = text.toLowerCase();
+        const r = role.toLowerCase();
+
+        if (r === 'superadmin') {
+          if (textLower.includes('student') || textLower.includes('enroll')) {
+            responseText = "Total enrolled students across all campuses: **2,450**.";
+          } else if (textLower.includes('revenue') || textLower.includes('fee') || textLower.includes('income')) {
+            responseText = "Total revenue collection this financial year: **₹1,24,50,000**.";
+          } else if (textLower.includes('campus') || textLower.includes('branch')) {
+            responseText = "Total active campuses: **3 campuses**.";
+          }
+        } else if (r === 'admin') {
+          if (textLower.includes('student')) {
+            responseText = "Total student strength for this campus: **1,280**.";
+          } else if (textLower.includes('staff') || textLower.includes('teacher')) {
+            responseText = "Total active staff members: **124**.";
+          } else if (textLower.includes('attendance')) {
+            responseText = "Campus-wide average attendance rate: **88%**.";
+          } else if (textLower.includes('fee') || textLower.includes('collection')) {
+            responseText = "Total fees collected this month: **₹48,50,000**.";
+          }
+        } else if (r === 'student') {
+          if (textLower.includes('attendance')) {
+            responseText = "Your current overall attendance rate is 84% (Present 42 out of 50 sessions). Subject breakdown:\n\n* Computer Science: 88%\n* Electronics: 72% (below threshold)\n\nTo raise your Electronics attendance above 75%, please attend the next 3 lab sessions.";
+          } else if (textLower.includes('fee') || textLower.includes('due') || textLower.includes('status')) {
+            responseText = "You have an outstanding balance of **₹2,500** library fines due. Please pay directly using the link: /library/fines";
+          } else if (textLower.includes('timetable') || textLower.includes('class')) {
+            responseText = "Your timetable for today:\n\n* **CS402**: Systems Engineering (09:00 AM - 10:30 AM, Room 302)\n* **CS405**: Lab Practice (11:00 AM - 01:00 PM, Lab A)";
+          } else if (textLower.includes('canteen') || textLower.includes('menu')) {
+            responseText = "Today's canteen menu specials:\n\n* **Masala Dosa**: ₹60\n* **Aloo Samosa**: ₹15\n* **Cold Coffee**: ₹40";
+          }
+        } else if (r === 'hod') {
+          if (textLower.includes('student')) {
+            responseText = "Your department currently has **120** enrolled students.";
+          } else if (textLower.includes('attendance')) {
+            responseText = "Overall department attendance rate: **86%**.";
+          } else if (textLower.includes('faculty') || textLower.includes('list')) {
+            responseText = "Department faculty strength: **12 teachers**.";
+          }
+        } else if (r === 'teacher') {
+          if (textLower.includes('class') || textLower.includes('schedule')) {
+            responseText = "Your schedule today:\n\n* **CS301**: Algorithms (10:00 AM - 11:30 AM)\n* **CS302**: Labs (02:00 PM - 04:00 PM)";
+          } else if (textLower.includes('student') || textLower.includes('attendance')) {
+            responseText = "Total students enrolled in your courses: **65**. Average class attendance: **84%**.";
+          }
+        } else if (r === 'warden' || r === 'hostelwarden') {
+          if (textLower.includes('occupancy') || textLower.includes('room')) {
+            responseText = "Current hostel occupancy: **128/150 Rooms** (85.3% occupancy).";
+          } else if (textLower.includes('mess')) {
+            responseText = "Current Mess Notices:\n\n* Lunch: 12:30 PM - 02:30 PM\n* Special Sunday Dinner: Paneer Butter Masala";
+          } else if (textLower.includes('complaint')) {
+            responseText = "There are **4 pending complaints** (2 plumbing, 1 electrical, 1 wifi issue). Details: /hostel/complaints";
+          }
+        } else if (r === 'security' || r === 'gatesecurity') {
+          if (textLower.includes('visitor')) {
+            responseText = "Total visitors logged today: **8 visitors**.";
+          } else if (textLower.includes('rfid') || textLower.includes('scan')) {
+            responseText = "RFID scans recorded today: **342 entry/exit logs**.";
+          }
+        } else if (r === 'librarian') {
+          if (textLower.includes('inventory') || textLower.includes('book')) {
+            responseText = "Total library book inventory: **12,450 books**.";
+          } else if (textLower.includes('return') || textLower.includes('pending') || textLower.includes('overdue')) {
+            responseText = "Pending/Overdue book returns: **23 books**. Details: /library/returns";
+          }
+        } else if (r === 'parent') {
+          if (textLower.includes('attendance')) {
+            responseText = "Your child's attendance rate is **84%** (Present 42 out of 50 sessions).";
+          } else if (textLower.includes('fee')) {
+            responseText = "Outstanding fees balance: **₹3,200** due by Friday. Link: /fees";
+          } else if (textLower.includes('bus') || textLower.includes('transit') || textLower.includes('location')) {
+            responseText = "School bus route tracking: **On Route - Passing Sector 5 (ETA 12 mins)**.";
+          }
+        } else if (r === 'driver') {
+          if (textLower.includes('route')) {
+            responseText = "Your assigned route today: **Route 4 (Vardan Nagar to Campus)**.";
+          } else if (textLower.includes('schedule')) {
+            responseText = "Trip timings:\n\n* Pick-up: 08:00 AM\n* Drop-off: 04:30 PM";
+          } else if (textLower.includes('passenger') || textLower.includes('count')) {
+            responseText = "Total passenger manifest count: **38 passengers**.";
+          }
+        } else if (r === 'vendor' || r === 'canteenvendor') {
+          if (textLower.includes('order')) {
+            responseText = "Total canteen orders received today: **42 orders**.";
+          } else if (textLower.includes('menu')) {
+            responseText = "Active menu items: Aloo Samosa, Masala Dosa, Paneer Roll, Cold Coffee.";
+          } else if (textLower.includes('queue') || textLower.includes('status')) {
+            responseText = "Canteen Queue Status: **Moderate (Est. wait time: 8-10 mins)**.";
+          }
+        } else if (r === 'staff') {
+          if (textLower.includes('announcement')) {
+            responseText = "Announcements:\n\n* Monthly Staff Review Meeting tomorrow at 3 PM\n* Submit AQAR data by Friday";
+          } else if (textLower.includes('task')) {
+            responseText = "Your tasks today:\n\n* Verify Admission Logs\n* Approve 3 Student Leave Requests";
+          }
         }
         
         const assistantMsg: Message = {
@@ -260,10 +384,38 @@ export default function AIChatWidget() {
   };
 
   const getQuickChips = () => {
-    if (role === 'parent') {
-      return ["My child's attendance", "Fee due?", "Bus location"];
+    const r = role.toLowerCase();
+    switch (r) {
+      case 'superadmin':
+        return ["Total students", "Total revenue", "Campus count", "System health"];
+      case 'admin':
+        return ["Total students", "Staff count", "Attendance rate", "Fee collection"];
+      case 'student':
+        return ["My attendance?", "Fee status", "Today's timetable", "Canteen menu", "Next exam?"];
+      case 'hod':
+        return ["Dept students", "Dept attendance", "Faculty list", "Dept notices"];
+      case 'teacher':
+        return ["My classes today", "My schedule", "Student attendance", "Room locations"];
+      case 'warden':
+      case 'hostelwarden':
+        return ["Room occupancy", "Mess notices", "Pending complaints", "Hostel roster"];
+      case 'security':
+      case 'gatesecurity':
+        return ["Today's visitor logs", "RFID scans today", "Gate alerts", "Incident log"];
+      case 'librarian':
+        return ["Book inventory", "Pending returns", "Library hours", "New arrivals"];
+      case 'parent':
+        return ["My child's attendance", "Child's fees", "Bus location", "PTM bookings"];
+      case 'driver':
+        return ["Today's route", "Bus schedule", "Passenger count", "Route status"];
+      case 'vendor':
+      case 'canteenvendor':
+        return ["Today's orders", "Canteen menu", "Queue status", "Wallet status"];
+      case 'staff':
+        return ["Announcements", "My tasks", "Office hours", "Submit leave"];
+      default:
+        return ["My attendance?", "Fee status", "Today's timetable", "Canteen menu", "Next exam?"];
     }
-    return ["My attendance?", "Fee status", "Today's timetable", "Canteen menu", "Next exam?"];
   };
 
   return (
