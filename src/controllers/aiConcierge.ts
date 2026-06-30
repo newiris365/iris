@@ -143,10 +143,11 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
     try {
       const { count: campusCount } = await supabaseAdmin
         .from('institutions')
-        .select('*', { count: 'exact', head: true });
-      ctx.total_campuses = campusCount || 3;
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+      ctx.total_campuses = campusCount ?? 0;
     } catch {
-      ctx.total_campuses = 3;
+      ctx.total_campuses = 0;
     }
   }
 

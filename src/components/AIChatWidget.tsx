@@ -196,7 +196,7 @@ export default function AIChatWidget() {
           } else if (textLower.includes('revenue') || textLower.includes('fee') || textLower.includes('income')) {
             responseText = "Total revenue collection this financial year: **₹1,24,50,000**.";
           } else if (textLower.includes('campus') || textLower.includes('branch')) {
-            responseText = "Total active campuses: **3 campuses**.";
+            responseText = "Unable to retrieve live campus count. Please check the SuperAdmin dashboard for the accurate active campus count.";
           }
         } else if (r === 'admin') {
           if (textLower.includes('student')) {
