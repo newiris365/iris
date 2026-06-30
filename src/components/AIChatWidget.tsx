@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost } from '../lib/api';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface Message {
   id?: string;
@@ -24,6 +25,9 @@ export default function AIChatWidget() {
   const [role, setRole] = useState<string>('student');
   const [sessionId, setSessionId] = useState<string>('');
   const [charCount, setCharCount] = useState(0);
+  const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +67,12 @@ export default function AIChatWidget() {
   };
 
   useEffect(() => {
+    setMounted(true);
+    const token = localStorage.getItem('iris_jwt_token');
+    setIsAuthenticated(!!token);
+  }, [pathname]);
+
+  useEffect(() => {
     // Load or generate session_id
     let savedSession = localStorage.getItem('iris_ai_session_id');
     if (!savedSession) {
@@ -83,10 +93,10 @@ export default function AIChatWidget() {
     }
 
     // Load conversation history from backend
-    if (savedSession) {
+    if (savedSession && isAuthenticated) {
       loadHistory(savedSession);
     }
-  }, [role]); // Reload if role updates
+  }, [role, isAuthenticated]); // Reload if role or authentication status updates
 
   useEffect(() => {
     scrollToBottom();
@@ -417,6 +427,10 @@ export default function AIChatWidget() {
         return ["My attendance?", "Fee status", "Today's timetable", "Canteen menu", "Next exam?"];
     }
   };
+
+  if (!mounted || pathname === '/login' || !isAuthenticated) {
+    return null;
+  }
 
   return (
     <>
