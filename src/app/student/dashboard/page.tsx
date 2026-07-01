@@ -44,18 +44,18 @@ export default function StudentDashboard() {
       } catch (e) {
         console.error('Failed to parse saved profile:', e);
         setProfile({
-          id: 'b0000000-0000-0000-0000-000000000006',
-          name: 'Khushal Gehlot',
-          roll_number: 'CS23B1024',
-          email: 'khushal@iris365.edu'
+          id: '',
+          name: 'Student',
+          roll_number: '',
+          email: ''
         });
       }
     } else {
       setProfile({
-        id: 'b0000000-0000-0000-0000-000000000006',
-        name: 'Khushal Gehlot',
-        roll_number: 'CS23B1024',
-        email: 'khushal@iris365.edu'
+        id: '',
+        name: 'Student',
+        roll_number: '',
+        email: ''
       });
     }
 

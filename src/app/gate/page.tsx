@@ -74,12 +74,9 @@ export default function SecurityGuardDashboard() {
         setLogs(logsRes.logs || []);
       }
     } catch {
-      // Mock Fallbacks
-      setLogs([
-        { id: '1', person_name: 'Khushal Gehlot', person_type: 'student', entry_method: 'rfid', direction: 'in', gate_number: 'main', timestamp: new Date().toISOString() },
-        { id: '2', person_name: 'Dr. K. R. Sharma', person_type: 'staff', entry_method: 'biometric', direction: 'in', gate_number: 'main', timestamp: new Date().toISOString() }
-      ]);
-      setOccupancy({ students_inside: 12, staff_inside: 4, visitors_inside: 1, total_occupancy: 17 });
+      // Clean Fallback
+      setLogs([]);
+      setOccupancy({ students_inside: 0, staff_inside: 0, visitors_inside: 0, total_occupancy: 0 });
     } finally {
       setLoading(false);
     }
@@ -113,12 +110,7 @@ export default function SecurityGuardDashboard() {
         triggerAlert(`ACCESS DENIED: ${res.error}`, 'danger');
       }
     } catch (err: any) {
-      // Mock Bypass for testing if server/db is slow
-      if (qrTokenInput.includes('khushal')) {
-        triggerAlert(`ACCESS ALLOWED: Khushal Gehlot (Mock QR)`, 'success');
-      } else {
-        triggerAlert(`ACCESS DENIED: QR expired or invalid signatures.`, 'danger');
-      }
+      triggerAlert(`ACCESS DENIED: QR expired or invalid signatures.`, 'danger');
       setQrTokenInput('');
     }
   };
@@ -137,11 +129,7 @@ export default function SecurityGuardDashboard() {
         triggerAlert(`ACCESS DENIED: ${res.error}`, 'danger');
       }
     } catch {
-      if (rfidUidInput === 'RFID_KHUSHAL_123') {
-        triggerAlert(`ACCESS ALLOWED: Khushal Gehlot (Mock RFID)`, 'success');
-      } else {
-        triggerAlert('ACCESS DENIED: RFID Card not registered or blocked.', 'danger');
-      }
+      triggerAlert('ACCESS DENIED: RFID Card not registered or blocked.', 'danger');
       setRfidUidInput('');
     }
   };

@@ -29,12 +29,8 @@ export default function AdminVisitorManagementPage() {
         setVisitors(res.visitors || []);
       }
     } catch {
-      // Mock Data
-      setVisitors([
-        { id: 'vp-1', visitor_name: 'Rajesh Malhotra', visitor_phone: '+91 98765 43210', host_name: 'Dr. K. R. Sharma', purpose: 'Research Collaboration', pass_number: 'VP-84920', is_used: true, valid_until: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), created_at: `${selectedDate}T09:00:00Z` },
-        { id: 'vp-2', visitor_name: 'Sunita Devi', visitor_phone: '+91 94432 12345', host_name: 'Khushal Gehlot', purpose: 'Family Visit', pass_number: 'VP-10294', is_used: true, valid_until: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), created_at: `${selectedDate}T10:30:00Z` },
-        { id: 'vp-3', visitor_name: 'Amit Patel Sr.', visitor_phone: '+91 91111 22222', host_name: 'Amit Kumar Patel', purpose: 'Laptop Delivery', pass_number: 'VP-22830', is_used: false, valid_until: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), created_at: `${selectedDate}T11:00:00Z` }
-      ]);
+      // Clean fallback
+      setVisitors([]);
     } finally {
       setLoading(false);
     }

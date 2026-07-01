@@ -49,12 +49,7 @@ export default function VisitorIntakePage() {
       }
     } catch {
       // Fallback Seed Hosts
-      setHosts([
-        { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Khushal Gehlot', role: 'Student', email: 'khushal@gmail.com' },
-        { id: '4fa85f64-5717-4562-b3fc-2c963f66afa7', name: 'Dr. K. R. Sharma', role: 'Staff', email: 'sharma@siet.edu.in' },
-        { id: '5fa85f64-5717-4562-b3fc-2c963f66afa8', name: 'Prof. Ananya Sen', role: 'Staff', email: 'ananya@siet.edu.in' },
-        { id: '6fa85f64-5717-4562-b3fc-2c963f66afa9', name: 'Amit Kumar Patel', role: 'Student', email: 'amit@gmail.com' }
-      ]);
+      setHosts([]);
     }
   };
 
@@ -66,10 +61,7 @@ export default function VisitorIntakePage() {
       }
     } catch {
       // Fallbacks
-      setPasses([
-        { id: '1', visitor_name: 'Rajesh Malhotra', visitor_phone: '+91 98765 43210', host_name: 'Dr. K. R. Sharma', purpose: 'Research Collaboration', pass_number: 'VP-84920', is_used: true, valid_until: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() },
-        { id: '2', visitor_name: 'Sunita Devi', visitor_phone: '+91 94432 12345', host_name: 'Khushal Gehlot', purpose: 'Family Visit', pass_number: 'VP-10294', is_used: false, valid_until: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() }
-      ]);
+      setPasses([]);
     }
   };
 

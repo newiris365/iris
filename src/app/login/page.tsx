@@ -43,7 +43,7 @@ const getMockProfile = (email: string, role: string) => {
         id: 'b0000000-0000-0000-0000-000000000006',
         student_id: 'c0000000-0000-0000-0000-000000000006',
         room_id: 'e4000000-0000-0000-0000-000000000001',
-        name: 'Khushal Gehlot (Sandbox)',
+        name: 'Priyansh Student',
         email: email,
         role: 'Student',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -54,7 +54,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Admin':
       return {
         id: 'b0000000-0000-0000-0000-000000000002',
-        name: 'Dr. K. R. Sharma (Sandbox)',
+        name: 'Director SIET',
         email: email,
         role: 'Admin',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -65,7 +65,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Warden':
       return {
         id: 'b0000000-0000-0000-0000-000000000012',
-        name: 'Jaswant Singh (Sandbox)',
+        name: 'Jaswant Singh',
         email: email,
         role: 'Warden',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -76,7 +76,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Security':
       return {
         id: 'b0000000-0000-0000-0000-000000000015',
-        name: 'Guard Sher Singh (Sandbox)',
+        name: 'Guard Sher Singh',
         email: email,
         role: 'Security',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -87,7 +87,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Driver':
       return {
         id: 'b0000000-0000-0000-0000-000000000013',
-        name: 'Rajesh Kumar (Sandbox)',
+        name: 'Priyansh Driver',
         email: email,
         role: 'Driver',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -98,7 +98,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Staff':
       return {
         id: 'b0000000-0000-0000-0000-000000000003',
-        name: 'Prof. Alok Vyas (Sandbox)',
+        name: 'Faculty Staff Member',
         email: email,
         role: 'Staff',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -109,7 +109,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Parent':
       return {
         id: 'b0000000-0000-0000-0000-000000000011',
-        name: 'Mr. Madanlal Gehlot (Sandbox)',
+        name: 'Nakshtra Parihar (Parent)',
         email: email,
         role: 'Parent',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -120,7 +120,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Vendor':
       return {
         id: 'b0000000-0000-0000-0000-000000000014',
-        name: 'Ramesh Canteen Wale (Sandbox)',
+        name: 'Canteen Vendor',
         email: email,
         role: 'Vendor',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -131,7 +131,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Teacher':
       return {
         id: 'b0000000-0000-0000-0000-000000000016',
-        name: 'Prof. Neha Gupta (Sandbox)',
+        name: 'Priyansh Rai (Teacher)',
         email: email,
         role: 'Teacher',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -142,7 +142,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'HOD':
       return {
         id: 'b0000000-0000-0000-0000-000000000017',
-        name: 'Dr. Vikram Mehta (Sandbox)',
+        name: 'HOD Member',
         email: email,
         role: 'HOD',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -153,7 +153,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Librarian':
       return {
         id: 'b0000000-0000-0000-0000-000000000018',
-        name: 'Sunita Devi (Sandbox)',
+        name: 'Librarian Head',
         email: email,
         role: 'Librarian',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -164,7 +164,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Director':
       return {
         id: 'b0000000-0000-0000-0000-000000000019',
-        name: 'Dr. K. R. Sharma (Sandbox)',
+        name: 'Director SIET',
         email: email,
         role: 'Director',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -175,7 +175,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'SuperAdmin':
       return {
         id: 'b0000000-0000-0000-0000-000000000001',
-        name: 'Siddharth Singh (Sandbox)',
+        name: 'Siddharth (SuperAdmin)',
         email: email,
         role: 'SuperAdmin',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -186,7 +186,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Principal':
       return {
         id: 'b0000000-0000-0000-0000-000000000021',
-        name: 'Dr. Ramesh Kumar (Principal)',
+        name: 'Khushal Khatri (Principal)',
         email: email,
         role: 'Principal',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -198,7 +198,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'VP':
       return {
         id: 'b0000000-0000-0000-0000-000000000022',
-        name: 'Prof. Sunil Verma (Vice Principal)',
+        name: 'Vice Principal SIET',
         email: email,
         role: 'Vice Principal',
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -209,7 +209,7 @@ const getMockProfile = (email: string, role: string) => {
     default:
       return {
         id: 'b0000000-0000-0000-0000-000000009999',
-        name: 'External Guest (Sandbox)',
+        name: 'External Guest',
         email: email,
         role: role,
         institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -442,32 +442,22 @@ export default function LoginPage() {
         // Automatic client-side bypass for sandbox testing profiles on connection failure (local dev only)
         const sandboxEmails = [
           'siddharth@sin.education',
-          'khushal@gmail.com',
           'director@siet.edu.in',
-          'admin@siet.edu.in',
-          'warden@siet.edu.in',
-          'security@siet.edu.in',
-          'rajesh.driver@siet.edu.in',
-          'alok.vyas@siet.edu.in',
-          'madanlal@gmail.com',
-          'canteen@siet.edu.in',
-          'hod@sin.education',
-          'teacher@sin.education',
-          'librarian@sin.education'
+          'khushalkhatri0019@gmail.com',
+          'raipriyansh45@gmail.com',
+          'priyansh.24jics153@jietjodhpur.ac.in',
+          'pariharnakshtra21@gmail.com',
+          'raip32380@gmail.com'
         ];
         if (sandboxEmails.includes(data.email)) {
           let role = 'Student';
           if (data.email === 'siddharth@sin.education') role = 'SuperAdmin';
-          else if (data.email === 'director@siet.edu.in' || data.email === 'admin@siet.edu.in') role = 'Admin';
-          else if (data.email === 'warden@siet.edu.in') role = 'Warden';
-          else if (data.email === 'security@siet.edu.in') role = 'Security';
-          else if (data.email === 'rajesh.driver@siet.edu.in') role = 'Driver';
-          else if (data.email === 'alok.vyas@siet.edu.in') role = 'Staff';
-          else if (data.email === 'madanlal@gmail.com') role = 'Parent';
-          else if (data.email === 'canteen@siet.edu.in') role = 'Vendor';
-          else if (data.email === 'hod@sin.education') role = 'HOD';
-          else if (data.email === 'teacher@sin.education') role = 'Teacher';
-          else if (data.email === 'librarian@sin.education') role = 'Librarian';
+          else if (data.email === 'director@siet.edu.in') role = 'Admin';
+          else if (data.email === 'khushalkhatri0019@gmail.com') role = 'Principal';
+          else if (data.email === 'raipriyansh45@gmail.com') role = 'Teacher';
+          else if (data.email === 'priyansh.24jics153@jietjodhpur.ac.in') role = 'Student';
+          else if (data.email === 'pariharnakshtra21@gmail.com') role = 'Parent';
+          else if (data.email === 'raip32380@gmail.com') role = 'Driver';
 
           const mockProfile = getMockProfile(data.email, role);
           const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
@@ -683,12 +673,12 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-3 gap-1.5">
             {[
-              { email: 'principal@siet.edu.in', role: 'Principal', label: 'Principal', bg: 'bg-violet-500/10', border: 'border-violet-500/25', hoverBorder: 'hover:border-violet-500', hoverBg: 'hover:bg-violet-500/20', text: 'text-violet-400', hoverText: 'hover:text-violet-300' },
-              { email: 'vp@siet.edu.in', role: 'Vice Principal', label: 'Vice Principal', bg: 'bg-blue-500/10', border: 'border-blue-500/25', hoverBorder: 'hover:border-blue-500', hoverBg: 'hover:bg-blue-500/20', text: 'text-blue-400', hoverText: 'hover:text-blue-300' },
-              { email: 'teacher@sin.education', role: 'Teacher', label: 'Teacher', bg: 'bg-purple-500/10', border: 'border-purple-500/25', hoverBorder: 'hover:border-purple-500', hoverBg: 'hover:bg-purple-500/20', text: 'text-purple-400', hoverText: 'hover:text-purple-300' },
-              { email: 'khushal@gmail.com', role: 'Student', label: 'Student', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', hoverBorder: 'hover:border-emerald-500', hoverBg: 'hover:bg-emerald-500/20', text: 'text-emerald-400', hoverText: 'hover:text-emerald-300' },
-              { email: 'madanlal@gmail.com', role: 'Parent', label: 'Parent', bg: 'bg-pink-500/10', border: 'border-pink-500/25', hoverBorder: 'hover:border-pink-500', hoverBg: 'hover:bg-pink-500/20', text: 'text-pink-400', hoverText: 'hover:text-pink-300' },
-              { email: 'rajesh.driver@siet.edu.in', role: 'Driver', label: 'Driver', bg: 'bg-orange-500/10', border: 'border-orange-500/25', hoverBorder: 'hover:border-orange-500', hoverBg: 'hover:bg-orange-500/20', text: 'text-orange-400', hoverText: 'hover:text-orange-300' },
+              { email: 'khushalkhatri0019@gmail.com', role: 'Principal', label: 'Principal', bg: 'bg-violet-500/10', border: 'border-violet-500/25', hoverBorder: 'hover:border-violet-500', hoverBg: 'hover:bg-violet-500/20', text: 'text-violet-400', hoverText: 'hover:text-violet-300' },
+              { email: 'director@siet.edu.in', role: 'Admin', label: 'Admin (VP)', bg: 'bg-blue-500/10', border: 'border-blue-500/25', hoverBorder: 'hover:border-blue-500', hoverBg: 'hover:bg-blue-500/20', text: 'text-blue-400', hoverText: 'hover:text-blue-300' },
+              { email: 'raipriyansh45@gmail.com', role: 'Teacher', label: 'Teacher', bg: 'bg-purple-500/10', border: 'border-purple-500/25', hoverBorder: 'hover:border-purple-500', hoverBg: 'hover:bg-purple-500/20', text: 'text-purple-400', hoverText: 'hover:text-purple-300' },
+              { email: 'priyansh.24jics153@jietjodhpur.ac.in', role: 'Student', label: 'Student', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', hoverBorder: 'hover:border-emerald-500', hoverBg: 'hover:bg-emerald-500/20', text: 'text-emerald-400', hoverText: 'hover:text-emerald-300' },
+              { email: 'pariharnakshtra21@gmail.com', role: 'Parent', label: 'Parent', bg: 'bg-pink-500/10', border: 'border-pink-500/25', hoverBorder: 'hover:border-pink-500', hoverBg: 'hover:bg-pink-500/20', text: 'text-pink-400', hoverText: 'hover:text-pink-300' },
+              { email: 'raip32380@gmail.com', role: 'Driver', label: 'Driver', bg: 'bg-orange-500/10', border: 'border-orange-500/25', hoverBorder: 'hover:border-orange-500', hoverBg: 'hover:bg-orange-500/20', text: 'text-orange-400', hoverText: 'hover:text-orange-300' },
             ].map((item) => (
               <button
                 key={item.role}

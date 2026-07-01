@@ -24,7 +24,7 @@ export default function StudentMovementHistoryPage() {
         fetchHistory(parsed.id);
       } catch {}
     } else {
-      const fallback = { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Khushal Gehlot', role: 'Student' };
+      const fallback = { id: '', name: 'Student', role: 'Student' };
       setProfile(fallback);
       fetchHistory(fallback.id);
     }
@@ -39,15 +39,9 @@ export default function StudentMovementHistoryPage() {
         calculateStats(res.history);
       }
     } catch {
-      // Mock Fallbacks
-      const mockHist = [
-        { id: '1', direction: 'in', gate_number: 'main', entry_method: 'rfid', timestamp: new Date(Date.now() - 4 * 3600 * 1000).toISOString(), reason: 'Regular Entry' },
-        { id: '2', direction: 'out', gate_number: 'main', entry_method: 'rfid', timestamp: new Date(Date.now() - 8 * 3600 * 1000).toISOString(), reason: 'Regular Exit' },
-        { id: '3', direction: 'in', gate_number: 'academic_gate', entry_method: 'qr', timestamp: new Date(Date.now() - 25 * 3600 * 1000).toISOString(), reason: 'Late arrival (after 09:00 AM)' },
-        { id: '4', direction: 'out', gate_number: 'main', entry_method: 'manual', timestamp: new Date(Date.now() - 32 * 3600 * 1000).toISOString(), reason: 'Special early leave approved' }
-      ];
-      setHistory(mockHist);
-      calculateStats(mockHist);
+      // Clean fallback
+      setHistory([]);
+      calculateStats([]);
     } finally {
       setLoading(false);
     }

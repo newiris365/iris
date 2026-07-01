@@ -10,8 +10,11 @@ export default function StudentIdCardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Sandbox student profile ID
-    apiGet('/core/idcards/generate/b0000000-0000-0000-0000-000000000006').then(res => {
+    const savedProfile = localStorage.getItem('iris_user_profile');
+    const profile = savedProfile ? JSON.parse(savedProfile) : null;
+    const studentId = profile?.student_id || profile?.id || 'b0000000-0000-0000-0000-000000000006';
+
+    apiGet(`/core/idcards/generate/${studentId}`).then(res => {
       if (res.success) {
         setCardData(res.card);
       }

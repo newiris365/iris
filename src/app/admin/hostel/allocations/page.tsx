@@ -22,44 +22,8 @@ export default function AdminHostelAllocations() {
         setMatrix(res.matrix || []);
       }
     } catch (err) {
-      console.log('Error loading compatibility matrix, using mock sandbox data');
-      setMatrix([
-        {
-          student_id: 's1',
-          name: 'Khushal Gehlot',
-          roll_number: 'CS-2024-001',
-          gender: 'male',
-          preferences: { sleep_schedule: 2, study_habits: 4, cleanliness: 5, noise_tolerance: 1 },
-          top_matches: [
-            { student_id: 's2', name: 'Aditya Vardhan', roll_number: 'CS-2024-042', compatibility_score: 93.75 },
-            { student_id: 's3', name: 'Rohan Sharma', roll_number: 'EC-2024-098', compatibility_score: 87.50 },
-            { student_id: 's4', name: 'Kabir Mehta', roll_number: 'ME-2024-012', compatibility_score: 81.25 }
-          ]
-        },
-        {
-          student_id: 's2',
-          name: 'Aditya Vardhan',
-          roll_number: 'CS-2024-042',
-          gender: 'male',
-          preferences: { sleep_schedule: 2, study_habits: 3, cleanliness: 5, noise_tolerance: 2 },
-          top_matches: [
-            { student_id: 's1', name: 'Khushal Gehlot', roll_number: 'CS-2024-001', compatibility_score: 93.75 },
-            { student_id: 's3', name: 'Rohan Sharma', roll_number: 'EC-2024-098', compatibility_score: 81.25 },
-            { student_id: 's4', name: 'Kabir Mehta', roll_number: 'ME-2024-012', compatibility_score: 75.00 }
-          ]
-        },
-        {
-          student_id: 's5',
-          name: 'Priyanka Sen',
-          roll_number: 'IT-2024-015',
-          gender: 'female',
-          preferences: { sleep_schedule: 1, study_habits: 5, cleanliness: 4, noise_tolerance: 1 },
-          top_matches: [
-            { student_id: 's6', name: 'Anjali Gupta', roll_number: 'CS-2024-055', compatibility_score: 93.75 },
-            { student_id: 's7', name: 'Divya Raj', roll_number: 'EE-2024-018', compatibility_score: 87.50 }
-          ]
-        }
-      ]);
+      console.log('Error loading compatibility matrix');
+      setMatrix([]);
     } finally {
       setLoading(false);
     }

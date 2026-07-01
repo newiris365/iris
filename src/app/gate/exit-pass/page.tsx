@@ -28,8 +28,8 @@ export default function ExitPassConsolePage() {
         setIsTeacher(parsed.role?.toLowerCase() === 'staff' || parsed.role?.toLowerCase() === 'teacher');
       } catch {}
     } else {
-      // Default mock profile for sandbox
-      setProfile({ id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Khushal Gehlot', role: 'Student' });
+      // Default profile
+      setProfile({ id: '', name: 'Student', role: 'Student' });
     }
 
     loadExitPasses();
@@ -42,13 +42,7 @@ export default function ExitPassConsolePage() {
 
   const loadExitPasses = () => {
     setLoading(true);
-    // Mock exit pass data store
-    const initialPasses = [
-      { id: 'ep-101', student_name: 'Khushal Gehlot', student_id: 'b0000000-0000-0000-0000-000000000006', reason: 'Medical Checkup - Dentist appointment', approver: 'Dr. K. R. Sharma (HOD)', exit_time: '14:30 PM', status: 'approved', qr_pass: 'EXIT-EP-101' },
-      { id: 'ep-102', student_name: 'Amit Kumar Patel', student_id: 'b0000000-0000-0000-0000-000000000007', reason: 'Inter-College Sports Tournament', approver: 'Prof. Ananya Sen', exit_time: '13:00 PM', status: 'pending' },
-      { id: 'ep-103', student_name: 'Priyesh Chawla', student_id: 'b0000000-0000-0000-0000-000000000008', reason: 'Emergency Family Travel', approver: 'Dr. K. R. Sharma (HOD)', exit_time: '11:15 AM', status: 'rejected' }
-    ];
-    setPasses(initialPasses);
+    setPasses([]);
     setLoading(false);
   };
 
@@ -61,8 +55,8 @@ export default function ExitPassConsolePage() {
 
     const newPass = {
       id: 'ep-' + Math.floor(100 + Math.random() * 900),
-      student_name: profile?.name || 'Khushal Gehlot',
-      student_id: profile?.id || 'b0000000-0000-0000-0000-000000000006',
+      student_name: profile?.name || 'Student',
+      student_id: profile?.id || '',
       reason,
       approver,
       exit_time: exitTime,

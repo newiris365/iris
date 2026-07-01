@@ -31,16 +31,10 @@ export default function AdminGateConsolePage() {
       if (incRes.success) setIncidents(incRes.incidents || []);
       if (occRes.success && occRes.occupancy) setOccupancy(occRes.occupancy);
     } catch {
-      // Mock Fallbacks
-      setLogs([
-        { id: '1', person_name: 'Khushal Gehlot', person_type: 'student', entry_method: 'rfid', direction: 'in', gate_number: 'main', timestamp: new Date().toISOString() },
-        { id: '2', person_name: 'Dr. K. R. Sharma', person_type: 'staff', entry_method: 'biometric', direction: 'in', gate_number: 'academic_gate', timestamp: new Date().toISOString() },
-        { id: '3', person_name: 'Alok Kumar', person_type: 'visitor', entry_method: 'visitor_pass', direction: 'out', gate_number: 'main', timestamp: new Date(Date.now() - 3600 * 1000).toISOString() }
-      ]);
-      setIncidents([
-        { id: 'inc-101', incident_type: 'Blacklist Entry Attempt', description: 'Visitor Rajesh tried using expired details', location: 'Main Gate 1', severity: 'high', status: 'open', created_at: new Date().toISOString() }
-      ]);
-      setOccupancy({ students_inside: 42, staff_inside: 15, visitors_inside: 3, total_occupancy: 60 });
+      // Clean Fallbacks
+      setLogs([]);
+      setIncidents([]);
+      setOccupancy({ students_inside: 0, staff_inside: 0, visitors_inside: 0, total_occupancy: 0 });
     } finally {
       setLoading(false);
     }

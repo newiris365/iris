@@ -22,8 +22,7 @@ export default function StudentMyPassPage() {
         fetchLastMovement(parsed.id);
       } catch {}
     } else {
-      // Fallback Student Profile for Sandbox Testing
-      const fallback = { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Khushal Gehlot', role: 'Student', email: 'khushal@gmail.com' };
+      const fallback = { id: '', name: 'Student', role: 'Student', email: '' };
       setProfile(fallback);
       generateQR(fallback);
       fetchLastMovement(fallback.id);
