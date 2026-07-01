@@ -95,9 +95,12 @@ export async function sendParentMessage(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Teacher ID and message are required.' });
     }
 
-    const senderId = req.user?.id || 'parent_id';
+    const senderId = req.user?.id;
+    if (!senderId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    }
     const senderRole = req.user?.role || 'Parent';
-    const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const institutionId = req.user?.institution_id;
     const slaDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
     const { data, error } = await supabaseAdmin
@@ -120,25 +123,18 @@ export async function sendParentMessage(req: Request, res: Response) {
       message: data
     });
   } catch (err: any) {
-    return res.status(200).json({
-      success: true,
-      message: {
-        id: 'msg_' + Math.random().toString(36).substring(2, 9),
-        sender_role: 'Parent',
-        sender_id: req.user?.id || 'parent_id',
-        receiver_id: req.body.teacher_id || 'teacher_id',
-        message: req.body.message || '',
-        sla_deadline: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-        created_at: new Date().toISOString()
-      }
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Message send operation failed.' });
   }
 }
 
 export async function getParentMessages(req: Request, res: Response) {
   try {
     const { teacherId } = req.params;
-    const userId = req.user?.id || 'parent_id';
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    }
 
     const { data, error } = await supabaseAdmin
       .from('parent_messages')
@@ -153,29 +149,64 @@ export async function getParentMessages(req: Request, res: Response) {
       messages: data || []
     });
   } catch (err: any) {
-    const mockMessages = [
-      {
-        id: 'msg_01',
-        sender_role: 'Parent',
-        sender_id: req.user?.id || 'parent_id',
-        receiver_id: req.params.teacherId,
-        message: 'Hello teacher, I wanted to inquire about Vikram\'s attendance dip.',
-        created_at: new Date(Date.now() - 3600 * 1000 * 25).toISOString()
-      },
-      {
-        id: 'msg_02',
-        sender_role: 'Teacher',
-        sender_id: req.params.teacherId,
-        receiver_id: req.user?.id || 'parent_id',
-        message: 'Hello! He was absent for two labs. We discussed this and he promised to submit regularizations.',
-        created_at: new Date(Date.now() - 3600 * 1000 * 22).toISOString()
+    return res.status(500).json({ success: false, error: err.message || 'Messages fetch operation failed.' });
+  }
+}
+
+export async function getConversationThreads(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    }
+
+    // Fetch all messages involving this user
+    const { data: messages, error } = await supabaseAdmin
+      .from('parent_messages')
+      .select('*, sender:sender_id(id, name, email, role), receiver:receiver_id(id, name, email, role)')
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const threadsMap = new Map<string, any>();
+
+    for (const msg of (messages || [])) {
+      const otherUser = msg.sender_id === userId ? msg.receiver : msg.sender;
+      if (!otherUser) continue;
+
+      if (!threadsMap.has(otherUser.id)) {
+        // Query to get student name if it's a parent
+        let studentName = '';
+        if (otherUser.role === 'Parent') {
+          const { data: link } = await supabaseAdmin
+            .from('parent_student_links')
+            .select('students(name)')
+            .eq('parent_user_id', otherUser.id)
+            .maybeSingle();
+          if (link?.students) {
+            studentName = (link.students as any).name || '';
+          }
+        }
+
+        threadsMap.set(otherUser.id, {
+          id: otherUser.id,
+          parentName: otherUser.name,
+          studentName: studentName || 'Student',
+          lastMessage: msg.message,
+          lastActive: msg.created_at,
+          slaUrgent: msg.sender_role === 'Parent' && msg.sla_deadline && new Date(msg.sla_deadline) > new Date(),
+          slaTimeLeft: msg.sender_role === 'Parent' ? 'Response required' : 'Responded'
+        });
       }
-    ];
+    }
 
     return res.status(200).json({
       success: true,
-      messages: mockMessages
+      threads: Array.from(threadsMap.values())
     });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch threads.' });
   }
 }
 

@@ -4,6 +4,7 @@ import {
   getChildDailyReport,
   sendParentMessage,
   getParentMessages,
+  getConversationThreads,
   bookPTM,
   getPTMSlots
 } from '../controllers/parent';
@@ -20,6 +21,7 @@ router.get('/child/:id/daily-report/:date', getChildDailyReport);
 
 // Messaging with teachers (both parent & teacher roles can access)
 router.post('/messages', requireRole(['Parent', 'Staff', 'Admin', 'SuperAdmin']), sendParentMessage);
+router.get('/messages/threads', requireRole(['Parent', 'Staff', 'Admin', 'SuperAdmin']), getConversationThreads);
 router.get('/messages/:teacherId', requireRole(['Parent', 'Staff', 'Admin', 'SuperAdmin']), getParentMessages);
 
 // Parent-Teacher Meetings (PTM) booking
