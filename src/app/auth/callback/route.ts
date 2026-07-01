@@ -226,6 +226,12 @@ export async function GET(request: NextRequest) {
                 // setAll may throw in read-only contexts (edge middleware).
               }
             }
+          },
+          cookieOptions: {
+            name: 'sb-auth-token',
+            path: '/',
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
           }
         }
       );

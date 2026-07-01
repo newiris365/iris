@@ -41,7 +41,15 @@ function getSupabase(): SupabaseClient {
     // so it is accessible server-side during the OAuth callback exchange.
     supabaseInstance = createBrowserClient(
       supabaseUrl || 'https://placeholder.supabase.co',
-      supabaseAnonKey || 'placeholder'
+      supabaseAnonKey || 'placeholder',
+      {
+        cookieOptions: {
+          name: 'sb-auth-token',
+          path: '/',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production'
+        }
+      }
     );
   }
 
