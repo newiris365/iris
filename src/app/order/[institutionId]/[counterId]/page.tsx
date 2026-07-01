@@ -162,7 +162,7 @@ export default function QrOrderingPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          student_id: 'b0000000-0000-0000-0000-000000000006', // Khushal
+          student_id: '',
           items: orderItems,
           total_amount: totalSub,
           payment_method: 'Wallet',

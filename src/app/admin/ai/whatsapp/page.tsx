@@ -29,8 +29,8 @@ export default function AdminWhatsappPage() {
   const [templateType, setTemplateType] = useState<'attendance_alert' | 'fee_reminder' | 'result_published' | 'bus_alert'>('fee_reminder');
   const [audience, setAudience] = useState<'all' | 'students' | 'parents' | 'staff'>('all');
   const [variables, setVariables] = useState<Record<string, string>>({
-    parent_name: 'Rahul Sharma',
-    student_name: 'Khushal Gehlot',
+    parent_name: '',
+    student_name: '',
     amount: '12000',
     fee_type: 'Tuition Fee',
     date: '15-Jun-2026'
@@ -49,11 +49,7 @@ export default function AdminWhatsappPage() {
       }
     } catch {
       // Sandbox Fallbacks
-      setSubscribers([
-        { id: 'sub1', phone: '919999988888', is_verified: true, opted_in: true, language_preference: 'hi', users: { name: 'Rahul Sharma (Parent)', role: 'Parent' } },
-        { id: 'sub2', phone: '919999912345', is_verified: true, opted_in: true, language_preference: 'en', users: { name: 'Khushal Gehlot (Student)', role: 'Student' } },
-        { id: 'sub3', phone: '919999954321', is_verified: true, opted_in: false, language_preference: 'en', users: { name: 'Vikram Sharma (Student)', role: 'Student' } }
-      ]);
+      setSubscribers([]);
     } finally {
       setLoading(false);
     }

@@ -43,8 +43,8 @@ export default function TpoDriveRoundOperations() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [venue, setVenue] = useState('Virtual');
   const [meetingLink, setMeetingLink] = useState('https://meet.google.com');
-  const [interviewerName, setInterviewerName] = useState('Rajesh Kumar');
-  const [interviewerEmail, setInterviewerEmail] = useState('rajesh@company.com');
+  const [interviewerName, setInterviewerName] = useState('');
+  const [interviewerEmail, setInterviewerEmail] = useState('');
   const [duration, setDuration] = useState(45);
 
   const [saving, setSaving] = useState(false);
@@ -75,25 +75,7 @@ export default function TpoDriveRoundOperations() {
 
     // fallback mock if empty
     if (rounds.length === 0) {
-      setRounds([
-        {
-          id: 'round-1',
-          application_id: 'app-1',
-          round_number: 1,
-          round_type: 'technical',
-          scheduled_at: new Date().toISOString(),
-          venue: 'Virtual',
-          meeting_link: 'https://meet.google.com',
-          interviewer_name: 'Rajesh Kumar',
-          status: 'scheduled',
-          drive_applications: {
-            students: {
-              first_name: 'Khushal',
-              last_name: 'Sharma'
-            }
-          }
-        }
-      ]);
+      setRounds([]);
     }
     setLoading(false);
   };
@@ -105,7 +87,7 @@ export default function TpoDriveRoundOperations() {
       const payload = {
         application_id: applicationId,
         drive_id: driveId,
-        student_id: activeDrives.find(d => d.id === applicationId)?.student_id || 'c0000000-0000-0000-0000-000000000006',
+        student_id: activeDrives.find(d => d.id === applicationId)?.student_id || '',
         round_number: roundNumber,
         round_type: roundType,
         scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,

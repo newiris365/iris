@@ -101,7 +101,7 @@ function VerificationDeskContent() {
       const mockApplicant: ApplicantData = {
         id: id,
         application_number: 'SIET-2026-884920',
-        first_name: 'Khushal',
+        first_name: '',
         last_name: 'Gehlot',
         email: 'khushal@gmail.com',
         phone: '+91 98765 43210',
@@ -112,38 +112,7 @@ function VerificationDeskContent() {
         ]
       };
 
-      const mockDocs: DocumentRecord[] = [
-        {
-          id: 'doc-1',
-          doc_type: 'photo',
-          doc_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300',
-          file_name: 'khushal_photo.jpg',
-          file_size_kb: 45,
-          is_verified: false,
-          rejection_reason: null,
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'doc-3',
-          doc_type: 'marksheet_10th',
-          doc_url: 'https://supabase.co/storage/v1/object/public/documents/marksheet10.pdf',
-          file_name: 'marksheet_10th_original.pdf',
-          file_size_kb: 1024,
-          is_verified: false,
-          rejection_reason: null,
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'doc-4',
-          doc_type: 'marksheet_12th',
-          doc_url: 'https://supabase.co/storage/v1/object/public/documents/marksheet12.pdf',
-          file_name: 'marksheet_12th_board.pdf',
-          file_size_kb: 1120,
-          is_verified: false,
-          rejection_reason: null,
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      ];
+      const mockDocs: DocumentRecord[] = [];
 
       setApplicant(mockApplicant);
       setDocuments(mockDocs);
@@ -164,9 +133,7 @@ function VerificationDeskContent() {
       }
     } catch {
       // Mock search results
-      setSearchResults([
-        { id: 'mock-id-1', first_name: 'Khushal', last_name: 'Gehlot', application_number: 'SIET-2026-884920', status: 'submitted' }
-      ]);
+      setSearchResults([]);
     } finally {
       setSearchLoading(false);
     }

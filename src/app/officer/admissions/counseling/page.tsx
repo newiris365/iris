@@ -67,10 +67,7 @@ export default function OfficerCounselingPage() {
       }
     } catch {
       // Mock data fallbacks
-      const mockApplicants = [
-        { id: 'b0000000-0000-0000-0000-000000009999', first_name: 'Khushal', last_name: 'Gehlot', application_number: 'SIET-2026-884920', status: 'offered' },
-        { id: 'b0000000-0000-0000-0000-000000009991', first_name: 'Priyanka', last_name: 'Sharma', application_number: 'SIET-2026-112930', status: 'merit_listed' }
-      ];
+      const mockApplicants = [];
       setApplicants(mockApplicants);
       setAssignApplicantId(mockApplicants[0].id);
 
@@ -80,21 +77,7 @@ export default function OfficerCounselingPage() {
       setSessions(mockSessions);
       setSelectedSessionId(mockSessions[0].id);
 
-      const mockSlots: SlotRecord[] = [
-        {
-          id: 'slot-1',
-          applicant_id: 'b0000000-0000-0000-0000-000000009999',
-          slot_time: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'assigned',
-          attended: false,
-          applicant: {
-            first_name: 'Khushal',
-            last_name: 'Gehlot',
-            application_number: 'SIET-2026-884920',
-            status: 'offered'
-          }
-        }
-      ];
+      const mockSlots: SlotRecord[] = [];
       setSlots(mockSlots);
     }
   }

@@ -49,46 +49,7 @@ export default function TpoStudentsRoster() {
 
     // seed mock lists if empty
     if (students.length === 0) {
-      setStudents([
-        {
-          id: 'stud-1',
-          first_name: 'Khushal',
-          last_name: 'Sharma',
-          roll_number: '22ETCS022',
-          branch: 'CSE',
-          student_profiles: {
-            cgpa: 8.9,
-            is_placed: true,
-            placed_role: 'Software Engineer (L3)',
-            placed_ctc: 32.5,
-            companies: {
-              name: 'Google India'
-            }
-          }
-        },
-        {
-          id: 'stud-2',
-          first_name: 'Vikas',
-          last_name: 'Choudhary',
-          roll_number: '22ETAI085',
-          branch: 'AIDS',
-          student_profiles: {
-            cgpa: 7.8,
-            is_placed: false
-          }
-        },
-        {
-          id: 'stud-3',
-          first_name: 'Neha',
-          last_name: 'Sen',
-          roll_number: '22ETEC052',
-          branch: 'ECE',
-          student_profiles: {
-            cgpa: 7.45,
-            is_placed: false
-          }
-        }
-      ]);
+      setStudents([]);
     }
     setLoading(false);
   };

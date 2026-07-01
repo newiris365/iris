@@ -26,11 +26,7 @@ export default function IqacDocumentsVault() {
     setLoading(true);
     try {
       // Mock documents database matching the user uploads
-      setDocuments([
-        { id: 'd-1', criterion: 'Criterion 1', document_name: 'Academic_Council_Revision_2026.pdf', document_url: '#', academic_year: '2026-27', uploaded_by: 'IQAC Admin', created_at: '2026-06-10T12:00:00Z' },
-        { id: 'd-2', criterion: 'Criterion 2', document_name: 'Admissions_Registration_Ratios.pdf', document_url: '#', academic_year: '2026-27', uploaded_by: 'Dr. Amit Mehta', created_at: '2026-06-11T08:00:00Z' },
-        { id: 'd-3', criterion: 'Criterion 3', document_name: 'Scopus_Indexed_Publications_List.pdf', document_url: '#', academic_year: '2026-27', uploaded_by: 'Prof. Satish Kumar', created_at: '2026-06-11T10:30:00Z' }
-      ]);
+      setDocuments([]);
     } catch (err) {
       console.error(err);
     } finally {

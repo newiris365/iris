@@ -41,7 +41,7 @@ const getMockProfile = (email: string, role: string) => {
     case 'Student':
       return {
         id: 'b0000000-0000-0000-0000-000000000006',
-        student_id: 'c0000000-0000-0000-0000-000000000006',
+        student_id: '',
         room_id: 'e4000000-0000-0000-0000-000000000001',
         name: 'Priyansh Student',
         email: email,
@@ -86,7 +86,7 @@ const getMockProfile = (email: string, role: string) => {
       };
     case 'Driver':
       return {
-        id: 'b0000000-0000-0000-0000-000000000013',
+        id: '',
         name: 'Priyansh Driver',
         email: email,
         role: 'Driver',
@@ -119,7 +119,7 @@ const getMockProfile = (email: string, role: string) => {
       };
     case 'Vendor':
       return {
-        id: 'b0000000-0000-0000-0000-000000000014',
+        id: '',
         name: 'Canteen Vendor',
         email: email,
         role: 'Vendor',
@@ -440,15 +440,7 @@ export default function LoginPage() {
 
       if (!isProduction) {
         // Automatic client-side bypass for sandbox testing profiles on connection failure (local dev only)
-        const sandboxEmails = [
-          'siddharth@sin.education',
-          'director@siet.edu.in',
-          'khushalkhatri0019@gmail.com',
-          'raipriyansh45@gmail.com',
-          'priyansh.24jics153@jietjodhpur.ac.in',
-          'pariharnakshtra21@gmail.com',
-          'raip32380@gmail.com'
-        ];
+        const sandboxEmails = [];
         if (sandboxEmails.includes(data.email)) {
           let role = 'Student';
           if (data.email === 'siddharth@sin.education') role = 'SuperAdmin';

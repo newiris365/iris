@@ -91,7 +91,7 @@ export function MobileStudentScannerScreen() {
  */
 export function MobileParentDashboardScreen() {
   const [stats] = useState({
-    name: 'Khushal Gehlot',
+    name: '',
     roll: 'CS23B1024',
     overallAttendance: 84,
     healthScore: 84,
@@ -1620,9 +1620,7 @@ export function MobileLibraryGoalsScreen() {
 export function MobileLibraryBookClubsScreen() {
   const [selectedClub, setSelectedClub] = useState('c1');
   const [replyText, setReplyText] = useState('');
-  const [responses, setResponses] = useState([
-    { name: 'Khushal Patel', text: 'Asymptotic analysis is critical for evaluating memory scalability.', date: 'Jun 09' }
-  ]);
+  const [responses, setResponses] = useState([]);
 
   const clubs = [
     { id: 'c1', name: 'Algorithms & Computing club', schedule: 'Fri 4 PM' },
@@ -2200,12 +2198,7 @@ export function MobileDirectorJourneyScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'disengaged' | 'ambassadors'>('all');
   
-  const [students, setStudents] = useState([
-    { id: '1', name: 'Rohan Sharma', roll: 'CS23B1042', dept: 'CSE', score: 92, intervention: 'none' },
-    { id: '2', name: 'Khushal Gehlot', roll: 'CS23B1024', dept: 'CSE', score: 95, intervention: 'none' },
-    { id: '3', name: 'Vikram Aditya', roll: 'EC23B1015', dept: 'ECE', score: 24, intervention: 'none' },
-    { id: '4', name: 'Sanjay Meena', roll: 'ME23B1089', dept: 'ME', score: 28, intervention: 'pending' }
-  ]);
+  const [students, setStudents] = useState([]);
 
   const handleIntervention = (id: string) => {
     setStudents(prev => prev.map(s => {

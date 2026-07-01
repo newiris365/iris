@@ -31,7 +31,7 @@ export default function ParentTransitSosPage() {
 
     try {
       const res = await apiPost('/transit/sos/trigger', {
-        student_id: 'c0000000-0000-0000-0000-000000000006', // Default student
+        student_id: '', // Default student
         bus_id: '70000000-0000-0000-0000-000000000001',     // Default Bus 1
         alert_type: 'parent'
       });

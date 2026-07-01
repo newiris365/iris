@@ -31,15 +31,7 @@ export default function PublicMeritListsPage() {
   };
 
   // Mock list entries
-  const entries = [
-    { rank: 1, appNo: 'SIET-2026-489274', name: 'Aditya Sharma', score: 95.8, category: 'General', status: 'offered' },
-    { rank: 2, appNo: 'SIET-2026-728491', name: 'Pooja Verma', score: 92.4, category: 'OBC', status: 'offered' },
-    { rank: 3, appNo: 'SIET-2026-928410', name: 'Rahul Singh', score: 89.5, category: 'General', status: 'offered' },
-    { rank: 4, appNo: 'SIET-2026-348921', name: 'Preeti Sharma', score: 87.2, category: 'EWS', status: 'listed' },
-    { rank: 5, appNo: 'SIET-2026-894723', name: 'Khushal Student', score: 84.5, category: 'General', status: 'listed' },
-    { rank: 6, appNo: 'SIET-2026-118492', name: 'Ankita Meena', score: 76.8, category: 'ST', status: 'listed' },
-    { rank: 7, appNo: 'SIET-2026-302849', name: 'Sanjay Kumar', score: 72.4, category: 'SC', status: 'listed' }
-  ];
+  const entries = [];
 
   const currentCutoffs = cutoffs[selectedProgramId] || {};
   const currentProgram = programs.find(p => p.id === selectedProgramId);

@@ -1471,7 +1471,7 @@ export async function respondToMuster(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Muster ID is required.' });
     }
 
-    const targetStudentId = student_id || (req.user as any)?.student_id || 'c0000000-0000-0000-0000-000000000006';
+    const targetStudentId = student_id || (req.user as any)?.student_id || '';
 
     const { data, error } = await supabaseAdmin
       .from('muster_responses')

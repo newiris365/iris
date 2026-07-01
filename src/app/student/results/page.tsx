@@ -10,9 +10,9 @@ export default function StudentResultsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Sandbox student profile ID and exam ID
-    apiGet('/core/exams/marksheet/b0000000-0000-0000-0000-000000000006/a0000000-0000-0000-0000-000000000001').then(res => {
-      if (res.success) {
+    const studentId = '';
+    (studentId ? apiGet(`/core/exams/marksheet/${studentId}/a0000000-0000-0000-0000-000000000001`) : Promise.resolve({} as any)).then(res => {
+      if (res?.success) {
         setResults(res.results || []);
         if (res.results?.length > 0) {
           setActiveExam(res.results[0].exams);

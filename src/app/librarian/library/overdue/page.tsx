@@ -22,32 +22,7 @@ export default function LibrarianOverduePage() {
       }
     } catch {
       // Mock Fallbacks
-      setOverdues([
-        {
-          id: 'i1',
-          issue_date: '2026-05-15',
-          due_date: '2026-05-29',
-          fine_amount: 120,
-          books: { title: 'Introduction to Algorithms', isbn: '978-0262033848' },
-          students: {
-            name: 'Priyansh Mehta',
-            roll_number: 'CS23B1042',
-            guardian_phone: '+91 98765 43210'
-          }
-        },
-        {
-          id: 'i2',
-          issue_date: '2026-05-20',
-          due_date: '2026-06-03',
-          fine_amount: 70,
-          books: { title: 'Design Patterns', isbn: '978-0201633610' },
-          students: {
-            name: 'Rohit Sharma',
-            roll_number: 'EC23B2051',
-            guardian_phone: '+91 91111 22222'
-          }
-        }
-      ]);
+      setOverdues([]);
     } finally {
       setLoading(false);
     }

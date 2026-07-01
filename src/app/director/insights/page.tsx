@@ -86,39 +86,9 @@ export default function DirectorAIInsightsPage() {
         }
       ]);
 
-      setDropoutStudents([
-        {
-          id: 's1',
-          name: 'Khushal Gehlot',
-          risk_score: 74,
-          reason: 'Declining attendance (67% over 30 days) and outstanding library checkouts.',
-          recommendation: 'Schedule parent counselor session.'
-        },
-        {
-          id: 's2',
-          name: 'Vikram Sharma',
-          risk_score: 58,
-          reason: 'Missed two terminal lab reviews, attendance is sitting exactly at 71%.',
-          recommendation: 'Assign peer academic tutor and alert mentor.'
-        }
-      ]);
+      setDropoutStudents([]);
 
-      setFeeDefaulters([
-        {
-          id: 'f1',
-          name: 'Rohan Sharma',
-          default_likelihood: 'High',
-          overdue_amount: 12000,
-          days_overdue: 15
-        },
-        {
-          id: 'f2',
-          name: 'Amit Gehlot',
-          default_likelihood: 'Medium',
-          overdue_amount: 8500,
-          days_overdue: 8
-        }
-      ]);
+      setFeeDefaulters([]);
     } finally {
       setLoading(false);
     }

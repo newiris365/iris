@@ -43,13 +43,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
         cover_image_url: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300',
         description: 'Introduction to Algorithms uniquely combines rigor and comprehensiveness. The book covers a broad range of algorithms in depth, yet makes their design and analysis accessible to all levels of readers.'
       });
-      setActiveIssues([
-        {
-          id: 'i1',
-          due_date: '2026-06-15',
-          students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042' }
-        }
-      ]);
+      setActiveIssues([]);
     } finally {
       setLoading(false);
     }
@@ -62,7 +56,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const res = await apiPost('/library/reservations', {
         book_id: book.id,

@@ -36,34 +36,7 @@ export default function WardenLeaveRequestsPage() {
     } catch (err: any) {
       console.error('Failed to load leave requests:', err);
       // Fallback to mock data
-      setLeaves([
-        {
-          id: 'mock-l1',
-          student_id: 'c0000000-0000-0000-0000-000000000006',
-          leave_from: '2026-06-25',
-          leave_to: '2026-06-28',
-          reason: 'Medical checkup and follow-up treatment at AIIMS hospital. Doctor has recommended rest.',
-          destination: 'New Delhi, AIIMS Hospital',
-          parent_consent: true,
-          status: 'pending',
-          approval_notes: null,
-          created_at: new Date().toISOString(),
-          students: { name: 'Khushal Gehlot', roll_number: '23CSE051' }
-        },
-        {
-          id: 'mock-l2',
-          student_id: 'c0000000-0000-0000-0000-000000000007',
-          leave_from: '2026-06-22',
-          leave_to: '2026-06-24',
-          reason: "Sister's wedding ceremony at home.",
-          destination: 'Jodhpur, Rajasthan',
-          parent_consent: true,
-          status: 'approved',
-          approval_notes: 'Approved. Please return by 10 PM on 24th.',
-          created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-          students: { name: 'Aarav Mehta', roll_number: '23CSE052' }
-        }
-      ]);
+      setLeaves([]);
     } finally {
       setLoading(false);
     }

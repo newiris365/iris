@@ -45,48 +45,7 @@ export default function DocumentCenterPage() {
       }
     } catch {
       // Offline fallback mock data
-      const mockDocs: DocumentRecord[] = [
-        {
-          id: 'doc-1',
-          doc_type: 'photo',
-          doc_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150',
-          file_name: 'khushal_photo.jpg',
-          file_size_kb: 45,
-          is_verified: true,
-          rejection_reason: null,
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'doc-2',
-          doc_type: 'signature',
-          doc_url: 'https://supabase.co/storage/v1/object/public/documents/signature.png',
-          file_name: 'signature_copy.png',
-          file_size_kb: 22,
-          is_verified: true,
-          rejection_reason: null,
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'doc-3',
-          doc_type: 'marksheet_10th',
-          doc_url: 'https://supabase.co/storage/v1/object/public/documents/marksheet10.pdf',
-          file_name: 'marksheet_10th_original.pdf',
-          file_size_kb: 1024,
-          is_verified: true,
-          rejection_reason: null,
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'doc-4',
-          doc_type: 'marksheet_12th',
-          doc_url: 'https://supabase.co/storage/v1/object/public/documents/marksheet12.pdf',
-          file_name: 'marksheet_12th_board.pdf',
-          file_size_kb: 1120,
-          is_verified: false,
-          rejection_reason: 'Scan is blurred. The marks percentage in the Chemistry column is unreadable. Please upload a clear high-resolution scan.',
-          uploaded_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      ];
+      const mockDocs: DocumentRecord[] = [];
       setDocuments(mockDocs);
     } finally {
       setLoading(false);

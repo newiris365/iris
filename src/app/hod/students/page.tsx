@@ -16,20 +16,7 @@ interface Student {
   status: 'active' | 'inactive';
 }
 
-const mockStudents: Student[] = [
-  { id: 1, name: 'Aarav Mehta', rollNumber: 'CS2022001', email: 'aarav.mehta@university.edu', phone: '+91 9876543210', semester: 5, batch: '2022', attendance: 92, cgpa: 8.5, status: 'active' },
-  { id: 2, name: 'Priya Sharma', rollNumber: 'CS2022002', email: 'priya.sharma@university.edu', phone: '+91 9876543211', semester: 5, batch: '2022', attendance: 78, cgpa: 7.2, status: 'active' },
-  { id: 3, name: 'Rohan Patel', rollNumber: 'CS2022003', email: 'rohan.patel@university.edu', phone: '+91 9876543212', semester: 5, batch: '2022', attendance: 45, cgpa: 5.1, status: 'active' },
-  { id: 4, name: 'Ananya Gupta', rollNumber: 'CS2023001', email: 'ananya.gupta@university.edu', phone: '+91 9876543213', semester: 3, batch: '2023', attendance: 95, cgpa: 9.1, status: 'active' },
-  { id: 5, name: 'Vikram Singh', rollNumber: 'CS2023002', email: 'vikram.singh@university.edu', phone: '+91 9876543214', semester: 3, batch: '2023', attendance: 68, cgpa: 6.8, status: 'active' },
-  { id: 6, name: 'Nisha Reddy', rollNumber: 'CS2021001', email: 'nisha.reddy@university.edu', phone: '+91 9876543215', semester: 7, batch: '2021', attendance: 88, cgpa: 8.9, status: 'active' },
-  { id: 7, name: 'Karthik Nair', rollNumber: 'CS2021002', email: 'karthik.nair@university.edu', phone: '+91 9876543216', semester: 7, batch: '2021', attendance: 42, cgpa: 4.8, status: 'inactive' },
-  { id: 8, name: 'Deepa Iyer', rollNumber: 'CS2024001', email: 'deepa.iyer@university.edu', phone: '+91 9876543217', semester: 1, batch: '2024', attendance: 97, cgpa: 9.4, status: 'active' },
-  { id: 9, name: 'Rahul Verma', rollNumber: 'CS2022004', email: 'rahul.verma@university.edu', phone: '+91 9876543218', semester: 5, batch: '2022', attendance: 55, cgpa: 5.9, status: 'active' },
-  { id: 10, name: 'Sneha Joshi', rollNumber: 'CS2023003', email: 'sneha.joshi@university.edu', phone: '+91 9876543219', semester: 3, batch: '2023', attendance: 82, cgpa: 7.8, status: 'active' },
-  { id: 11, name: 'Arjun Das', rollNumber: 'CS2021003', email: 'arjun.das@university.edu', phone: '+91 9876543220', semester: 7, batch: '2021', attendance: 38, cgpa: 4.2, status: 'inactive' },
-  { id: 12, name: 'Meera Pillai', rollNumber: 'CS2024002', email: 'meera.pillai@university.edu', phone: '+91 9876543221', semester: 1, batch: '2024', attendance: 91, cgpa: 8.7, status: 'active' },
-];
+
 
 const HODStudentsPage = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -57,9 +44,9 @@ const HODStudentsPage = () => {
         : Array.isArray(data?.data) ? data.data
         : Array.isArray(data?.students) ? data.students
         : null;
-      setStudents(list ?? mockStudents);
+      setStudents(list ?? []);
     } catch {
-      setStudents(mockStudents);
+      setStudents([]);
     } finally {
       setLoading(false);
     }

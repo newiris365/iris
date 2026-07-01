@@ -29,26 +29,7 @@ export default function TrainerSessionsQueue() {
       }
     } catch (err) {
       console.log('Error loading sessions, using mock fallbacks');
-      setSessions([
-        {
-          id: 'ts1',
-          scheduled_at: '2026-06-10T09:00:00Z',
-          duration_minutes: 60,
-          session_type: 'personal_training',
-          status: 'scheduled',
-          notes: 'Goal: Focus on bench press form',
-          students: { name: 'Khushal Patel', roll_number: 'CS22B005', department: 'Computer Science' }
-        },
-        {
-          id: 'ts2',
-          scheduled_at: '2026-06-08T10:00:00Z',
-          duration_minutes: 45,
-          session_type: 'assessment',
-          status: 'completed',
-          notes: 'Completed initial BMI assessment',
-          students: { name: 'Aarav Mehta', roll_number: 'ME23B012', department: 'Mechanical Engineering' }
-        }
-      ]);
+      setSessions([]);
     } finally {
       setLoading(false);
     }

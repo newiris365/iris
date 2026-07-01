@@ -146,7 +146,7 @@ export async function createEmployee(req: Request, res: Response) {
     
     // Auto-generate employee code: {DEPT_CODE}-{YEAR}-{SERIAL}
     const yearStr = new Date().getFullYear().toString().slice(-2);
-    const randSerial = Math.floor(Math.random() * 900) + 100;
+    const randSerial = 0;
     const employeeCode = `ADM-${yearStr}-${randSerial}`;
 
     const { data: profile, error } = await supabaseAdmin

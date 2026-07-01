@@ -41,10 +41,7 @@ export default function AdminCheckinScannerPage() {
         title: 'TechFest 2026 — AI & Robotics Summit',
         max_participants: 500
       });
-      setRegistrations([
-        { id: '1', ticket_number: 'EVT-A3F9K2L1', attendance_marked: true, students: { name: 'Aarav Sharma', roll_number: 'CS23B1001' } },
-        { id: '2', ticket_number: 'EVT-Z8X4P5W0', attendance_marked: false, students: { name: 'Diya Patel', roll_number: 'EC23B2014' } }
-      ]);
+      setRegistrations([]);
     } finally {
       setLoading(false);
     }

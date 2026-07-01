@@ -19,7 +19,7 @@ export default function AdminFeesPage() {
   });
 
   const [concessionData, setConcessionData] = useState({
-    student_id: 'b0000000-0000-0000-0000-000000000006', // Khushal
+    student_id: '',
     fee_structure_id: '',
     concession_type: 'Scholarship',
     amount: '',

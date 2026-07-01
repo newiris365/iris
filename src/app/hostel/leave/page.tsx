@@ -37,7 +37,7 @@ export default function StudentLeavePage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 'c0000000-0000-0000-0000-000000000006';
+      const studentId = user?.student_id || '';
 
       const res = await apiGet(`/hostel/leaves/student/${studentId}`);
       if (res.success) {
@@ -96,7 +96,7 @@ export default function StudentLeavePage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 'c0000000-0000-0000-0000-000000000006';
+      const studentId = user?.student_id || '';
 
       const payload = {
         student_id: studentId,

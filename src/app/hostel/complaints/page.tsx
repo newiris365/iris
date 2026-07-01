@@ -18,7 +18,7 @@ export default function StudentComplaintsPage() {
   const loadComplaints = async () => {
     try {
       // Force demo student ID so the seeded data always shows up for testing
-      const studentId = 'c0000000-0000-0000-0000-000000000006';
+      const studentId = '';
 
       const res = await apiGet(`/hostel/complaints?studentId=${studentId}&t=${Date.now()}`);
       if (res.success) {

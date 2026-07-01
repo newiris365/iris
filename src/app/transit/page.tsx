@@ -599,7 +599,7 @@ export default function StudentTransitPage() {
                       </div>
                       <div className="text-xs">
                         <p className="text-[10px] text-[#C4B5FD]/40 uppercase tracking-wider font-bold">Driver</p>
-                        <h4 className="font-bold text-white mt-0.5">{bus.users?.name || 'Rajesh Kumar'}</h4>
+                        <h4 className="font-bold text-white mt-0.5">{bus.users?.name || ''}</h4>
                         <p className="text-[10px] text-[#C4B5FD]/50 mt-0.5">{bus.users?.phone || '+91 98290 12347'}</p>
                       </div>
                     </div>

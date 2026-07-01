@@ -112,10 +112,7 @@ export default function AdminFleetDashboard() {
 
     } catch {
       // Mock Fallbacks
-      setBuses([
-        { id: '70000000-0000-0000-0000-000000000001', vehicle_number: 'RJ-19-PB-4050', model: 'Tata Starbus 40-Seater', capacity: 40, bus_routes: { name: 'Jodhpur Central Route' }, users: { name: 'Rajesh Kumar' } },
-        { id: '70000000-0000-0000-0000-000000000002', vehicle_number: 'RJ-19-PB-8820', model: 'Tata Starbus 50-Seater', capacity: 50, bus_routes: { name: 'Mandore Outskirts Route' }, users: { name: 'Vikram Singh' } }
-      ]);
+      setBuses([]);
       setPositions([
         { bus_id: '70000000-0000-0000-0000-000000000001', vehicle_number: 'RJ-19-PB-4050', latitude: 26.2912, longitude: 73.0156, speed: 38 }
       ]);

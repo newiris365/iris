@@ -59,10 +59,7 @@ export default function OfficerMeritPage() {
       }
     } catch {
       // Mock list
-      const mockList = [
-        { id: 'b0000000-0000-0000-0000-000000009999', first_name: 'Khushal', last_name: 'Gehlot', status: 'submitted' },
-        { id: 'b0000000-0000-0000-0000-000000009991', first_name: 'Priyanka', last_name: 'Sharma', status: 'verified' }
-      ];
+      const mockList = [];
       setApplicantsList(mockList);
       setAiApplicantId(mockList[0].id);
     }
@@ -103,11 +100,7 @@ export default function OfficerMeritPage() {
       // Simulated calculations
       setTimeout(() => {
         setSuccess('Calculated scores locally under simulation bypass.');
-        setRankings([
-          { id: '1', first_name: 'Priyanka', last_name: 'Sharma', category: 'General', merit_score: 95.6, rank_overall: 1 },
-          { id: '2', first_name: 'Khushal', last_name: 'Gehlot', category: 'General', merit_score: 92.1, rank_overall: 2 },
-          { id: '3', first_name: 'Amit', last_name: 'Jangid', category: 'OBC', merit_score: 82.3, rank_overall: 3 }
-        ]);
+        setRankings([]);
         setLoading(false);
       }, 1500);
     }

@@ -59,28 +59,7 @@ const mockPlacementStats: PlacementStats = {
   placementRate: 78,
 };
 
-const mockStudents: StudentPlacement[] = [
-  { id: '1', name: 'Aarav Mehta', rollNumber: 'CS21001', branch: 'Computer Science', status: 'placed', company: 'TCS', package: 720000, role: 'Software Engineer', offerDate: '2026-01-15' },
-  { id: '2', name: 'Vidya Iyer', rollNumber: 'CS21002', branch: 'Computer Science', status: 'placed', company: 'Infosys', package: 650000, role: 'Systems Analyst', offerDate: '2026-01-20' },
-  { id: '3', name: 'Rohan Gupta', rollNumber: 'EC21001', branch: 'Electronics', status: 'placed', company: 'Wipro', package: 600000, role: 'Embedded Developer', offerDate: '2026-02-05' },
-  { id: '4', name: 'Sneha Reddy', rollNumber: 'CS21003', branch: 'Computer Science', status: 'placed', company: 'Google', package: 2400000, role: 'SDE-II', offerDate: '2026-02-12' },
-  { id: '5', name: 'Karthik Nair', rollNumber: 'ME21001', branch: 'Mechanical', status: 'unplaced', company: undefined, role: undefined },
-  { id: '6', name: 'Priya Das', rollNumber: 'CS21004', branch: 'Computer Science', status: 'placed', company: 'Amazon', package: 1800000, role: 'Applied Scientist', offerDate: '2026-02-18' },
-  { id: '7', name: 'Arjun Patel', rollNumber: 'EC21002', branch: 'Electronics', status: 'pending', company: 'Samsung', role: 'Hardware Engineer' },
-  { id: '8', name: 'Divya Sharma', rollNumber: 'CE21001', branch: 'Civil', status: 'unplaced' },
-  { id: '9', name: 'Nikhil Bose', rollNumber: 'CS21005', branch: 'Computer Science', status: 'placed', company: 'Microsoft', package: 2100000, role: 'SDE-I', offerDate: '2026-03-01' },
-  { id: '10', name: 'Ananya Joshi', rollNumber: 'CH21001', branch: 'Chemical', status: 'placed', company: 'Reliance', package: 550000, role: 'Process Engineer', offerDate: '2026-03-05' },
-  { id: '11', name: 'Tarun Verma', rollNumber: 'ME21002', branch: 'Mechanical', status: 'placed', company: 'Tata Motors', package: 580000, role: 'Design Engineer', offerDate: '2026-03-10' },
-  { id: '12', name: 'Meera Singh', rollNumber: 'EC21003', branch: 'Electronics', status: 'unplaced' },
-  { id: '13', name: 'Aditya Kulkarni', rollNumber: 'CS21006', branch: 'Computer Science', status: 'placed', company: 'TCS', package: 720000, role: 'Developer', offerDate: '2026-03-12' },
-  { id: '14', name: 'Lakshmi Rao', rollNumber: 'CE21002', branch: 'Civil', status: 'pending', company: 'L&T', role: 'Site Engineer' },
-  { id: '15', name: 'Rahul Mishra', rollNumber: 'CH21002', branch: 'Chemical', status: 'placed', company: 'Infosys', package: 650000, role: 'Consultant', offerDate: '2026-03-15' },
-  { id: '16', name: 'Neha Kapoor', rollNumber: 'CS21007', branch: 'Computer Science', status: 'placed', company: 'Wipro', package: 600000, role: 'Full Stack Dev', offerDate: '2026-03-18' },
-  { id: '17', name: 'Siddharth Jain', rollNumber: 'ME21003', branch: 'Mechanical', status: 'pending', company: 'Mahindra', role: 'CAD Engineer' },
-  { id: '18', name: 'Pooja Menon', rollNumber: 'EC21004', branch: 'Electronics', status: 'placed', company: 'Samsung', package: 800000, role: 'VLSI Engineer', offerDate: '2026-03-22' },
-  { id: '19', name: 'Varun Agarwal', rollNumber: 'CS21008', branch: 'Computer Science', status: 'unplaced' },
-  { id: '20', name: 'Ishita Banerjee', rollNumber: 'CE21003', branch: 'Civil', status: 'placed', company: 'L&T', package: 500000, role: 'Project Engineer', offerDate: '2026-03-25' },
-];
+const mockStudents: StudentPlacement[] = [];
 
 const mockCompanyOffers: CompanyOffer[] = [
   { company: 'TCS', totalOffers: 65, avgPackage: 720000, highestPackage: 850000, roles: ['Software Engineer', 'Developer', 'Consultant'], branches: ['Computer Science', 'Electronics', 'Chemical'] },

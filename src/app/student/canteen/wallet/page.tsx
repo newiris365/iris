@@ -48,7 +48,7 @@ export default function StudentWalletPage() {
   }, []);
 
   const loadWallet = async () => {
-    let studentId = 'c0000000-0000-0000-0000-000000000006';
+    let studentId = '';
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('iris_user_profile');
       if (userStr) {
@@ -70,7 +70,7 @@ export default function StudentWalletPage() {
     const amount = customAmount ? Number(customAmount) : topupAmount;
     if (!amount || amount <= 0) return;
 
-    let studentId = 'c0000000-0000-0000-0000-000000000006';
+    let studentId = '';
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('iris_user_profile');
       if (userStr) {

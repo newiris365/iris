@@ -29,7 +29,7 @@ export default function StudentGymMembership() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       // Fetch plans
       const planRes = await apiGet('/fitzone/gym/membership-plans');
@@ -65,7 +65,7 @@ export default function StudentGymMembership() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       // Initiate order on backend
       const initRes = await apiPost('/fitzone/gym/memberships/purchase/initiate', {
@@ -92,7 +92,7 @@ export default function StudentGymMembership() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const verifyRes = await apiPost('/fitzone/gym/memberships/purchase/verify', {
         student_id: studentId,

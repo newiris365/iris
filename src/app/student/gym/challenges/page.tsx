@@ -65,7 +65,7 @@ export default function StudentChallengesPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       // 1. Fetch Challenges
       const chalRes = await apiGet('/fitzone/gym/challenges');
@@ -118,7 +118,7 @@ export default function StudentChallengesPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const res = await apiPost(`/fitzone/gym/challenges/${challengeId}/join`, {
         student_id: studentId
@@ -152,7 +152,7 @@ export default function StudentChallengesPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const res = await apiPost(`/fitzone/gym/challenges/${challengeId}/log`, {
         student_id: studentId,
@@ -340,7 +340,7 @@ export default function StudentChallengesPage() {
               {challenges.map(c => {
                 const leaderboard = challengeLeaderboards[c.id] || [
                   { students: { name: 'Alok Kumar', roll_number: 'EE23B2014' }, current_value: 38000 },
-                  { students: { name: 'Khushal Gehlot', roll_number: 'CS23B1024' }, current_value: 12000 }
+                  { students: { name: '', roll_number: 'CS23B1024' }, current_value: 12000 }
                 ];
                 return (
                   <div key={c.id} className="glass-panel border border-white/5 p-5 rounded-2xl space-y-3 bg-[#13102A]/20">

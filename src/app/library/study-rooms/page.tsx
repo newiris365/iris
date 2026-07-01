@@ -41,7 +41,7 @@ export default function StudyRoomsBookingPage() {
         // Filter student's own bookings for previewing
         const userStr = localStorage.getItem('iris_user_profile');
         const user = userStr ? JSON.parse(userStr) : null;
-        const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+        const studentId = user?.student_id || user?.id || '';
 
         const myBks = (res.bookings || []).filter((b: any) => b.student_id === studentId);
         setMyBookings(myBks);
@@ -99,7 +99,7 @@ export default function StudyRoomsBookingPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const payload = {
         room_id: selectedRoom.id,

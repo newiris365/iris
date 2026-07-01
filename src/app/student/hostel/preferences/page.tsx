@@ -56,32 +56,7 @@ export default function StudentHostelPreferences() {
         cleanliness: 5,
         noise_tolerance: 1
       });
-      setMatches([
-        {
-          student_id: 's1',
-          name: 'Aditya Vardhan',
-          roll_number: 'CS-2024-042',
-          gender: 'male',
-          compatibility_score: 93.75,
-          preferences: { sleep_schedule: 2, study_habits: 3, cleanliness: 5, noise_tolerance: 2 }
-        },
-        {
-          student_id: 's2',
-          name: 'Rohan Sharma',
-          roll_number: 'EC-2024-098',
-          gender: 'male',
-          compatibility_score: 87.50,
-          preferences: { sleep_schedule: 3, study_habits: 4, cleanliness: 4, noise_tolerance: 1 }
-        },
-        {
-          student_id: 's3',
-          name: 'Kabir Mehta',
-          roll_number: 'ME-2024-012',
-          gender: 'male',
-          compatibility_score: 81.25,
-          preferences: { sleep_schedule: 1, study_habits: 5, cleanliness: 4, noise_tolerance: 2 }
-        }
-      ]);
+      setMatches([]);
     } finally {
       setLoading(false);
     }

@@ -72,13 +72,7 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
       setSelectedTool(demoTools[0].id);
 
       // Mock Students
-      const demoStudents: StudentRow[] = [
-        { student_id: 's-1', roll_no: '22CSE01', name: 'Amit Sharma', marks_obtained: { 'co-1': 8, 'co-2': 9, 'co-3': 7, 'co-4': 6 } },
-        { student_id: 's-2', roll_no: '22CSE02', name: 'Priya Patel', marks_obtained: { 'co-1': 9, 'co-2': 10, 'co-3': 8, 'co-4': 9 } },
-        { student_id: 's-3', roll_no: '22CSE03', name: 'Rahul Verma', marks_obtained: { 'co-1': 6, 'co-2': 5, 'co-3': 7, 'co-4': 4 } },
-        { student_id: 's-4', roll_no: '22CSE04', name: 'Anjali Gupta', marks_obtained: { 'co-1': 10, 'co-2': 8, 'co-3': 9, 'co-4': 9 } },
-        { student_id: 's-5', roll_no: '22CSE05', name: 'Vikram Singh', marks_obtained: { 'co-1': 5, 'co-2': 6, 'co-3': 4, 'co-4': 5 } }
-      ];
+      const demoStudents: StudentRow[]  = [];
       setStudents(demoStudents);
     } catch (err) {
       console.error(err);
@@ -151,10 +145,10 @@ export default function CIEMarksEntry({ params }: { params: { courseId: string }
           setStudents(prev => prev.map(s => ({
             ...s,
             marks_obtained: {
-              'co-1': Math.floor(Math.random() * 5) + 5,
-              'co-2': Math.floor(Math.random() * 5) + 5,
-              'co-3': Math.floor(Math.random() * 5) + 5,
-              'co-4': Math.floor(Math.random() * 5) + 5
+              'co-1': 0,
+              'co-2': 0,
+              'co-3': 0,
+              'co-4': 0
             }
           })));
           setLoading(false);

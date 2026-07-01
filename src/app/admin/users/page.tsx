@@ -354,13 +354,13 @@ export default function AdminUsersPage() {
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-400">Full Name *</label>
                 <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="Dr. Rajesh Kumar"
+                  placeholder=""
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-400">Email *</label>
                 <input type="email" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
-                  placeholder="rajesh@siet.edu.in"
+                  placeholder=""
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50" />
               </div>
               <div className="grid grid-cols-2 gap-4">

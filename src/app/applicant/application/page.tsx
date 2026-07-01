@@ -68,7 +68,7 @@ export default function ApplicationProfilePage() {
         const mockData: ApplicationData = {
           id: 'b0000000-0000-0000-0000-000000009999',
           application_number: 'SIET-2026-884920',
-          first_name: 'Khushal',
+          first_name: '',
           last_name: 'Gehlot',
           email: 'khushal@gmail.com',
           phone: '+91 98765 43210',

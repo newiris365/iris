@@ -25,13 +25,9 @@ export default function LibrarianReportsPage() {
     } catch {
       // Mock Fallbacks
       if (activeTab === 'borrowings') {
-        setReportData([
-          { id: '1', issue_date: '2026-06-01', due_date: '2026-06-15', status: 'issued', books: { title: 'Introduction to Algorithms' }, students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042' } }
-        ]);
+        setReportData([]);
       } else if (activeTab === 'fines') {
-        setReportData([
-          { id: '1', amount: 50, reason: 'Overdue checkout penalty', status: 'unpaid', students: { name: 'Sneha Reddy', roll_number: 'CS23B1099' } }
-        ]);
+        setReportData([]);
       } else {
         setReportData([
           { id: '1', date: '2026-06-09', start_time: '10:00', end_time: '12:00', status: 'confirmed', study_rooms: { name: 'Albert Einstein Room' } }

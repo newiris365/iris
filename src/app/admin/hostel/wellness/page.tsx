@@ -33,21 +33,9 @@ export default function AdminHostelWellness() {
       }
     } catch (err) {
       console.log('Error loading wellness metrics, using mock data');
-      setTrends([
-        { week: '05-18', average_mood: 3.8 },
-        { week: '05-25', average_mood: 3.5 },
-        { week: '06-01', average_mood: 3.1 }, // Exams approaching
-        { week: '06-08', average_mood: 2.8 }  // Aggregated mood drop!
-      ]);
-      setBlockAverages([
-        { block_name: 'Block A (Aryabhata)', average_mood: 3.4, count: 45 },
-        { block_name: 'Block B (Gargi)', average_mood: 3.1, count: 52 },
-        { block_name: 'Block C (Engineering)', average_mood: 2.7, count: 35 } // Dip below 3.0
-      ]);
-      setAlerts([
-        { type: 'immediate_crisis', student_id: 's10', student_name: 'Khushal Gehlot', roll_number: 'CS-2024-001', mood: 1, notes: 'Feeling extremely overwhelmed and exhausted due to project deadlines. Need guidance.', date: '2026-06-10', timestamp: new Date().toISOString() },
-        { type: 'consecutive_low_mood', student_id: 's12', student_name: 'Aditya Vardhan', roll_number: 'CS-2024-042', mood_history: [2, 1, 2], details: 'Mood ratings <= 2 for last 3 entries. Latest note: Homesick, facing sleep issues.', timestamp: new Date().toISOString() }
-      ]);
+      setTrends([]);
+      setBlockAverages([]);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }

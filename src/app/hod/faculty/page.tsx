@@ -20,128 +20,7 @@ interface Faculty {
   status: string;
 }
 
-const MOCK_FACULTY: Faculty[] = [
-  {
-    id: 'F001',
-    name: 'Dr. Rajesh Kumar',
-    designation: 'Professor',
-    specialization: 'Artificial Intelligence & Machine Learning',
-    email: 'rajesh.kumar@iris.edu',
-    phone: '+91 98765 43210',
-    qualifications: ['Ph.D. Computer Science (IIT Delhi)', 'M.Tech AI (IIT Bombay)'],
-    yearsOfExperience: 18,
-    publicationsCount: 45,
-    currentCourseLoad: 3,
-    studentsHandled: 120,
-    rating: 4.8,
-    status: 'Active',
-  },
-  {
-    id: 'F002',
-    name: 'Dr. Sneha Patel',
-    designation: 'Associate Professor',
-    specialization: 'Data Science & Analytics',
-    email: 'sneha.patel@iris.edu',
-    phone: '+91 98765 43211',
-    qualifications: ['Ph.D. Data Science (NIT Trichy)', 'MCA (BITS Pilani)'],
-    yearsOfExperience: 12,
-    publicationsCount: 28,
-    currentCourseLoad: 4,
-    studentsHandled: 150,
-    rating: 4.6,
-    status: 'Active',
-  },
-  {
-    id: 'F003',
-    name: 'Prof. Amit Sharma',
-    designation: 'Professor',
-    specialization: 'Computer Networks & Security',
-    email: 'amit.sharma@iris.edu',
-    phone: '+91 98765 43212',
-    qualifications: ['Ph.D. Network Security (IISc Bangalore)', 'M.Tech CSE (IIIT Hyderabad)'],
-    yearsOfExperience: 22,
-    publicationsCount: 62,
-    currentCourseLoad: 2,
-    studentsHandled: 80,
-    rating: 4.9,
-    status: 'Active',
-  },
-  {
-    id: 'F004',
-    name: 'Dr. Priya Nair',
-    designation: 'Assistant Professor',
-    specialization: 'Cloud Computing & DevOps',
-    email: 'priya.nair@iris.edu',
-    phone: '+91 98765 43213',
-    qualifications: ['Ph.D. Cloud Architecture (VIT)', 'AWS Solutions Architect Certified'],
-    yearsOfExperience: 7,
-    publicationsCount: 15,
-    currentCourseLoad: 5,
-    studentsHandled: 180,
-    rating: 4.4,
-    status: 'Active',
-  },
-  {
-    id: 'F005',
-    name: 'Dr. Vikram Singh',
-    designation: 'Associate Professor',
-    specialization: 'Software Engineering & Full Stack Development',
-    email: 'vikram.singh@iris.edu',
-    phone: '+91 98765 43214',
-    qualifications: ['Ph.D. Software Engineering (NIT Warangal)', 'M.Tech SE (DTU)'],
-    yearsOfExperience: 14,
-    publicationsCount: 32,
-    currentCourseLoad: 3,
-    studentsHandled: 110,
-    rating: 4.7,
-    status: 'Active',
-  },
-  {
-    id: 'F006',
-    name: 'Ms. Kavitha Reddy',
-    designation: 'Lecturer',
-    specialization: 'Web Technologies & UI/UX Design',
-    email: 'kavitha.reddy@iris.edu',
-    phone: '+91 98765 43215',
-    qualifications: ['M.Tech CSE (Manipal)', 'Google UX Design Certified'],
-    yearsOfExperience: 4,
-    publicationsCount: 8,
-    currentCourseLoad: 5,
-    studentsHandled: 200,
-    rating: 4.3,
-    status: 'Active',
-  },
-  {
-    id: 'F007',
-    name: 'Dr. Arun Mehta',
-    designation: 'Assistant Professor',
-    specialization: 'Internet of Things & Embedded Systems',
-    email: 'arun.mehta@iris.edu',
-    phone: '+91 98765 43216',
-    qualifications: ['Ph.D. IoT (IIT Kanpur)', 'M.Tech Embedded Systems (NIT Calicut)'],
-    yearsOfExperience: 6,
-    publicationsCount: 12,
-    currentCourseLoad: 4,
-    studentsHandled: 140,
-    rating: 4.5,
-    status: 'Active',
-  },
-  {
-    id: 'F008',
-    name: 'Ms. Deepa Iyer',
-    designation: 'Lecturer',
-    specialization: 'Database Management & Big Data',
-    email: 'deepa.iyer@iris.edu',
-    phone: '+91 98765 43217',
-    qualifications: ['M.Tech Data Engineering (SRM)', 'Oracle Certified Professional'],
-    yearsOfExperience: 3,
-    publicationsCount: 5,
-    currentCourseLoad: 6,
-    studentsHandled: 220,
-    rating: 4.2,
-    status: 'On Leave',
-  },
-];
+
 
 const DESIGNATIONS = ['All', 'Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer'];
 
@@ -175,10 +54,10 @@ export default function FacultyManagementPage() {
           }));
           setFaculty(mapped);
         } else {
-          setFaculty(MOCK_FACULTY);
+          setFaculty([]);
         }
       } catch {
-        setFaculty(MOCK_FACULTY);
+        setFaculty([]);
       } finally {
         setLoading(false);
       }

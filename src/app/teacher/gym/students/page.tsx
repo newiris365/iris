@@ -25,10 +25,7 @@ export default function TrainerStudentsList() {
       }
     } catch (err) {
       console.log('Error loading students, using mocks');
-      setStudents([
-        { id: 's0000000-0000-0000-0000-000000000001', name: 'Khushal Patel', roll_number: 'CS22B005', department: 'Computer Science', semester: 6 },
-        { id: 's0000000-0000-0000-0000-000000000002', name: 'Aarav Mehta', roll_number: 'ME23B012', department: 'Mechanical Engineering', semester: 4 }
-      ]);
+      setStudents([]);
     } finally {
       setLoading(false);
     }

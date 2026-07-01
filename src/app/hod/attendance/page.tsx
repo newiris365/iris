@@ -4,29 +4,7 @@ import { Users, TrendingUp, AlertTriangle, Download, Filter, Calendar, ChevronDo
 import { apiGet } from '../../../lib/api';
 import { exportToCSV, exportToPDF } from '../../../lib/exportUtils';
 
-const mockStudents = [
-  { id: 1, name: "Aarav Mehta", rollNo: "CS2024001", subjects: { Mathematics: 92, Physics: 88, Chemistry: 95 }, overall: 91.7 },
-  { id: 2, name: "Priya Sharma", rollNo: "CS2024002", subjects: { Mathematics: 78, Physics: 72, Chemistry: 80 }, overall: 76.7 },
-  { id: 3, name: "Rohan Patel", rollNo: "CS2024003", subjects: { Mathematics: 65, Physics: 60, Chemistry: 68 }, overall: 64.3 },
-  { id: 4, name: "Sneha Gupta", rollNo: "CS2024004", subjects: { Mathematics: 98, Physics: 95, Chemistry: 97 }, overall: 96.7 },
-  { id: 5, name: "Vikram Singh", rollNo: "CS2024005", subjects: { Mathematics: 55, Physics: 50, Chemistry: 58 }, overall: 54.3 },
-  { id: 6, name: "Ananya Reddy", rollNo: "CS2024006", subjects: { Mathematics: 85, Physics: 82, Chemistry: 88 }, overall: 85.0 },
-  { id: 7, name: "Karan Joshi", rollNo: "CS2024007", subjects: { Mathematics: 70, Physics: 68, Chemistry: 72 }, overall: 70.0 },
-  { id: 8, name: "Divya Nair", rollNo: "CS2024008", subjects: { Mathematics: 90, Physics: 87, Chemistry: 91 }, overall: 89.3 },
-  { id: 9, name: "Arjun Verma", rollNo: "CS2024009", subjects: { Mathematics: 45, Physics: 42, Chemistry: 48 }, overall: 45.0 },
-  { id: 10, name: "Neha Kapoor", rollNo: "CS2024010", subjects: { Mathematics: 80, Physics: 76, Chemistry: 82 }, overall: 79.3 },
-];
 
-const mockSubjectStats = [
-  { subject: "Mathematics", average: 75.8, totalClasses: 45, conducted: 42 },
-  { subject: "Physics", average: 72.5, totalClasses: 40, conducted: 38 },
-  { subject: "Chemistry", average: 78.6, totalClasses: 42, conducted: 40 },
-];
-
-const mockTrendData = Array.from({ length: 30 }, (_, i) => ({
-  date: new Date(Date.now() - (29 - i) * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
-  percentage: 65 + Math.floor(Math.random() * 25),
-}));
 
 const getStatus = (pct: number) => {
   if (pct >= 85) return { label: "Good", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" };
@@ -35,9 +13,9 @@ const getStatus = (pct: number) => {
 };
 
 export default function HodAttendancePage() {
-  const [students, setStudents] = useState(mockStudents);
-  const [subjectStats, setSubjectStats] = useState(mockSubjectStats);
-  const [trendData, setTrendData] = useState(mockTrendData);
+  const [students, setStudents] = useState<{id:number;name:string;rollNo:string;subjects:Record<string,number>;overall:number}[]>([]);
+  const [subjectStats, setSubjectStats] = useState<{subject:string;average:number;totalClasses:number;conducted:number}[]>([]);
+  const [trendData, setTrendData] = useState<{date:string;percentage:number}[]>([]);
   const [semester, setSemester] = useState("All");
   const [batch, setBatch] = useState("All");
   const [dateRange, setDateRange] = useState("30d");
@@ -405,7 +383,7 @@ export default function HodAttendancePage() {
       <div className="bg-[#1A1530] border border-[#0891B2]/10 rounded-xl p-5">
         <h2 className="text-lg font-semibold mb-4">Subject-wise Top & Bottom Performers</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.keys(mockStudents[0].subjects).map((subj) => {
+          {students.length > 0 && Object.keys(students[0].subjects || {}).map((subj) => {
             const sorted = [...students].sort((a, b) => b.subjects[subj as keyof typeof b.subjects] - a.subjects[subj as keyof typeof a.subjects]);
             const top = sorted[0];
             const bottom = sorted[sorted.length - 1];

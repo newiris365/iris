@@ -101,17 +101,9 @@ export default function ManageEventPage() {
       registration_deadline: '2026-06-19T23:59:59Z'
     });
 
-    setRegistrations([
-      { id: 'r1', ticket_number: 'EVT-A3F9K2L1', payment_status: 'Completed', amount_paid: 299, attendance_marked: true, checked_in_at: '2026-06-20T10:15:00Z', students: { name: 'Aarav Sharma', roll_number: 'CS23B1001', department: 'Computer Science' } },
-      { id: 'r2', ticket_number: 'EVT-Z8X4P5W0', payment_status: 'Completed', amount_paid: 299, attendance_marked: false, checked_in_at: null, students: { name: 'Diya Patel', roll_number: 'EC23B2014', department: 'Electronics' } },
-      { id: 'r3', ticket_number: 'EVT-M7B2N6X8', payment_status: 'Pending', amount_paid: 0, attendance_marked: false, checked_in_at: null, students: { name: 'Kabir Singh', roll_number: 'ME24M3002', department: 'Mechanical' } },
-      { id: 'r4', ticket_number: 'EVT-T5V9C1X2', payment_status: 'Completed', amount_paid: 299, attendance_marked: true, checked_in_at: '2026-06-20T10:30:00Z', students: { name: 'Ananya Iyer', roll_number: 'CS23B1045', department: 'Computer Science' } }
-    ]);
+    setRegistrations([]);
 
-    setVolunteers([
-      { id: 'v1', student_id: 's1', role: 'Technical Lead', students: { name: 'Rahul Verma', roll_number: 'CS22B1020', department: 'Computer Science' } },
-      { id: 'v2', student_id: 's2', role: 'Logistics Manager', students: { name: 'Neha Gupta', roll_number: 'ME22B1040', department: 'Mechanical' } }
-    ]);
+    setVolunteers([]);
 
     setBudgetItems([
       { id: 'b1', category: 'Venue', description: 'Auditorium Booking Charge', estimated_amount: 15000, actual_amount: 15000, status: 'approved' },
@@ -131,10 +123,7 @@ export default function ManageEventPage() {
       { id: 'a2', title: 'Free Wi-Fi access details', message: 'Connect to campus guest network using credential techfest2026', priority: 'normal', sent_via: ['push'], created_at: '2026-06-08T15:30:00Z' }
     ]);
 
-    setFeedback([
-      { id: 'f1', overall_rating: 5, comment: 'Amazing hackathon, learned a lot about robotics and AI!', students: { name: 'Aditya Sen' } },
-      { id: 'f2', overall_rating: 4, comment: 'Great food and venue. The speakers were awesome.', students: { name: 'Pooja Hegde' } }
-    ]);
+    setFeedback([]);
     setFeedbackStats({ total_responses: 2, avg_overall_rating: 4.5 });
   };
 

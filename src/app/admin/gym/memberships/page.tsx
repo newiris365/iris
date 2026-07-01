@@ -23,11 +23,7 @@ export default function AdminGymMemberships() {
       // For fallback/demos, let's load a list
       const res = await apiGet('/fitzone/gym/membership-plans'); // check endpoints
       // Fetch mock memberships if table is fresh
-      setMemberships([
-        { id: 'm1', student_name: 'Khushal Patel', roll_number: 'CS22B005', plan: 'Annual Pro Elite', amount_paid: 4999, status: 'active', is_frozen: false, start_date: '2026-01-10', end_date: '2027-01-09', transaction_id: 'pay_sim_91a812' },
-        { id: 'm2', student_name: 'Aarav Mehta', roll_number: 'ME23B012', plan: 'Quarterly Prime', amount_paid: 1499, status: 'active', is_frozen: true, start_date: '2026-05-01', end_date: '2026-08-10', transaction_id: 'pay_sim_87f23a' },
-        { id: 'm3', student_name: 'Rohan Joshi', roll_number: 'EC21B088', plan: 'Monthly Basic', amount_paid: 599, status: 'expired', is_frozen: false, start_date: '2026-04-01', end_date: '2026-05-01', transaction_id: 'pay_sim_54b01e' }
-      ]);
+      setMemberships([]);
     } catch (err) {
       console.log('Error loading memberships');
     } finally {

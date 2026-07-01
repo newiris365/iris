@@ -30,14 +30,8 @@ export default function AdminMusterDashboard() {
         resolved_at: null
       });
 
-      setSafeList([
-        { id: '1', students: { users: { name: 'Khushal Student' } }, location: 'Main Sports Field', marked_safe_at: new Date().toISOString() },
-        { id: '2', students: { users: { name: 'Aditya Sharma' } }, location: 'Library Lawn', marked_safe_at: new Date(Date.now() - 5000).toISOString() }
-      ]);
-      setUnaccountedList([
-        { id: '3', students: { users: { name: 'Pooja Verma' } } },
-        { id: '4', students: { users: { name: 'Rahul Singh' } } }
-      ]);
+      setSafeList([]);
+      setUnaccountedList([]);
       setReportText('');
     } catch {
       // Default offline seeds

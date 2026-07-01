@@ -41,7 +41,7 @@ export default function StudentWellnessPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const res = await apiGet(`/fitzone/gym/wellness/${studentId}`);
       if (res.success && res.checkins) {
@@ -102,7 +102,7 @@ export default function StudentWellnessPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const res = await apiPost('/fitzone/gym/wellness/checkin', {
         student_id: studentId,

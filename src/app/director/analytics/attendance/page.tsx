@@ -42,10 +42,7 @@ export default function AttendanceAnalyticsPage() {
           return { date: d.toISOString().split('T')[0], attendance_percent: 74 + Math.floor(Math.random() * 20) };
         })
       );
-      setDefaulters([
-        { id: '1', name: 'Rohan Sharma', roll_number: 'CS23B1042', department: 'Computer Science', attendance_rate: 67, phone: '+919999912345' },
-        { id: '2', name: 'Priyansh Patel', roll_number: 'EC23B2050', department: 'Electronics', attendance_rate: 71, phone: '+919876543210' }
-      ]);
+      setDefaulters([]);
       setHeatmap({
         '2026-06-01': 82,
         '2026-06-02': 74,

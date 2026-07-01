@@ -1632,7 +1632,7 @@ export async function registerVehicle(req: Request, res: Response) {
       .from('registered_vehicles')
       .insert({
         institution_id: institutionId,
-        student_id: student_id || (req.user as any)?.student_id || 'c0000000-0000-0000-0000-000000000006',
+        student_id: student_id || (req.user as any)?.student_id || '',
         vehicle_number,
         type,
         color,

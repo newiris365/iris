@@ -395,7 +395,7 @@ function getMockDataForTable(tableName: string) {
           }
         },
         {
-          id: 'c0000000-0000-0000-0000-000000000006',
+          id: '',
           roll_number: 'CS23B1042',
           user_id: 'b0000000-0000-0000-0000-000000000006',
           institution_id: 'a0000000-0000-0000-0000-000000000001',
@@ -512,7 +512,7 @@ function getMockDataForTable(tableName: string) {
         {
           id: 'link-1',
           parent_user_id: 'parent-1',
-          student_id: 'c0000000-0000-0000-0000-000000000006',
+          student_id: '',
           relationship: 'father',
           verified: true,
           users: {
@@ -535,7 +535,7 @@ function getMockDataForTable(tableName: string) {
         {
           id: 'reg-1',
           event_id: 'e0000000-0000-0000-0000-000000000001',
-          student_id: 'c0000000-0000-0000-0000-000000000006',
+          student_id: '',
           attendance_marked: true,
           institution_id: 'a0000000-0000-0000-0000-000000000001'
         }

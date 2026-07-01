@@ -60,12 +60,7 @@ export default function AdminCRMPage() {
       }
     } catch {
       // Mock leads list
-      const mockLeads: LeadRecord[] = [
-        { id: 'lead-1', name: 'Manish Vyas', email: 'manish@gmail.com', phone: '+91 99280 12345', source: 'website', program_interest: 'BTECH-CSE', status: 'new', notes: 'Inquired about fee structure.', created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'lead-2', name: 'Ravi Gehlot', email: 'ravi@gmail.com', phone: '+91 98290 88290', source: 'social', program_interest: 'BTECH-CSE', status: 'contacted', notes: 'Phone call done, requested prospectus.', last_contacted: new Date().toISOString(), created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'lead-3', name: 'Pooja Choudhary', email: 'pooja@gmail.com', phone: '+91 94140 99887', source: 'event', program_interest: 'MBA-CORE', status: 'interested', notes: 'Attended webinar, highly interested.', created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'lead-4', name: 'Sanjay Singh', email: 'sanjay@gmail.com', phone: '+91 96020 11223', source: 'walkin', program_interest: 'BTECH-AIDS', status: 'applied', notes: 'Application form filled on desk.', created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() }
-      ];
+      const mockLeads: LeadRecord[] = [];
       setLeads(mockLeads);
     } finally {
       setLoading(false);

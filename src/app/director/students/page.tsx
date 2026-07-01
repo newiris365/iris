@@ -77,11 +77,7 @@ export default function StudentLookupPage() {
       }
     } catch {
       // Sandbox Fallbacks
-      const fallbackList = [
-        { id: 's1', roll_number: 'CS23B1042', user_id: 'u1', semester: 4, batch_year: '2023', users: { name: 'Khushal Gehlot', email: 'khushal@siet.edu.in', phone: '+91 99999 88888' } },
-        { id: 's2', roll_number: 'EC23B2011', user_id: 'u2', semester: 4, batch_year: '2023', users: { name: 'Rohan Sharma', email: 'rohan@siet.edu.in', phone: '+91 99999 12345' } },
-        { id: 's3', roll_number: 'ME24B1008', user_id: 'u3', semester: 2, batch_year: '2024', users: { name: 'Vikram Gehlot', email: 'vikram@siet.edu.in', phone: '+91 99999 54321' } }
-      ];
+      const fallbackList = [];
       setStudentsList(fallbackList);
       setFilteredList(fallbackList);
 
@@ -125,7 +121,7 @@ export default function StudentLookupPage() {
         setProfile({
           id: 's1',
           roll_number: 'CS23B1042',
-          name: 'Khushal Gehlot',
+          name: '',
           email: 'khushal@siet.edu.in',
           phone: '+91 99999 88888',
           department: 'Computer Science',

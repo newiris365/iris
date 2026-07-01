@@ -44,17 +44,11 @@ export default function AdminEmployeeDirectory() {
         setEmployees(data.employees);
       } else {
         // Fallback mock roster
-        setEmployees([
-          { id: 'emp-1', employee_code: 'CSE-26-892', first_name: 'Satish', last_name: 'Kumar', personal_email: 'satish.kumar@siet.edu.in', personal_phone: '+91 98765 43210' },
-          { id: 'emp-2', employee_code: 'ECE-26-482', first_name: 'Amit', last_name: 'Mehta', personal_email: 'amit.mehta@siet.edu.in', personal_phone: '+91 87654 32109' }
-        ]);
+        setEmployees([]);
       }
     } catch (err) {
       console.error(err);
-      setEmployees([
-        { id: 'emp-1', employee_code: 'CSE-26-892', first_name: 'Satish', last_name: 'Kumar', personal_email: 'satish.kumar@siet.edu.in', personal_phone: '+91 98765 43210' },
-        { id: 'emp-2', employee_code: 'ECE-26-482', first_name: 'Amit', last_name: 'Mehta', personal_email: 'amit.mehta@siet.edu.in', personal_phone: '+91 87654 32109' }
-      ]);
+      setEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -81,7 +75,7 @@ export default function AdminEmployeeDirectory() {
     } catch (err) {
       const mockObj: Employee = {
         id: `emp-${Date.now()}`,
-        employee_code: `CSE-26-${Math.floor(Math.random() * 900) + 100}`,
+        employee_code: `CSE-26-${0}`,
         ...formData
       };
       setEmployees(prev => [...prev, mockObj]);

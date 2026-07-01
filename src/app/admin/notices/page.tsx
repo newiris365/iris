@@ -81,7 +81,7 @@ export default function AdminNoticesPage() {
         title: notice.title,
         readsCount: Math.floor(10 + Math.random() * 50),
         readBy: [
-          { users: { name: "Khushal Gehlot" }, read_at: new Date().toISOString() },
+          { users: { name: "" }, read_at: new Date().toISOString() },
           { users: { name: "Sunil Choudhary" }, read_at: new Date().toISOString() }
         ]
       });

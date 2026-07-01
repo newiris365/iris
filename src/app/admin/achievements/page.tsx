@@ -42,11 +42,7 @@ export default function AdminStudentAchievements() {
       }
 
       // Mock student achievements list
-      setAchievements([
-        { id: 'ac-1', student_name: 'Priya Patel', roll_no: '22CSE02', achievement_type: 'academic', title: 'National Code-Golf Hackathon 1st Rank', level: 'national', date: '2026-05-18', description: 'Awarded cash prize of Rs. 50,000 for serverless database sharding script optimizations.' },
-        { id: 'ac-2', student_name: 'Amit Sharma', roll_no: '22CSE01', achievement_type: 'sports', title: 'State Level Chess Tournament Gold Medalist', level: 'state', date: '2026-06-01', description: 'Represented institution in interstate sports championship.' },
-        { id: 'ac-3', student_name: 'Rahul Verma', roll_no: '22CSE03', achievement_type: 'competitive', title: 'Google Summer of Code (GSoC) Contributor', level: 'international', date: '2026-05-20', description: 'Selected for open source memory compilation projects.' }
-      ]);
+      setAchievements([]);
     } catch (err) {
       console.error(err);
     } finally {

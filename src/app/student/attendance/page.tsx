@@ -48,7 +48,7 @@ interface AttendanceSummary {
 // STUDENT DATA
 // ============================================================
 const STUDENT = {
-  name: 'Rahul Sharma',
+  name: '',
   rollNo: '21CS001',
   course: 'B.Tech CSE',
   currentSem: 4,

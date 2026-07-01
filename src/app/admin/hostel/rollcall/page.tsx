@@ -76,16 +76,9 @@ export default function AdminHostelRollCall() {
         setStats(res.stats);
       }
     } catch (err) {
-      // Setup high quality mockup on errors
-      setPresent([
-        { student_id: 's1', name: 'Khushal Gehlot', roll_number: 'CS-2024-001', verified_at: new Date().toISOString() },
-        { student_id: 's2', name: 'Aditya Vardhan', roll_number: 'CS-2024-042', verified_at: new Date().toISOString() }
-      ]);
-      setAbsent([
-        { student_id: 's3', name: 'Rohan Sharma', roll_number: 'EC-2024-098', guardian_phone: '+919876543210', is_outside_campus: true },
-        { student_id: 's4', name: 'Kabir Mehta', roll_number: 'ME-2024-012', guardian_phone: '+919929123456', is_outside_campus: false }
-      ]);
-      setStats({ total: 4, present: 2, absent: 2 });
+      setPresent([]);
+      setAbsent([]);
+      setStats({ total: 0, present: 0, absent: 0 });
     }
   };
 
@@ -106,21 +99,7 @@ export default function AdminHostelRollCall() {
         setMessage(res.error || 'Failed to start roll call.');
       }
     } catch (err) {
-      // Sandbox fallback trigger
-      setActiveSession({
-        id: 'rc-mock-1',
-        block_name: 'Block A (Aryabhata)',
-        floor: selectedFloor,
-        started_at: new Date().toISOString()
-      });
-      setTimeLeft(60);
-      setPresent([]);
-      setAbsent([
-        { student_id: 's3', name: 'Rohan Sharma', roll_number: 'EC-2024-098', guardian_phone: '+919876543210', is_outside_campus: true },
-        { student_id: 's4', name: 'Kabir Mehta', roll_number: 'ME-2024-012', guardian_phone: '+919929123456', is_outside_campus: false }
-      ]);
-      setStats({ total: 2, present: 0, absent: 2 });
-      setMessage('Roll call session started (Emulated)');
+      setMessage('Failed to start roll call.');
     } finally {
       setStarting(false);
     }

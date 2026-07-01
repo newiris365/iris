@@ -89,67 +89,7 @@ export default function AdminGrievancesPage() {
     } catch (err: any) {
       console.warn('Backend grievances fetch failed, loading high-fidelity sandbox fallback data:', err);
       // Sandbox fallback data of complaints across all modules
-      setGrievances([
-        {
-          id: 'g1',
-          category: 'hostel',
-          subject: 'Broken fan regulator in Block A room 102',
-          description: 'The fan speed regulator is completely broken and is running only at full speed. It is impossible to sleep at night.',
-          status: 'under_investigation',
-          priority: 'high',
-          is_anonymous: false,
-          submitted_by_name: 'Khushal Gehlot (23CSE051)',
-          created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-          resolution_notes: 'Technician assigned to inspect regulator.'
-        },
-        {
-          id: 'g2',
-          category: 'canteen',
-          subject: 'Cold food served at canteen counters',
-          description: 'The dinner served in the main mess yesterday was completely cold by 8:30 PM. The warmer system seems to be switched off early.',
-          status: 'submitted',
-          priority: 'normal',
-          is_anonymous: true,
-          submitted_by_name: 'Anonymous Student',
-          created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-        },
-        {
-          id: 'g3',
-          category: 'academic',
-          subject: 'Physics Lab equipment digital scale error',
-          description: 'The digital weighing scales in Physics Lab 2 show fluctuating values and need recalibration. This is causing errors in students practical readings.',
-          status: 'resolution_proposed',
-          priority: 'normal',
-          is_anonymous: false,
-          submitted_by_name: 'Aishwarya Patil (22PHY012)',
-          created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-          resolution_notes: 'Lab assistant has contacted the service agency for recalibration by this Saturday.'
-        },
-        {
-          id: 'g4',
-          category: 'transport',
-          subject: 'Bus Route 4 repeatedly delayed',
-          description: 'Bus Route 4 has been late by over 20 minutes for the past 3 days. Students are missing the morning 9 AM attendance session.',
-          status: 'resolved',
-          priority: 'high',
-          is_anonymous: false,
-          submitted_by_name: 'Rahul Sen (23ECE044)',
-          created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
-          resolution_notes: 'Driver was notified to alter route bypass due to local traffic construction. Time tables normalized.'
-        },
-        {
-          id: 'g5',
-          category: 'library',
-          subject: 'Air conditioning noise in reading room',
-          description: 'The central AC unit in Reading Room C makes a loud buzzing sound. It is very difficult to concentrate on studying.',
-          status: 'closed',
-          priority: 'low',
-          is_anonymous: false,
-          submitted_by_name: 'Jaswant Singh (Faculty)',
-          created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-          resolution_notes: 'Maintenance service cleaned the filter and tightened the loose bracket. AC noise resolved.'
-        }
-      ]);
+      setGrievances([]);
       setIsSandboxMode(true);
     } finally {
       setLoading(false);

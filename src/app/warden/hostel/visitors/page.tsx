@@ -38,37 +38,7 @@ export default function WardenVisitorsPage() {
       }
     } catch {
       // Mock data fallbacks
-      setVisitors([
-        {
-          id: 'v1',
-          visitor_name: 'Rajesh Mehta',
-          visitor_phone: '+91 98765 43210',
-          visitor_id_type: 'Aadhaar',
-          visitor_id_number: 'XXXX XXXX 1234',
-          relation: 'Father',
-          purpose: 'Delivering winter clothing and home food',
-          gate_pass_id: 'GP-VIS826X',
-          in_time: new Date().toISOString(),
-          status: 'inside',
-          is_approved: true,
-          students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042' }
-        },
-        {
-          id: 'v2',
-          visitor_name: 'Amit Sharma',
-          visitor_phone: '+91 91111 22222',
-          visitor_id_type: 'Driving License',
-          visitor_id_number: 'DL-XXXXXX992',
-          relation: 'Friend',
-          purpose: 'Group study reference textbook delivery',
-          gate_pass_id: 'GP-VIS103Q',
-          in_time: '2026-06-08T15:00:00Z',
-          out_time: '2026-06-08T16:30:00Z',
-          status: 'checked_out',
-          is_approved: true,
-          students: { name: 'Rohit Sharma', roll_number: 'EC23B2051' }
-        }
-      ]);
+      setVisitors([]);
     } finally {
       setLoading(false);
     }
@@ -295,7 +265,7 @@ export default function WardenVisitorsPage() {
                     <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Guest Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. Rajesh Kumar"
+                      placeholder=""
                       value={form.visitor_name}
                       onChange={e => setForm({ ...form, visitor_name: e.target.value })}
                       className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white"

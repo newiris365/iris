@@ -12,9 +12,9 @@ export default function TeacherTimetablePage() {
   const slots = ['09:00 - 10:00 AM', '10:15 - 11:15 AM', '11:30 - 12:30 PM', '02:00 - 03:00 PM'];
 
   useEffect(() => {
-    // Teacher timetable displays all assignments mapped to the mock teacher ID
-    apiGet('/core/timetable/student/b0000000-0000-0000-0000-000000000006').then(res => {
-      if (res.success) {
+    const teacherId = '';
+    (teacherId ? apiGet(`/core/timetable/teacher/${teacherId}`) : Promise.resolve({} as any)).then(res => {
+      if (res?.success) {
         setTimetable(res.timetable || []);
       }
       setIsLoading(false);

@@ -38,11 +38,7 @@ export default function SecurityIncidentsPage() {
       }
     } catch {
       // Mock cases
-      setIncidents([
-        { id: 'inc-101', incident_type: 'Blacklist Entry Attempt', description: 'Visitor Rajesh tried using expired details', location: 'Main Gate 1', severity: 'high', status: 'open', created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString() },
-        { id: 'inc-102', incident_type: 'Tailgating', description: 'Car followed closely behind bus, bypass validation check', location: 'South Transit Gate', severity: 'medium', status: 'investigating', created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString() },
-        { id: 'inc-103', incident_type: 'Device Failure', description: 'RFID sensor unresponsive during heavy rain', location: 'Academic Gate 2', severity: 'low', status: 'resolved', resolution: 'Hardware reboot complete', created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString() }
-      ]);
+      setIncidents([]);
     } finally {
       setLoading(false);
     }

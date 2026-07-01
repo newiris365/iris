@@ -44,7 +44,7 @@ export default function AdminParkingManagement() {
           { id: 's2', slot_number: 'A-02', zone: 'Zone A', vehicle_number: 'RJ-19-CS-4412', last_occupied_at: new Date(Date.now() - 14 * 60 * 60 * 1000).toISOString() }
         ],
         visitor_logs: [
-          { vehicle_number: "DL-3C-AS-1020", visitor_name: "Amit Kumar", entry_time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), purpose: "Guest Lecture" },
+          { vehicle_number: "DL-3C-AS-1020", visitor_name: "", entry_time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), purpose: "Guest Lecture" },
           { vehicle_number: "MH-12-PQ-9080", visitor_name: "Suresh Mehta", entry_time: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), purpose: "Vendor Delivery" }
         ]
       });

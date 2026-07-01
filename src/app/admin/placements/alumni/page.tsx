@@ -11,9 +11,7 @@ export default function AdminAlumniSettings() {
   const [alumniList, setAlumniList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [testimonials, setTestimonials] = useState<any[]>([
-    { id: 1, student: 'Khushal Sharma', company: 'Google India', quote: 'The placement cell mock interview guides prepared me extensively for technical and coding rounds.', active: true }
-  ]);
+  const [testimonials, setTestimonials] = useState<any[]>([]);
   const [newStudent, setNewStudent] = useState('');
   const [newCompany, setNewCompany] = useState('');
   const [newQuote, setNewQuote] = useState('');
@@ -119,7 +117,7 @@ export default function AdminAlumniSettings() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[9px] uppercase font-bold text-[#C4B5FD]/60">Student Name</label>
                   <input
-                    placeholder="e.g. Khushal Sharma"
+                    placeholder=""
                     value={newStudent}
                     onChange={e => setNewStudent(e.target.value)}
                     className="px-4 py-2.5 bg-[#0D0A1A] border border-white/10 rounded-xl text-white placeholder:text-white/20 outline-none focus:border-[#6C2BD9]/50"

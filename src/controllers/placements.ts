@@ -357,7 +357,7 @@ export async function applyDrive(req: Request, res: Response) {
       .eq('user_id', req.user?.id)
       .maybeSingle();
 
-    const studentId = student?.id || 'c0000000-0000-0000-0000-000000000006';
+    const studentId = student?.id || '';
 
     const { data, error } = await supabaseAdmin
       .from('drive_applications')
@@ -970,7 +970,7 @@ export async function bookMentorshipSession(req: Request, res: Response) {
       .eq('user_id', req.user?.id)
       .maybeSingle();
 
-    const studentId = student?.id || 'c0000000-0000-0000-0000-000000000006';
+    const studentId = student?.id || '';
 
     const { data, error } = await supabaseAdmin
       .from('alumni_mentorship')

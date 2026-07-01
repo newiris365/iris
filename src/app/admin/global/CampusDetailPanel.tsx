@@ -80,7 +80,7 @@ export default function CampusDetailPanel({ institutionId, institutionName, onCl
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         months.push({
           month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
-          count: Math.floor(Math.random() * 50) + 10,
+          count: 0,
         });
       }
       setMonthlyActivity(months);

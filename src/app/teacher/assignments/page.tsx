@@ -96,20 +96,20 @@ const MOCK_ASSIGNMENTS = [
 
 const MOCK_SUBMISSIONS: Record<string, { id: string; student_name: string; roll_number: string; submitted_at: string; marks?: number; feedback?: string }[]> = {
   '1': [
-    { id: 's1', student_name: 'Aarav Sharma', roll_number: 'CS2024001', submitted_at: '2026-06-14T10:30:00Z', marks: undefined },
-    { id: 's2', student_name: 'Priya Patel', roll_number: 'CS2024015', submitted_at: '2026-06-15T14:20:00Z', marks: 85, feedback: 'Good implementation, minor edge case missed.' },
-    { id: 's3', student_name: 'Rohan Gupta', roll_number: 'CS2024032', submitted_at: '2026-06-16T09:10:00Z', marks: undefined },
-    { id: 's4', student_name: 'Sneha Reddy', roll_number: 'CS2024008', submitted_at: '2026-06-14T16:45:00Z', marks: 92, feedback: 'Excellent work with well-documented complexity analysis.' },
-    { id: 's5', student_name: 'Vikram Singh', roll_number: 'CS2024022', submitted_at: '2026-06-17T11:00:00Z', marks: undefined },
+    { id: 's1', student_name: '', roll_number: 'CS2024001', submitted_at: '2026-06-14T10:30:00Z', marks: undefined },
+    { id: 's2', student_name: '', roll_number: 'CS2024015', submitted_at: '2026-06-15T14:20:00Z', marks: 85, feedback: 'Good implementation, minor edge case missed.' },
+    { id: 's3', student_name: '', roll_number: 'CS2024032', submitted_at: '2026-06-16T09:10:00Z', marks: undefined },
+    { id: 's4', student_name: '', roll_number: 'CS2024008', submitted_at: '2026-06-14T16:45:00Z', marks: 92, feedback: 'Excellent work with well-documented complexity analysis.' },
+    { id: 's5', student_name: '', roll_number: 'CS2024022', submitted_at: '2026-06-17T11:00:00Z', marks: undefined },
   ],
   '2': [
-    { id: 's6', student_name: 'Ananya Iyer', roll_number: 'CS2024011', submitted_at: '2026-06-13T20:00:00Z', marks: 78, feedback: 'Working simulator but missing priority scheduling comparison.' },
+    { id: 's6', student_name: '', roll_number: 'CS2024011', submitted_at: '2026-06-13T20:00:00Z', marks: 78, feedback: 'Working simulator but missing priority scheduling comparison.' },
     { id: 's7', student_name: 'Karthik Nair', roll_number: 'CS2024028', submitted_at: '2026-06-14T22:15:00Z', marks: 95, feedback: 'Outstanding implementation with detailed metrics analysis.' },
     { id: 's8', student_name: 'Meera Joshi', roll_number: 'CS2024005', submitted_at: '2026-06-14T18:30:00Z', marks: 88, feedback: 'Well-structured code with good visualization.' },
   ],
   '3': [
     { id: 's9', student_name: 'Arjun Mehta', roll_number: 'CS2024019', submitted_at: '2026-06-10T15:00:00Z', marks: 90, feedback: 'Excellent multi-threaded implementation.' },
-    { id: 's10', student_name: 'Divya Kapoor', roll_number: 'CS2024033', submitted_at: '2026-06-11T09:45:00Z', marks: 82, feedback: 'File transfer needs improvement, rest is solid.' },
+    { id: 's10', student_name: '', roll_number: 'CS2024033', submitted_at: '2026-06-11T09:45:00Z', marks: 82, feedback: 'File transfer needs improvement, rest is solid.' },
     { id: 's11', student_name: 'Nikhil Verma', roll_number: 'CS2024041', submitted_at: '2026-06-11T21:30:00Z', marks: 75, feedback: 'Basic implementation complete but lacks private messaging.' },
   ],
   '4': [

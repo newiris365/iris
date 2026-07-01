@@ -56,16 +56,10 @@ export default function AdminFacultyDevelopment() {
       }
 
       // Mock Publications
-      setPublications([
-        { id: 'pub-1', title: 'Decentralized Sharding Indexes in PostgreSQL Supabase Platforms', journal_conference: 'IEEE Transactions on Cloud Systems', publication_type: 'journal', year: 2026, impact_factor: 4.82, indexed_in: ['Scopus', 'Web of Science'], staff_name: 'Dr. Amit Mehta' },
-        { id: 'pub-2', title: 'Curriculum attainment analytics engine for NBA accreditation workflows', journal_conference: 'Journal of Outcome Education', publication_type: 'journal', year: 2025, impact_factor: 2.15, indexed_in: ['Scopus'], staff_name: 'Prof. Satish Kumar' }
-      ]);
+      setPublications([]);
 
       // Mock FDPs
-      setFdps([
-        { id: 'fdp-1', program_type: 'fdp', title: 'Outcome Based Education and Curriculum Design under NEP', organizing_body: 'IIT Jodhpur MHRD Cell', date: '2026-05-10', duration_days: 7, staff_name: 'Dr. Amit Mehta' },
-        { id: 'fdp-2', program_type: 'workshop', title: 'Next.js 14 App Router and Edge Middleware Architectures', organizing_body: 'Vercel Campus Developer Forum', date: '2026-06-02', duration_days: 3, staff_name: 'Prof. Satish Kumar' }
-      ]);
+      setFdps([]);
     } catch (err) {
       console.error(err);
     } finally {

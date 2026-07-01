@@ -27,7 +27,7 @@ export default function NewComplaintPage() {
   const loadAllocation = async () => {
     try {
       // Force demo student ID so the seeded data always shows up for testing
-      const studentId = 'c0000000-0000-0000-0000-000000000006';
+      const studentId = '';
 
       const res = await apiGet(`/hostel/allocations?studentId=${studentId}&t=${Date.now()}`);
       if (res.success) {

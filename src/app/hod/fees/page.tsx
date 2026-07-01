@@ -3,16 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, IndianRupee, Download, Mail, Phone, Filter, ChevronDown, Send, Clock, Users } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 
-const mockDefaulters = [
-  { id: 1, name: "Rahul Verma", rollNo: "CS210045", amountDue: 45000, daysOverdue: 45, lastPaymentDate: "2025-12-10", contactStatus: "reachable", escalationStatus: "sent_reminder", semester: 6, program: "B.Tech CSE" },
-  { id: 2, name: "Priya Sharma", rollNo: "CS210078", amountDue: 62000, daysOverdue: 30, lastPaymentDate: "2026-01-05", contactStatus: "unreachable", escalationStatus: "whatsapp_sent", semester: 6, program: "B.Tech CSE" },
-  { id: 3, name: "Amit Patel", rollNo: "CS210112", amountDue: 38500, daysOverdue: 60, lastPaymentDate: "2025-11-20", contactStatus: "reachable", escalationStatus: "hod_notified", semester: 6, program: "B.Tech CSE" },
-  { id: 4, name: "Sneha Reddy", rollNo: "CS220023", amountDue: 28000, daysOverdue: 15, lastPaymentDate: "2026-02-01", contactStatus: "reachable", escalationStatus: "none", semester: 4, program: "B.Tech CSE" },
-  { id: 5, name: "Vikram Singh", rollNo: "CS210089", amountDue: 71500, daysOverdue: 90, lastPaymentDate: "2025-10-15", contactStatus: "unreachable", escalationStatus: "hod_notified", semester: 6, program: "B.Tech CSE" },
-  { id: 6, name: "Deepa Nair", rollNo: "CS220056", amountDue: 19000, daysOverdue: 22, lastPaymentDate: "2026-01-18", contactStatus: "reachable", escalationStatus: "sent_reminder", semester: 4, program: "B.Tech CSE" },
-  { id: 7, name: "Karan Mehta", rollNo: "CS210034", amountDue: 55000, daysOverdue: 50, lastPaymentDate: "2025-12-01", contactStatus: "reachable", escalationStatus: "whatsapp_sent", semester: 6, program: "B.Tech CSE" },
-  { id: 8, name: "Ananya Das", rollNo: "CS220091", amountDue: 33000, daysOverdue: 35, lastPaymentDate: "2025-12-28", contactStatus: "unreachable", escalationStatus: "none", semester: 4, program: "B.Tech CSE" },
-];
+const mockDefaulters = [];
 
 const feeCollectionSummary = {
   totalStudents: 120,

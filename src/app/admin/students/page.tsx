@@ -274,7 +274,7 @@ export default function AdminStudentsPage() {
                     type="text" required
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Khushal Gehlot"
+                    placeholder=""
                     className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                   />
                 </div>
@@ -285,7 +285,7 @@ export default function AdminStudentsPage() {
                       type="email" required={instituteType !== 'school'}
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      placeholder="khushal@college.edu.in"
+                      placeholder=""
                       className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                     />
                   </div>

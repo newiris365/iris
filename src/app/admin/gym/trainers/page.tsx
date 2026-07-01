@@ -29,10 +29,7 @@ export default function AdminGymTrainers() {
       }
     } catch (err) {
       console.log('Error loading trainers, using mocks');
-      setTrainers([
-        { id: 't1', name: 'Rahul Sharma', specializations: ['Weight Training', 'Powerlifting'], bio: '10+ years experience coaching athletic students.', photo_url: '', is_active: true },
-        { id: 't2', name: 'Pooja Sen', specializations: ['Yoga', 'Calisthenics', 'Core Strength'], bio: 'Certified yoga instructor and core training specialist.', photo_url: '', is_active: true }
-      ]);
+      setTrainers([]);
     } finally {
       setLoading(false);
     }
@@ -114,7 +111,7 @@ export default function AdminGymTrainers() {
                 required
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g., Vikram Singh"
+                placeholder="e.g., John Doe"
                 className="w-full px-4 py-2.5 bg-[#0D0A1A] border border-white/10 rounded-xl text-xs text-white"
               />
             </div>

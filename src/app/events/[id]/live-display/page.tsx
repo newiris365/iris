@@ -69,8 +69,8 @@ export default function KioskLiveDisplayPage() {
         start_datetime: new Date(Date.now() + 4500000).toISOString(), // ~1.25 hours away
         venue: 'Main Auditorium, Campus Gate A',
         questions: [
-          { id: '1', question: 'Will there be GPU servers provided for hosting large neural networks during hackathon?', upvotes: 24, students: { name: 'Rahul Verma' } },
-          { id: '2', question: 'Can we submit React Native apps for review or only web apps?', upvotes: 15, students: { name: 'Ananya Iyer' } },
+          { id: '1', question: 'Will there be GPU servers provided for hosting large neural networks during hackathon?', upvotes: 24, students: { name: '' } },
+          { id: '2', question: 'Can we submit React Native apps for review or only web apps?', upvotes: 15, students: { name: '' } },
           { id: '3', question: 'Are extra ethernet switches allowed at team desks?', upvotes: 5, students: { name: 'Dev Patel' } }
         ],
         active_poll: {
@@ -161,7 +161,7 @@ export default function KioskLiveDisplayPage() {
 
   const triggerFloatingEmoji = (emoji: string) => {
     const newId = Math.random().toString();
-    const randomLeft = Math.floor(Math.random() * 80) + 10; // 10% to 90%
+    const randomLeft = 0; // 10% to 90%
     setFloatingEmojis(prev => [...prev, { id: newId, emoji, left: randomLeft }]);
 
     // Remove emoji from DOM after animation completes (3s)

@@ -63,44 +63,7 @@ export default function WardenAllocationsPage() {
       }
     } catch {
       // Mock allocations fallback
-      setAllocations([
-        {
-          id: 'a1',
-          student_id: 's1',
-          allotted_date: '2025-07-15',
-          deposit_amount: 10000,
-          deposit_status: 'paid',
-          is_current: true,
-          students: {
-            name: 'Priyansh Mehta',
-            roll_number: 'CS23B1042',
-            department: 'Computer Science'
-          },
-          hostel_rooms: {
-            id: 'r1',
-            room_number: 'A-304',
-            hostel_blocks: { name: 'Aryabhata Boys Hostel (Block A)' }
-          }
-        },
-        {
-          id: 'a2',
-          student_id: 's2',
-          allotted_date: '2025-08-01',
-          deposit_amount: 10000,
-          deposit_status: 'paid',
-          is_current: true,
-          students: {
-            name: 'Rohit Sharma',
-            roll_number: 'EC23B2051',
-            department: 'Electronics'
-          },
-          hostel_rooms: {
-            id: 'r1',
-            room_number: 'A-304',
-            hostel_blocks: { name: 'Aryabhata Boys Hostel (Block A)' }
-          }
-        }
-      ]);
+      setAllocations([]);
 
       setRooms([
         { id: 'r2', room_number: 'A-305', capacity: 2, occupied: 1, hostel_blocks: { name: 'Aryabhata Boys Hostel' } },

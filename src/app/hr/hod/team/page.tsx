@@ -21,11 +21,7 @@ export default function HodTeamOverview() {
     setLoading(true);
     try {
       // Mock department team
-      setTeam([
-        { id: 't-1', name: 'Prof. Satish Kumar', designation: 'Associate Professor', email: 'satish.kumar@siet.edu.in', phone: '+91 98765 43210', employee_type: 'permanent', shift: 'General Shift (09 AM - 05 PM)' },
-        { id: 't-2', name: 'Ms. Priya Patel', designation: 'Assistant Professor', email: 'priya.patel@siet.edu.in', phone: '+91 87654 32109', employee_type: 'probation', shift: 'General Shift (09 AM - 05 PM)' },
-        { id: 't-3', name: 'Dr. Vikram Singh', designation: 'Guest Lecturer', email: 'vikram.singh@siet.edu.in', phone: '+91 76543 21098', employee_type: 'guest', shift: 'Morning Shift (08 AM - 02 PM)' }
-      ]);
+      setTeam([]);
     } catch (err) {
       console.error(err);
     } finally {

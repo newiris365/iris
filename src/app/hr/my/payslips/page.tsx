@@ -65,15 +65,7 @@ export default function EmployeePayslipHistory() {
       throw new Error('API download failed');
     } catch (err) {
       // Local fallback using exportToPDF
-      const mockSlipDetails = [
-        { label: 'Employee Name', value: 'Khushal Gehlot' },
-        { label: 'Designation', value: 'Assistant Professor' },
-        { label: 'Department', value: 'Computer Science' },
-        { label: 'Salary Month', value: `${slip.month_name} ${slip.year}` },
-        { label: 'Gross Earnings', value: `₹${slip.gross_earnings.toLocaleString('en-IN')}` },
-        { label: 'Total Deductions', value: `₹${slip.total_deductions.toLocaleString('en-IN')}` },
-        { label: 'Net Take-Home Salary', value: `₹${slip.net_salary.toLocaleString('en-IN')}` }
-      ];
+      const mockSlipDetails = [];
       exportToPDF(
         `IRIS 365 Monthly Payslip - ${slip.month_name} ${slip.year}`,
         mockSlipDetails,

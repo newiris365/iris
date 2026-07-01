@@ -21,11 +21,7 @@ export default function AdminPlacementsOverview() {
     ]
   });
 
-  const [liveLogs, setLiveLogs] = useState<any[]>([
-    { student: 'Khushal Sharma', company: 'Google India', action: 'Offer Accepted', time: '10m ago', reward: '₹32.5 LPA' },
-    { student: 'Vikas Choudhary', company: 'ZS Associates', action: 'Shortlisted for interview', time: '35m ago', reward: '₹8.5 LPA' },
-    { student: 'Neha Sen', company: 'Infosys', action: 'Technical round passed', time: '2h ago', reward: '₹4.5 LPA' }
-  ]);
+  const [liveLogs, setLiveLogs] = useState<any[]>([]);
 
   useEffect(() => {
     loadAdminStats();

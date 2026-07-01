@@ -49,17 +49,7 @@ export default function WardenDashboard() {
         console.error('Warden dashboard load error:', err);
         // Set mock stats for demo
         setStats({ visitors: 3, pending: 1, absent: 0, transfers: 0, pendingLeaves: 2, openComplaints: 4 });
-        setPendingLeaves([
-          {
-            id: 'mock-l1',
-            students: { name: 'Khushal Gehlot', roll_number: '23CSE051' },
-            leave_from: '2026-06-25',
-            leave_to: '2026-06-28',
-            leave_type: 'medical',
-            reason: 'Medical checkup at AIIMS hospital.',
-            status: 'pending',
-          }
-        ]);
+        setPendingLeaves([]);
       } finally {
         setIsLoading(false);
       }

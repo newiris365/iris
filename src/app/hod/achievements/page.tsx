@@ -24,27 +24,10 @@ interface Stats {
 const categories = ['All', 'Academic', 'Sports', 'Cultural', 'Technical', 'Research', 'Community Service'];
 const levels = ['All', 'College', 'University', 'National', 'International'];
 
-const mockAchievements: Achievement[] = [
-  { id: 1, studentName: 'Aarav Sharma', studentId: 'CS2021001', title: 'Hackathon Winner - Smart India Hackathon', category: 'Technical', level: 'National', date: '2026-05-15', description: 'Won first place in the Software Edition of Smart India Hackathon 2026 for developing an AI-powered healthcare solution.', verified: true },
-  { id: 2, studentName: 'Priya Patel', studentId: 'CS2021045', title: 'Published Research Paper in IEEE', category: 'Research', level: 'International', date: '2026-04-20', description: 'Published a research paper on "Machine Learning Approaches for Predictive Analytics in Healthcare" in IEEE Transactions.', verified: true },
-  { id: 3, studentName: 'Rohan Gupta', studentId: 'CS2021012', title: 'University Gold Medalist', category: 'Academic', level: 'University', date: '2026-03-10', description: 'Achieved the highest CGPA of 9.8 across the university and received the Gold Medal for Academic Excellence.', verified: true },
-  { id: 4, studentName: 'Sneha Reddy', studentId: 'CS2021078', title: 'National Basketball Championship', category: 'Sports', level: 'National', date: '2026-02-28', description: 'Led the university basketball team to victory in the National Inter-University Basketball Championship 2026.', verified: true },
-  { id: 5, studentName: 'Karthik Nair', studentId: 'CS2021033', title: 'Best Cultural Performer - Annual Fest', category: 'Cultural', level: 'College', date: '2026-01-25', description: 'Won the Best Performer award at the annual cultural fest for outstanding classical dance performance.', verified: true },
-  { id: 6, studentName: 'Ananya Singh', studentId: 'CS2021091', title: 'Community Service Excellence Award', category: 'Community Service', level: 'College', date: '2026-05-02', description: 'Recognized for leading the rural digital literacy drive that impacted over 500 villagers in nearby districts.', verified: true },
-  { id: 7, studentName: 'Vikram Das', studentId: 'CS2021056', title: 'Google Summer of Code Contributor', category: 'Technical', level: 'International', date: '2026-04-10', description: 'Successfully completed GSoC 2026 contributing to an open-source machine learning framework with 50+ merged PRs.', verified: true },
-  { id: 8, studentName: 'Meera Joshi', studentId: 'CS2021022', title: 'Paper Presentation - ICCSE 2026', category: 'Research', level: 'International', date: '2026-03-18', description: 'Presented a paper on "Blockchain-based Secure Voting Systems" at the International Conference on Computer Science and Engineering.', verified: false },
-  { id: 9, studentName: 'Arjun Mehta', studentId: 'CS2021067', title: 'Inter-University Cricket Tournament', category: 'Sports', level: 'University', date: '2026-02-15', description: 'Scored a century in the finals leading the team to win the Inter-University Cricket Tournament.', verified: true },
-  { id: 10, studentName: 'Ishita Banerjee', studentId: 'CS2021089', title: 'Dean\'s List - Semester 6', category: 'Academic', level: 'College', date: '2026-05-20', description: 'Featured on the Dean\'s List for achieving a perfect score in all core computer science courses.', verified: true },
-];
+const mockAchievements: Achievement[] = [];
 
 const mockStats: Stats = { totalAchievements: 247, thisMonth: 18, topPerformers: 34 };
-const mockLeaderboard = [
-  { name: 'Aarav Sharma', count: 8 },
-  { name: 'Priya Patel', count: 7 },
-  { name: 'Vikram Das', count: 6 },
-  { name: 'Sneha Reddy', count: 5 },
-  { name: 'Meera Joshi', count: 5 },
-];
+const mockLeaderboard = [];
 
 const getCategoryColor = (cat: string) => {
   const map: Record<string, string> = {

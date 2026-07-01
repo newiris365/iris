@@ -22,43 +22,10 @@ export default function AdminSosDashboard() {
       if (res.success && res.alerts?.length > 0) {
         setAlerts(res.alerts);
       } else {
-        // High fidelity mock fallback
-        setAlerts([
-          {
-            id: 'mock-sos-1',
-            status: 'active',
-            alert_type: 'parent',
-            timestamp: new Date().toISOString(),
-            buses: { vehicle_number: 'RJ-19-PB-4050' },
-            students: { users: { name: 'Khushal Student' } },
-            incident_details: {
-              parent_name: 'Emergency Parent Guard',
-              phone: '+91 98290 12347',
-              last_rfid_location: 'RFID scan: Boarded Bus Stop Jodhpur Terminal (05:05 PM)',
-              last_gps_location: 'GPS lat: 26.2912, lng: 73.0156 (Updated 1 minute ago)',
-              driver_broadcasted: true
-            }
-          }
-        ]);
+        setAlerts([]);
       }
     } catch {
-      // Offline fallback
-      setAlerts([
-        {
-          id: 'mock-sos-1',
-          status: 'active',
-          alert_type: 'parent',
-          timestamp: new Date().toISOString(),
-          buses: { vehicle_number: 'RJ-19-PB-4050' },
-          students: { users: { name: 'Khushal Student' } },
-          incident_details: {
-            parent_name: 'Emergency Parent Guard',
-            phone: '+91 98290 12347',
-            last_rfid_location: 'RFID scan: Boarded Bus Stop Jodhpur Terminal (05:05 PM)',
-            last_gps_location: 'GPS lat: 26.2912, lng: 73.0156 (Updated 1 minute ago)'
-          }
-        }
-      ]);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -108,7 +75,7 @@ GENERATED: ${new Date().toLocaleString()}
    Emergency SOS flagged by parent stating their child did not reach home.
    Student Name: ${alert.students?.users?.name || 'Student'}
    Bus Assigned: ${alert.buses?.vehicle_number || 'RJ-19-PB-4050'}
-   Driver Name: Rajesh Kumar (+91 98290 12347)
+   Driver Name: ${alert.buses?.driver_id || 'Not Assigned'}
 
 2. CHRONOLOGICAL TELEMETRY SCAN:
    - Last RFID Scan Spot: ${alert.incident_details?.last_rfid_location}

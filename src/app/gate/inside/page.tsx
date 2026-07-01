@@ -39,14 +39,8 @@ export default function InsideOccupantsPage() {
       setVisitors(fetchedVisitors);
     } catch {
       // Mock Fallbacks if local backend is not running or seeds are empty
-      setOccupants([
-        { id: 'o1', person_name: 'Khushal Gehlot', person_type: 'student', entry_method: 'rfid', gate_number: 'main', timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() },
-        { id: 'o2', person_name: 'Dr. K. R. Sharma', person_type: 'staff', entry_method: 'biometric', gate_number: 'academic_gate', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-        { id: 'o3', person_name: 'Amit Kumar Patel', person_type: 'student', entry_method: 'qr', gate_number: 'main', timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() }
-      ]);
-      setVisitors([
-        { id: 'v1', visitor_name: 'Rajesh Malhotra', visitor_phone: '+91 98765 43210', host_name: 'Dr. K. R. Sharma', purpose: 'Research Collaboration', pass_number: 'VP-84920', timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() }
-      ]);
+      setOccupants([]);
+      setVisitors([]);
     } finally {
       setLoading(false);
     }

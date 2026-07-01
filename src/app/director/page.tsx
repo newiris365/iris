@@ -75,11 +75,7 @@ export default function DirectorDashboard() {
         active_bus_trips: 3,
         events_today: 2
       });
-      setFeed([
-        { id: '1', type: 'payment', description: 'Fee payment of ₹15,000 received from Rohan Sharma', timestamp: new Date().toISOString(), module: 'Finance' },
-        { id: '2', type: 'complaint', description: 'New complaint: "Wifi offline in Wing B" by Vikram Gehlot', timestamp: new Date(Date.now() - 3600000).toISOString(), module: 'Hostel' },
-        { id: '3', type: 'incident', description: 'Gate incident: Unauthorized vehicle entry bypassed barrier', timestamp: new Date(Date.now() - 7200000).toISOString(), module: 'Gate' }
-      ]);
+      setFeed([]);
       setAlerts([
         { id: 'a1', severity: 'warning', title: 'Low Attendance Alert', message: 'Sophomore attendance rate stands at 72%, below threshold.', created_at: new Date().toISOString() }
       ]);

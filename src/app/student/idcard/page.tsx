@@ -12,7 +12,7 @@ export default function StudentIdCardPage() {
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
     const profile = savedProfile ? JSON.parse(savedProfile) : null;
-    const studentId = profile?.student_id || profile?.id || 'b0000000-0000-0000-0000-000000000006';
+    const studentId = profile?.student_id || profile?.id || '';
 
     apiGet(`/core/idcards/generate/${studentId}`).then(res => {
       if (res.success) {
@@ -83,7 +83,7 @@ export default function StudentIdCardPage() {
                   </div>
 
                   <div className="text-center mt-5 flex-1 px-4">
-                    <h3 className="font-heading font-extrabold text-sm text-white">{cardData.student?.name || 'Khushal Gehlot'}</h3>
+                    <h3 className="font-heading font-extrabold text-sm text-white">{cardData.student?.name || ''}</h3>
                     <p className="text-[9px] text-[#C4B5FD]/70 font-mono mt-0.5">Roll: {cardData.student?.roll_number || 'CSE-2026-06'}</p>
                     <p className="text-[10px] text-[#A78BFA] font-bold mt-2">{cardData.student?.department || 'B.Tech. Computer Science'}</p>
                   </div>

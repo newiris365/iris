@@ -57,34 +57,7 @@ export default function TpoCompaniesCrm() {
 
     // fallback mock seed if empty
     if (companies.length === 0) {
-      setCompanies([
-        {
-          id: 'c-1',
-          name: 'Google India',
-          website: 'https://google.com',
-          industry: 'Technology',
-          company_type: 'mnc',
-          hr_name: 'Neha Sen',
-          hr_email: 'neha.sen@google.com',
-          hr_phone: '+91 99881 23456',
-          tier: 'dream',
-          relationship_status: 'active',
-          notes: 'High relationship value. Recruits SWE trainees.'
-        },
-        {
-          id: 'c-2',
-          name: 'ZS Associates',
-          website: 'https://zs.com',
-          industry: 'Consulting',
-          company_type: 'product',
-          hr_name: 'Preeti Sharma',
-          hr_email: 'preeti.sharma@zs.com',
-          hr_phone: '+91 99290 12347',
-          tier: 'core',
-          relationship_status: 'active',
-          notes: 'Regular visitor. Analytical roles.'
-        }
-      ]);
+      setCompanies([]);
     }
     setLoading(false);
   };

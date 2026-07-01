@@ -31,12 +31,7 @@ export default function AdminAnalyticsPage() {
       }
     } catch {
       // Mock billing list
-      const mockFees = [
-        { id: 'f1', month: '2026-06-01', amount: 6500, penalty: 0, payment_status: 'pending', students: { name: 'Priyansh Mehta' } },
-        { id: 'f2', month: '2026-05-01', amount: 6500, penalty: 150, payment_status: 'paid', students: { name: 'Rohit Sharma' } },
-        { id: 'f3', month: '2026-05-01', amount: 6500, penalty: 0, payment_status: 'paid', students: { name: ' Sneha Reddy' } },
-        { id: 'f4', month: '2026-05-01', amount: 12000, penalty: 250, payment_status: 'paid', students: { name: 'Prof. Alok Sen' } }
-      ];
+      const mockFees = [];
       setFees(mockFees);
       calculateStats(mockFees);
     } finally {

@@ -59,14 +59,7 @@ export default function GlobalSearchPage() {
         const mockMatches: SearchResult[] = [];
         const lowQuery = searchVal.toLowerCase();
         
-        const fallbackPool: SearchResult[] = [
-          { id: 's1', entity_type: 'Student', title: 'Khushal Gehlot', content: 'Roll No: CS23B1042 · Computer Science · Sem 4' },
-          { id: 's2', entity_type: 'Student', title: 'Rohan Sharma', content: 'Roll No: EC23B2011 · Electronics · Sem 4' },
-          { id: 'n1', entity_type: 'Notice', title: 'Terminal Exam Schedule', content: 'Semester 4 terminal reviews start on June 15th.' },
-          { id: 'n2', entity_type: 'Notice', title: 'Hostel Maintenance Shutdown', content: 'Power grid bypass testing scheduled for block B rooms.' },
-          { id: 'b1', entity_type: 'Book', title: 'Introduction to Algorithms', content: 'Author: Cormen · Category: Computer Science · 3 copies available' },
-          { id: 'e1', entity_type: 'Event', title: 'HackOverflow 2026 Hackathon', content: 'Register before June 12th. Venue: Seminar Hall B.' }
-        ];
+        const fallbackPool: SearchResult[]  = [];
 
         fallbackPool.forEach(item => {
           if (item.title.toLowerCase().includes(lowQuery) || item.content.toLowerCase().includes(lowQuery)) {

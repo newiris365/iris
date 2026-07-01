@@ -20,7 +20,7 @@ export default function StudentGymProgress() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       // Load metrics
       const metrRes = await apiGet(`/fitzone/gym/metrics/${studentId}`);
@@ -53,7 +53,7 @@ export default function StudentGymProgress() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const blob = await apiFetchBlob(`/fitzone/gym/report/${studentId}`);
       const url = window.URL.createObjectURL(blob);

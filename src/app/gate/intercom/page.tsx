@@ -19,10 +19,7 @@ export default function StudentIntercomPage() {
       // Fetch intercom logs mock/DB
       // For student portal, we show incoming calls or logs
       // Set default mock calls list
-      const mockCalls = [
-        { id: 'call-1', visitor_name: 'Amit Verma', called_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(), answered: true, approved: true, recording_url: '#' },
-        { id: 'call-2', visitor_name: 'Courier Delivery', called_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), answered: true, approved: false, recording_url: '#' }
-      ];
+      const mockCalls = [];
       setCalls(mockCalls);
 
       // Simulate a live incoming ring

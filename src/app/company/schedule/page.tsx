@@ -45,23 +45,7 @@ export default function CompanyHRInterviewSchedule() {
 
     // fallback mock if empty
     if (slots.length === 0) {
-      setSlots([
-        {
-          id: 'round-1',
-          round_number: 1,
-          round_type: 'technical',
-          scheduled_at: new Date(Date.now() + 3600000).toISOString(),
-          venue: 'Virtual',
-          meeting_link: 'https://meet.google.com',
-          interviewer_name: 'Rajesh Kumar',
-          drive_applications: {
-            students: {
-              first_name: 'Khushal',
-              last_name: 'Sharma'
-            }
-          }
-        }
-      ]);
+      setSlots([]);
     }
     setLoading(false);
   };

@@ -20,7 +20,7 @@ export default function StudentGymBookingsList() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const res = await apiGet(`/fitzone/gym/bookings/student/${studentId}`);
       if (res.success) {
@@ -29,23 +29,7 @@ export default function StudentGymBookingsList() {
     } catch (err) {
       console.log('Error loading bookings, using fallback mocks');
       // Fallback mocks
-      setBookings([
-        {
-          id: 'b1',
-          qr_code: 'FIT-BOOK-b1-s0001',
-          status: 'booked',
-          booking_date: '2026-06-09',
-          gym_slots: { date: '2026-06-10', start_time: '08:00:00', end_time: '09:30:00', slot_type: 'general', gym_trainers: { name: 'Rahul Sharma' } }
-        },
-        {
-          id: 'b2',
-          qr_code: 'FIT-BOOK-b2-s0001',
-          status: 'checked_in',
-          booking_date: '2026-06-08',
-          checkin_time: '2026-06-08T08:05:00Z',
-          gym_slots: { date: '2026-06-08', start_time: '08:00:00', end_time: '09:30:00', slot_type: 'weights-only', gym_trainers: null }
-        }
-      ]);
+      setBookings([]);
     } finally {
       setLoading(false);
     }

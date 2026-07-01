@@ -23,12 +23,7 @@ export default function WardenComplaintsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Mock staff list for assignment
-  const staffMembers = [
-    { id: 'b0000000-0000-0000-0000-000000000012', name: 'Jaswant Singh (Maintenance Supervisor)', role: 'maintenance' },
-    { id: 'b0000000-0000-0000-0000-000000000003', name: 'Alok Vyas (IT Support)', role: 'internet' },
-    { id: 'b0000000-0000-0000-0000-000000000004', name: 'Preeti Choudhary (Facilities)', role: 'plumbing' },
-    { id: 'b0000000-0000-0000-0000-000000000005', name: 'Amit Rathi (Electrical)', role: 'electrical' }
-  ];
+  const staffMembers = [];
 
   useEffect(() => {
     loadComplaints();
@@ -44,35 +39,7 @@ export default function WardenComplaintsPage() {
       }
     } catch {
       // Mock data fallbacks
-      setComplaints([
-        {
-          id: 'c0000000-0000-0000-0000-000000000001',
-          title: 'Wi-Fi connection drops repeatedly',
-          category: 'internet',
-          description: 'The Wi-Fi router in the lobby keeps turning off. The signal inside B-304 is extremely weak.',
-          priority: 'high',
-          status: 'open',
-          created_at: '2026-06-08T09:30:00Z',
-          resolution_notes: null,
-          student_rating: null,
-          students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042' },
-          hostel_rooms: { room_number: 'B-304' }
-        },
-        {
-          id: 'c0000000-0000-0000-0000-000000000002',
-          title: 'Bathroom tap leakage',
-          category: 'plumbing',
-          description: 'The bathroom basin tap is dripping constantly, causing water wastage.',
-          priority: 'medium',
-          status: 'assigned',
-          created_at: '2026-06-05T14:20:00Z',
-          resolved_at: '2026-06-07T11:00:00Z',
-          resolution_notes: 'Replaced washers in tap valve assembly.',
-          student_rating: 4,
-          students: { name: 'Rohit Sharma', roll_number: 'EC23B2051' },
-          hostel_rooms: { room_number: 'A-304' }
-        }
-      ]);
+      setComplaints([]);
     } finally {
       setLoading(false);
     }

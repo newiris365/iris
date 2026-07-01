@@ -47,40 +47,7 @@ export default function CompanyHRStudentsShortlist() {
 
     // fallback mock values if empty
     if (candidates.length === 0) {
-      setCandidates([
-        {
-          id: 'app-1',
-          student_id: 'stud-1',
-          applied_at: new Date().toISOString(),
-          status: 'shortlisted',
-          resume_url: 'https://supabase.co/storage/v1/object/public/resumes/my_resume.pdf',
-          cover_letter: 'Excited about the role',
-          students: {
-            first_name: 'Khushal',
-            last_name: 'Sharma',
-            branch: 'CSE',
-            student_profiles: {
-              cgpa: 8.9
-            }
-          }
-        },
-        {
-          id: 'app-2',
-          student_id: 'stud-2',
-          applied_at: new Date().toISOString(),
-          status: 'shortlisted',
-          resume_url: 'https://supabase.co/storage/v1/object/public/resumes/another.pdf',
-          cover_letter: 'Experienced in React',
-          students: {
-            first_name: 'Vikas',
-            last_name: 'Choudhary',
-            branch: 'AIDS',
-            student_profiles: {
-              cgpa: 7.8
-            }
-          }
-        }
-      ]);
+      setCandidates([]);
     }
     setLoading(false);
   };

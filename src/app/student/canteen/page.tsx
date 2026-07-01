@@ -119,7 +119,7 @@ export default function StudentCanteenMenu() {
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
   const placeOrder = async () => {
-    let studentId = 'c0000000-0000-0000-0000-000000000006'; // Default valid UUID fallback
+    let studentId = ''; // Default valid UUID fallback
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem('iris_user_profile');
       if (userStr) {

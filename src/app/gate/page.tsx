@@ -267,7 +267,7 @@ export default function SecurityGuardDashboard() {
                 <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">RFID Tap Sensor</label>
                 <input
                   type="text"
-                  placeholder="e.g. RFID_KHUSHAL_123"
+                  placeholder=""
                   value={rfidUidInput}
                   onChange={e => setRfidUidInput(e.target.value)}
                   className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder-white/20 font-mono"

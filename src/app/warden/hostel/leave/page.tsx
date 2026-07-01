@@ -33,32 +33,7 @@ export default function WardenLeaveApprovalsPage() {
       }
     } catch {
       // Mock data fallbacks
-      setLeaves([
-        {
-          id: 'l1',
-          leave_from: '2026-06-12',
-          leave_to: '2026-06-15',
-          reason: 'Sister\'s marriage ceremony in hometown',
-          destination: 'Jaipur, Rajasthan',
-          parent_consent: true,
-          status: 'pending',
-          approval_notes: null,
-          created_at: '2026-06-09T10:00:00Z',
-          students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042' }
-        },
-        {
-          id: 'l2',
-          leave_from: '2026-05-20',
-          leave_to: '2026-05-24',
-          reason: 'Severe illness and home recovery recommended by doctor',
-          destination: 'New Delhi',
-          parent_consent: true,
-          status: 'approved',
-          approval_notes: 'Take care and submit medical certificate upon return.',
-          created_at: '2026-05-18T14:00:00Z',
-          students: { name: 'Rohit Sharma', roll_number: 'EC23B2051' }
-        }
-      ]);
+      setLeaves([]);
     } finally {
       setLoading(false);
     }

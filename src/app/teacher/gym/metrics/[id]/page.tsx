@@ -36,7 +36,7 @@ export default function TrainerEnterMetrics({ params }: { params: { id: string }
       console.log('Error loading student details, using mock fallback');
       setStudent({
         id: studentId,
-        name: 'Khushal Patel',
+        name: '',
         roll_number: 'CS22B005',
         department: 'Computer Science'
       });

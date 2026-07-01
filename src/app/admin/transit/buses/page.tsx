@@ -51,62 +51,12 @@ export default function AdminBusesManagementPage() {
       if (driverRes.success) {
         setDrivers(driverRes.drivers || []);
       } else {
-        // Fallback drivers fetch mock if endpoint is empty
-        setDrivers([
-          { id: 'd1', user_id: 'b0000000-0000-0000-0000-000000000013', license_number: 'DL-14202500009', users: { name: 'Rajesh Kumar', phone: '+919829012347' } },
-          { id: 'd2', user_id: 'b0000000-0000-0000-0000-000000000014', license_number: 'DL-14202500010', users: { name: 'Vikram Singh', phone: '+919829012348' } }
-        ]);
+        setDrivers([]);
       }
     } catch {
-      // Mock Fallbacks if server is down during dev
-      const mockRoutes = [
-        { id: '80000000-0000-0000-0000-000000000001', name: 'Jodhpur Central Route', route_number: 'ROUTE-101' },
-        { id: '80000000-0000-0000-0000-000000000002', name: 'Mandore Outskirts Route', route_number: 'ROUTE-102' }
-      ];
-      const mockDrivers = [
-        { id: 'd1', user_id: 'b0000000-0000-0000-0000-000000000013', license_number: 'DL-14202500009', users: { name: 'Rajesh Kumar', phone: '+919829012347' } },
-        { id: 'd2', user_id: 'b0000000-0000-0000-0000-000000000014', license_number: 'DL-14202500010', users: { name: 'Vikram Singh', phone: '+919829012348' } }
-      ];
-      // Expiry calculation helper for mocking warning soon
-      const warnDate = new Date();
-      warnDate.setDate(warnDate.getDate() + 15);
-      const safeDate = new Date();
-      safeDate.setDate(safeDate.getDate() + 120);
-
-      const mockBuses = [
-        {
-          id: '70000000-0000-0000-0000-000000000001',
-          vehicle_number: 'RJ-19-PB-4050',
-          model: 'Tata Starbus 40-Seater',
-          capacity: 40,
-          route_id: '80000000-0000-0000-0000-000000000001',
-          driver_id: 'b0000000-0000-0000-0000-000000000013',
-          device_id: 'GPS-DEV-4050',
-          insurance_expiry: warnDate.toISOString().split('T')[0], // Expires soon
-          fitness_expiry: safeDate.toISOString().split('T')[0],
-          is_active: true,
-          bus_routes: { name: 'Jodhpur Central Route' },
-          users: { name: 'Rajesh Kumar' }
-        },
-        {
-          id: '70000000-0000-0000-0000-000000000002',
-          vehicle_number: 'RJ-19-PB-8820',
-          model: 'Tata Starbus 50-Seater',
-          capacity: 50,
-          route_id: '80000000-0000-0000-0000-000000000002',
-          driver_id: 'b0000000-0000-0000-0000-000000000014',
-          device_id: 'GPS-DEV-8820',
-          insurance_expiry: safeDate.toISOString().split('T')[0],
-          fitness_expiry: safeDate.toISOString().split('T')[0],
-          is_active: true,
-          bus_routes: { name: 'Mandore Outskirts Route' },
-          users: { name: 'Vikram Singh' }
-        }
-      ];
-
-      setRoutes(mockRoutes);
-      setDrivers(mockDrivers);
-      setBuses(mockBuses);
+      setRoutes([]);
+      setDrivers([]);
+      setBuses([]);
     } finally {
       setLoading(false);
     }

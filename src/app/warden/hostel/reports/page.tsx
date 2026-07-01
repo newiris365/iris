@@ -33,44 +33,9 @@ export default function WardenReportsPage() {
       }
     } catch {
       // Mock Data Fallbacks
-      setDefaulters([
-        {
-          id: 'fd1',
-          month: '2026-05-01',
-          amount: 6500,
-          penalty: 250,
-          due_date: '2026-05-15',
-          students: {
-            name: 'Vikram Aditya',
-            roll_number: 'ME23B1089',
-            guardian_phone: '+91 99887 76655'
-          }
-        },
-        {
-          id: 'fd2',
-          month: '2026-05-01',
-          amount: 6500,
-          penalty: 250,
-          due_date: '2026-05-15',
-          students: {
-            name: 'Sneha Reddy',
-            roll_number: 'CS23B1099',
-            guardian_phone: '+91 88776 65544'
-          }
-        }
-      ]);
+      setDefaulters([]);
 
-      setInsideVisitors([
-        {
-          id: 'v1',
-          visitor_name: 'Rajesh Mehta',
-          relation: 'Father',
-          visitor_phone: '+91 98765 43210',
-          gate_pass_id: 'GP-VIS826X',
-          in_time: new Date(Date.now() - 4.5 * 3600 * 1000).toISOString(), // 4.5 hours ago
-          students: { name: 'Priyansh Mehta', roll_number: 'CS23B1042' }
-        }
-      ]);
+      setInsideVisitors([]);
     } finally {
       setLoading(false);
     }

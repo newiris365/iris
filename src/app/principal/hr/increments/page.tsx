@@ -35,32 +35,7 @@ export default function PrincipalIncrements() {
       if (data.success) setIncrements([]);
     } catch {
       // Mock data
-      setIncrements([
-        {
-          id: 'inc-001', employee_name: 'Dr. Rajesh Sharma', department: 'Computer Science',
-          designation: 'Associate Professor', current_basic: 78000, proposed_basic: 85800,
-          increment_percent: 10, hod_recommendation: 'Strongly recommend — exceptional research output and student feedback scores.',
-          appraisal_score: 4.2, status: 'pending', effective_date: '2026-07-01'
-        },
-        {
-          id: 'inc-002', employee_name: 'Prof. Meera Gupta', department: 'Mechanical Eng.',
-          designation: 'Assistant Professor', current_basic: 62000, proposed_basic: 65100,
-          increment_percent: 5, hod_recommendation: 'Standard increment recommended. Good teaching, needs more publications.',
-          appraisal_score: 3.5, status: 'pending', effective_date: '2026-07-01'
-        },
-        {
-          id: 'inc-003', employee_name: 'Mr. Vikram Singh', department: 'Administration',
-          designation: 'Senior Clerk', current_basic: 32000, proposed_basic: 34560,
-          increment_percent: 8, hod_recommendation: 'Reliable performer. Managed digitization of 2000+ student records.',
-          appraisal_score: 3.8, status: 'pending', effective_date: '2026-07-01'
-        },
-        {
-          id: 'inc-004', employee_name: 'Dr. Anita Verma', department: 'Civil Eng.',
-          designation: 'Professor', current_basic: 95000, proposed_basic: 106400,
-          increment_percent: 12, hod_recommendation: 'Top performer. Secured ₹25L AICTE grant. Promotion-worthy.',
-          appraisal_score: 4.4, status: 'approved', effective_date: '2026-07-01'
-        }
-      ]);
+      setIncrements([]);
     } finally {
       setLoading(false);
     }

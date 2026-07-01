@@ -12,9 +12,9 @@ export default function StudentTimetablePage() {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
   useEffect(() => {
-    // Sandbox student profile ID
-    apiGet('/core/timetable/student/b0000000-0000-0000-0000-000000000006').then(res => {
-      if (res.success) {
+    const studentId = '';
+    (studentId ? apiGet(`/core/timetable/student/${studentId}`) : Promise.resolve({} as any)).then(res => {
+      if (res?.success) {
         setTimetable(res.timetable || []);
       }
       setIsLoading(false);

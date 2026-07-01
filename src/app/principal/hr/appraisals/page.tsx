@@ -43,36 +43,7 @@ export default function PrincipalAppraisals() {
       }
     } catch {
       // Mock data
-      setAppraisals([
-        {
-          id: 'apr-001', employee_name: 'Dr. Rajesh Sharma', department: 'Computer Science',
-          designation: 'Associate Professor', self_rating: 4.2, hod_rating: 4.0, principal_rating: null,
-          status: 'hod_reviewed', self_comments: 'Conducted advanced ML workshops and published 2 papers in IEEE.',
-          hod_comments: 'Consistent performer with strong research output. Recommended for increment.',
-          cycle_name: 'Annual Appraisal 2025-26'
-        },
-        {
-          id: 'apr-002', employee_name: 'Prof. Meera Gupta', department: 'Mechanical Eng.',
-          designation: 'Assistant Professor', self_rating: 3.8, hod_rating: 3.5, principal_rating: null,
-          status: 'hod_reviewed', self_comments: 'Led student innovation lab and mentored 5 final year projects.',
-          hod_comments: 'Good teaching feedback but research output needs improvement.',
-          cycle_name: 'Annual Appraisal 2025-26'
-        },
-        {
-          id: 'apr-003', employee_name: 'Mr. Vikram Singh', department: 'Administration',
-          designation: 'Senior Clerk', self_rating: 3.5, hod_rating: 3.8, principal_rating: null,
-          status: 'hod_reviewed', self_comments: 'Managed admission documentation and digitized 2000+ student files.',
-          hod_comments: 'Exemplary administrative support. Proactive and reliable.',
-          cycle_name: 'Annual Appraisal 2025-26'
-        },
-        {
-          id: 'apr-004', employee_name: 'Dr. Anita Verma', department: 'Civil Eng.',
-          designation: 'Professor', self_rating: 4.5, hod_rating: 4.3, principal_rating: 4.4,
-          status: 'finalized', self_comments: 'Secured AICTE grant of ₹25 lakhs. Published 3 SCI journals.',
-          hod_comments: 'Outstanding performance. Strongly recommended for promotion.',
-          cycle_name: 'Annual Appraisal 2025-26'
-        }
-      ]);
+      setAppraisals([]);
     } finally {
       setLoading(false);
     }

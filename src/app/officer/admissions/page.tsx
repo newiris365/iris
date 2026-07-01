@@ -51,78 +51,7 @@ export default function OfficerQueuePage() {
       }
     } catch {
       // Offline fallback mock data
-      const mockApplicants: ApplicantRecord[] = [
-        {
-          id: 'b0000000-0000-0000-0000-000000009999',
-          application_number: 'SIET-2026-884920',
-          first_name: 'Khushal',
-          last_name: 'Gehlot',
-          email: 'khushal@gmail.com',
-          phone: '+91 98765 43210',
-          status: 'submitted',
-          created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          merit_score: 88.5,
-          academic_records: [
-            { level: '10th', board_university: 'CBSE', year_of_passing: 2022, percentage: 92.4 },
-            { level: '12th', board_university: 'CBSE', year_of_passing: 2024, percentage: 89.6 }
-          ],
-          entrance_scores: [
-            { exam_name: 'JEE Main', score: 184, percentile: 97.42, rank: 28492 }
-          ]
-        },
-        {
-          id: 'b0000000-0000-0000-0000-000000009991',
-          application_number: 'SIET-2026-112930',
-          first_name: 'Priyanka',
-          last_name: 'Sharma',
-          email: 'priyanka@gmail.com',
-          phone: '+91 99887 76655',
-          status: 'verified',
-          created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          merit_score: 91.2,
-          academic_records: [
-            { level: '10th', board_university: 'RBSE', year_of_passing: 2022, percentage: 94.0 },
-            { level: '12th', board_university: 'RBSE', year_of_passing: 2024, percentage: 93.4 }
-          ],
-          entrance_scores: [
-            { exam_name: 'JEE Main', score: 198, percentile: 98.12, rank: 19302 }
-          ]
-        },
-        {
-          id: 'b0000000-0000-0000-0000-000000009992',
-          application_number: 'SIET-2026-556942',
-          first_name: 'Amit',
-          last_name: 'Jangid',
-          email: 'amit@gmail.com',
-          phone: '+91 91122 33445',
-          status: 'shortlisted',
-          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          merit_score: 79.8,
-          academic_records: [
-            { level: '10th', board_university: 'CBSE', year_of_passing: 2022, percentage: 82.0 },
-            { level: '12th', board_university: 'CBSE', year_of_passing: 2024, percentage: 81.5 }
-          ],
-          entrance_scores: []
-        },
-        {
-          id: 'b0000000-0000-0000-0000-000000009993',
-          application_number: 'SIET-2026-442819',
-          first_name: 'Divya',
-          last_name: 'Choudhary',
-          email: 'divya@gmail.com',
-          phone: '+91 94140 12345',
-          status: 'offered',
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          merit_score: 93.5,
-          academic_records: [
-            { level: '10th', board_university: 'CBSE', year_of_passing: 2022, percentage: 95.2 },
-            { level: '12th', board_university: 'CBSE', year_of_passing: 2024, percentage: 94.8 }
-          ],
-          entrance_scores: [
-            { exam_name: 'JEE Main', score: 210, percentile: 98.92, rank: 9812 }
-          ]
-        }
-      ];
+      const mockApplicants: ApplicantRecord[] = [];
       setApplicants(mockApplicants);
     } finally {
       setLoading(false);

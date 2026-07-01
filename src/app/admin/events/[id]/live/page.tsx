@@ -72,11 +72,7 @@ export default function AdminLiveControlPanel() {
       { option: 'GPT-4o', votes: 78 },
       { option: 'Gemini 1.5 Pro', votes: 94 }
     ]);
-    setQuestions([
-      { id: 'q1', question: 'Will there be GPU servers provided for hosting large neural networks during hackathon?', upvotes: 24, is_approved: true, is_answered: false, students: { name: 'Rahul Verma' } },
-      { id: 'q2', question: 'Can we submit React Native apps for review or only web apps?', upvotes: 15, is_approved: false, is_answered: false, students: { name: 'Ananya Iyer' } },
-      { id: 'q3', question: 'Is the API gateway rate-limit credentials shared in email?', upvotes: 8, is_approved: true, is_answered: true, students: { name: 'Kabir Singh' } }
-    ]);
+    setQuestions([]);
   };
 
   const setupSockets = () => {

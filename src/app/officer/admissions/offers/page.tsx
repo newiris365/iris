@@ -54,11 +54,7 @@ export default function OfficerOffersPage() {
       setSelectedListId(mockLists[0].id);
 
       // Mock offer log
-      setOffersLog([
-        { id: 'off-1', applicant_name: 'Priyanka Sharma', program_code: 'BTECH-CSE', status: 'accepted', offered_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), expires_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'off-2', applicant_name: 'Khushal Gehlot', program_code: 'BTECH-CSE', status: 'sent', offered_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), expires_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'off-3', applicant_name: 'Amit Jangid', program_code: 'BTECH-CSE', status: 'expired', offered_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(), expires_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() }
-      ]);
+      setOffersLog([]);
     }
   }
 

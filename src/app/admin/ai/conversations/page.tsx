@@ -51,11 +51,7 @@ export default function AdminConversationsPage() {
       }
     } catch {
       // Sandbox Fallbacks
-      const fallbackList: SessionItem[] = [
-        { session_id: 'sess_1', updated_at: new Date().toISOString(), snippet: 'My attendance statistics?', channel: 'app', name: 'Khushal Gehlot' },
-        { session_id: 'wa_919999988888', updated_at: new Date(Date.now() - 3600000).toISOString(), snippet: 'Meri attendance kya hai', channel: 'whatsapp', name: 'Rohan Sharma' },
-        { session_id: 'sess_2', updated_at: new Date(Date.now() - 7200000).toISOString(), snippet: 'Canteen token wallet recharge', channel: 'web', name: 'Vikram Gehlot' }
-      ];
+      const fallbackList: SessionItem[]  = [];
       setSessions(fallbackList);
       setFilteredSessions(fallbackList);
       setSelectedSessionId('sess_1');
@@ -80,20 +76,14 @@ export default function AdminConversationsPage() {
     } catch {
       // Sandbox Fallback chats
       if (sessId === 'wa_919999988888') {
-        setHistory([
-          { role: 'user', content: 'Meri attendance kya hai', timestamp: new Date(Date.now() - 3600000).toISOString() },
-          { role: 'assistant', content: 'नमस्ते Rohan! आपकी अटेंडेंस इस महीने 76% है। Science में 80%, Maths में 71% है। 75% से ऊपर रखने के लिए अगले 3 क्लास miss मत करना! 📚', timestamp: new Date(Date.now() - 3590000).toISOString() }
-        ]);
+        setHistory([]);
       } else if (sessId === 'sess_2') {
         setHistory([
           { role: 'user', content: 'Canteen token wallet recharge', timestamp: new Date(Date.now() - 7200000).toISOString() },
           { role: 'assistant', content: 'Your canteen wallet balance is ₹350. To recharge your wallet balance, navigate to the billing panel here: /student/canteen/wallet', timestamp: new Date(Date.now() - 7190000).toISOString() }
         ]);
       } else {
-        setHistory([
-          { role: 'user', content: 'My attendance statistics?', timestamp: new Date().toISOString() },
-          { role: 'assistant', content: 'Hi Khushal! Your current overall attendance is 88%. You have no classes scheduled for the rest of today.', timestamp: new Date().toISOString() }
-        ]);
+        setHistory([]);
       }
     } finally {
       setLoadingHistory(false);

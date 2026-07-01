@@ -31,7 +31,7 @@ export default function StudentVisitorsPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 'c0000000-0000-0000-0000-000000000006';
+      const studentId = user?.student_id || '';
 
       const res = await apiGet(`/hostel/visitors?studentId=${studentId}`);
       if (res.success) {
@@ -76,7 +76,7 @@ export default function StudentVisitorsPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 'c0000000-0000-0000-0000-000000000006';
+      const studentId = user?.student_id || '';
 
       const res = await apiPost('/hostel/visitors', {
         ...form,
@@ -238,7 +238,7 @@ export default function StudentVisitorsPage() {
                     <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Guest Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. Rajesh Kumar"
+                      placeholder=""
                       value={form.visitor_name}
                       onChange={e => setForm({ ...form, visitor_name: e.target.value })}
                       className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-[#6C2BD9]/50 focus:outline-none"

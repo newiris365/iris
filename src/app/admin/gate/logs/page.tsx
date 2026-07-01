@@ -32,12 +32,7 @@ export default function AdminMovementLogsPage() {
       }
     } catch {
       // Mock Fallbacks
-      setLogs([
-        { id: 'l-1', person_name: 'Khushal Gehlot', person_type: 'student', entry_method: 'rfid', direction: 'in', gate_number: 'main', timestamp: `${selectedDate}T09:12:00Z`, reason: 'Regular Entry' },
-        { id: 'l-2', person_name: 'Dr. K. R. Sharma', person_type: 'staff', entry_method: 'biometric', direction: 'in', gate_number: 'academic_gate', timestamp: `${selectedDate}T09:40:00Z`, reason: 'Regular Entry' },
-        { id: 'l-3', person_name: 'Alok Kumar', person_type: 'visitor', entry_method: 'visitor_pass', direction: 'in', gate_number: 'main', timestamp: `${selectedDate}T10:15:00Z`, reason: 'Approved Visitor' },
-        { id: 'l-4', person_name: 'Khushal Gehlot', person_type: 'student', entry_method: 'rfid', direction: 'out', gate_number: 'main', timestamp: `${selectedDate}T13:45:00Z`, reason: 'Early exit approved' }
-      ]);
+      setLogs([]);
     } finally {
       setLoading(false);
     }

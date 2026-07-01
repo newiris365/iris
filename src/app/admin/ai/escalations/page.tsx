@@ -49,44 +49,7 @@ export default function AdminEscalationsPage() {
       }
     } catch {
       // Sandbox Fallbacks
-      const fallbackList: Escalation[] = [
-        {
-          id: 'esc1',
-          conversation_id: 'sess_1',
-          user_id: 'u1',
-          query: 'I need to contest my attendance percentage. Who can change my present records?',
-          reason: 'User explicitly requested a human staff override.',
-          status: 'pending',
-          resolved_at: null,
-          resolution: null,
-          created_at: new Date().toISOString(),
-          users: { name: 'Khushal Gehlot', email: 'khushal@siet.edu.in', role: 'Student' }
-        },
-        {
-          id: 'esc2',
-          conversation_id: 'wa_919999988888',
-          user_id: 'u2',
-          query: 'My exam result shows F grade, but I passed my recheck reviews.',
-          reason: 'Fuzzy query matched recheck complaints triggers.',
-          status: 'pending',
-          resolved_at: null,
-          resolution: null,
-          created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-          users: { name: 'Rohan Sharma', email: 'rohan@siet.edu.in', role: 'Student' }
-        },
-        {
-          id: 'esc3',
-          conversation_id: 'sess_2',
-          user_id: 'u3',
-          query: 'Hostel room door lock key missing.',
-          reason: 'Escalated to warden dispatcher room.',
-          status: 'resolved',
-          resolved_at: new Date().toISOString(),
-          resolution: 'Allocated duplicate key and handed to security guard.',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          users: { name: 'Vikram Gehlot', email: 'vikram@siet.edu.in', role: 'Student' }
-        }
-      ];
+      const fallbackList: Escalation[]  = [];
       setEscalations(fallbackList);
       setSelectedTicket(fallbackList[0]);
     } finally {

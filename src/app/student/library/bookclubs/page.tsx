@@ -27,7 +27,7 @@ export default function BookClubsPage() {
   useEffect(() => {
     const userStr = localStorage.getItem('iris_user_profile');
     const user = userStr ? JSON.parse(userStr) : null;
-    const stdId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+    const stdId = user?.student_id || user?.id || '';
     setStudentId(stdId);
     loadClubs();
   }, []);
@@ -70,16 +70,7 @@ export default function BookClubsPage() {
       setClubs(mockClubs);
       setSelectedClub(mockClubs[0]);
       // Load mock discussions directly
-      setDiscussions([
-        {
-          id: 'd1',
-          chapter: 'Chapter 1: Foundations',
-          question: 'What are the main time complexities we care about in practice and why does asymptotic order matter?',
-          responses: [
-            { name: 'Khushal Patel', response: 'Asymptotic order matters because for larger datasets, lower-order terms become negligible compared to growth rates.', posted_at: '2026-06-09T16:00:00Z' }
-          ]
-        }
-      ]);
+      setDiscussions([]);
     } finally {
       setLoading(false);
     }
@@ -154,7 +145,7 @@ export default function BookClubsPage() {
     } catch {
       // mock callback
       setCertificate({
-        student_name: 'Khushal Patel',
+        student_name: '',
         book_title: selectedClub.books?.title || selectedClub.name,
         verification_code: 'CERT-MOCK88',
         url: 'https://iris365.edu/verify/certificate/MOCK88'

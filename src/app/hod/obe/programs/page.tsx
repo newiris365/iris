@@ -61,19 +61,11 @@ export default function HodCoursesOverview() {
         setCourses(mapped);
       } else {
         // Fallback mock roster
-        setCourses([
-          { id: 'c-1', course_code: 'CS-401', course_name: 'Advanced Web Applications', teacher_name: 'Prof. Satish Kumar', status: 'attained', co_mapped: true, marks_entered: true, attainment_score: 75.0 },
-          { id: 'c-2', course_code: 'CS-402', course_name: 'Database Security & Sharding', teacher_name: 'Dr. Amit Mehta', status: 'configured', co_mapped: true, marks_entered: false },
-          { id: 'c-3', course_code: 'CS-408', course_name: 'Outcome Based Machine Learning', teacher_name: 'Prof. Satish Kumar', status: 'draft', co_mapped: false, marks_entered: false }
-        ]);
+        setCourses([]);
       }
     } catch (err) {
       // Fallback
-      setCourses([
-        { id: 'c-1', course_code: 'CS-401', course_name: 'Advanced Web Applications', teacher_name: 'Prof. Satish Kumar', status: 'attained', co_mapped: true, marks_entered: true, attainment_score: 75.0 },
-        { id: 'c-2', course_code: 'CS-402', course_name: 'Database Security & Sharding', teacher_name: 'Dr. Amit Mehta', status: 'configured', co_mapped: true, marks_entered: false },
-        { id: 'c-3', course_code: 'CS-408', course_name: 'Outcome Based Machine Learning', teacher_name: 'Prof. Satish Kumar', status: 'draft', co_mapped: false, marks_entered: false }
-      ]);
+      setCourses([]);
     } finally {
       setLoading(false);
     }
