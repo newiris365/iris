@@ -58,14 +58,8 @@ export default function StudentGymBooking() {
       if (slotsRes.success) setSlots(slotsRes.slots || []);
       if (bookRes.success) setBookings(bookRes.bookings || []);
     } catch (err) {
-      console.log('Error loading slots, using fallback mocks');
-      // Fallback mocks
-      setSlots([
-        { id: 's1', date: selectedDate, start_time: '06:00:00', end_time: '07:30:00', capacity: 30, booked_count: 12, slot_type: 'general', gym_trainers: { name: 'Rahul Sharma' } },
-        { id: 's2', date: selectedDate, start_time: '08:00:00', end_time: '09:30:00', capacity: 25, booked_count: 25, slot_type: 'cardio-only', gym_trainers: { name: 'Pooja Sen' } },
-        { id: 's3', date: selectedDate, start_time: '17:00:00', end_time: '18:30:00', capacity: 40, booked_count: 38, slot_type: 'weights-only', gym_trainers: { name: 'Vikram Singh' } },
-        { id: 's4', date: selectedDate, start_time: '19:00:00', end_time: '20:30:00', capacity: 35, booked_count: 8, slot_type: 'yoga', gym_trainers: null }
-      ]);
+      console.log('Error loading slots');
+      setSlots([]);
       setBookings([]);
     } finally {
       setLoading(false);

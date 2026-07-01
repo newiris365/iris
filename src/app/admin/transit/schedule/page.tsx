@@ -63,60 +63,9 @@ export default function AdminTransitSchedulePage() {
         setTrips(allTrips);
       }
     } catch {
-      // Mock Fallbacks
-      setBuses([
-        { id: '70000000-0000-0000-0000-000000000001', vehicle_number: 'RJ-19-PB-4050', model: 'Tata Starbus 40-Seater', driver_id: 'b0000000-0000-0000-0000-000000000013', users: { name: 'Rajesh Kumar' } },
-        { id: '70000000-0000-0000-0000-000000000002', vehicle_number: 'RJ-19-PB-8820', model: 'Tata Starbus 50-Seater', driver_id: 'b0000000-0000-0000-0000-000000000014', users: { name: 'Vikram Singh' } }
-      ]);
-      setRoutes([
-        {
-          id: '80000000-0000-0000-0000-000000000001',
-          name: 'Jodhpur Central Route',
-          route_number: 'ROUTE-101',
-          stops: [
-            { name: "Sardarpura 4th Road", scheduled_time_morning: "08:00 AM", scheduled_time_evening: "05:30 PM" },
-            { name: "Shastri Nagar Circle", scheduled_time_morning: "08:15 AM", scheduled_time_evening: "05:15 PM" },
-            { name: "SIET Campus Terminal", scheduled_time_morning: "08:45 AM", scheduled_time_evening: "04:45 PM" }
-          ]
-        },
-        {
-          id: '80000000-0000-0000-0000-000000000002',
-          name: 'Mandore Outskirts Route',
-          route_number: 'ROUTE-102',
-          stops: [
-            { name: "Mandore Garden Stop", scheduled_time_morning: "07:50 AM", scheduled_time_evening: "05:40 PM" },
-            { name: "Paota Circle Hub", scheduled_time_morning: "08:10 AM", scheduled_time_evening: "05:20 PM" },
-            { name: "SIET Campus Terminal", scheduled_time_morning: "08:45 AM", scheduled_time_evening: "04:45 PM" }
-          ]
-        }
-      ]);
-
-      setTrips([
-        {
-          id: 'trip-1',
-          bus_id: '70000000-0000-0000-0000-000000000001',
-          route_id: '80000000-0000-0000-0000-000000000001',
-          trip_date: new Date().toISOString().split('T')[0],
-          trip_type: 'morning',
-          scheduled_start: new Date().toISOString().split('T')[0] + 'T08:00:00Z',
-          actual_start: new Date().toISOString().split('T')[0] + 'T08:05:00Z',
-          actual_end: new Date().toISOString().split('T')[0] + 'T08:52:00Z',
-          status: 'completed',
-          passenger_count: 32,
-          bus_routes: { name: 'Jodhpur Central Route' }
-        },
-        {
-          id: 'trip-2',
-          bus_id: '70000000-0000-0000-0000-000000000002',
-          route_id: '80000000-0000-0000-0000-000000000002',
-          trip_date: new Date().toISOString().split('T')[0],
-          trip_type: 'evening',
-          scheduled_start: new Date().toISOString().split('T')[0] + 'T17:00:00Z',
-          status: 'scheduled',
-          passenger_count: 0,
-          bus_routes: { name: 'Mandore Outskirts Route' }
-        }
-      ]);
+      setBuses([]);
+      setRoutes([]);
+      setTrips([]);
     } finally {
       setLoading(false);
     }

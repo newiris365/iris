@@ -40,36 +40,7 @@ export default function StudentVisitorsPage() {
         throw new Error('API Error');
       }
     } catch {
-      // Mock data fallbacks
-      setVisitors([
-        {
-          id: 'v1',
-          visitor_name: 'Rajesh Mehta',
-          visitor_phone: '+91 98765 43210',
-          visitor_id_type: 'Aadhaar',
-          visitor_id_number: 'XXXX XXXX 1234',
-          relation: 'Father',
-          purpose: 'Delivering winter clothing and home food',
-          gate_pass_id: 'GP-VIS826X',
-          in_time: new Date().toISOString(),
-          status: 'inside',
-          is_approved: true
-        },
-        {
-          id: 'v2',
-          visitor_name: 'Amit Sharma',
-          visitor_phone: '+91 91111 22222',
-          visitor_id_type: 'Driving License',
-          visitor_id_number: 'DL-XXXXXX992',
-          relation: 'Friend',
-          purpose: 'Group study reference textbook delivery',
-          gate_pass_id: 'GP-VIS103Q',
-          in_time: '2026-06-08T15:00:00Z',
-          out_time: '2026-06-08T16:30:00Z',
-          status: 'checked_out',
-          is_approved: true
-        }
-      ]);
+      setVisitors([]);
     } finally {
       setLoading(false);
     }

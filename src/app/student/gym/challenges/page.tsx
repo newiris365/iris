@@ -91,43 +91,11 @@ export default function StudentChallengesPage() {
         setCampusLeaderboard(ldRes.leaderboard);
       }
     } catch (err) {
-      console.log('Error loading challenges or points data, using fallback mocks');
-      // Fallback Mocks
-      setChallenges([
-        {
-          id: 'c1',
-          name: '10K Daily Steps Marathon',
-          description: 'Log steps daily. Walk your way to victory and earn points.',
-          challenge_type: 'steps',
-          start_date: '2026-06-01',
-          end_date: '2026-06-15',
-          target_value: 70000,
-          unit: 'steps',
-          is_active: true
-        },
-        {
-          id: 'c2',
-          name: 'FitZone Workout Streak Challenge',
-          description: 'Complete 10 workouts at the campus gym during this challenge.',
-          challenge_type: 'workouts',
-          start_date: '2026-06-01',
-          end_date: '2026-06-30',
-          target_value: 10,
-          unit: 'sessions',
-          is_active: true
-        }
-      ]);
-      setFitPointsTotal(340);
-      setFitPointsLogs([
-        { id: '1', points: 100, reason: '7-Day check-in streak bonus', created_at: '2026-06-09T08:00:00Z' },
-        { id: '2', points: 10, reason: 'Daily wellness check-in completed', created_at: '2026-06-09T08:00:00Z' },
-        { id: '3', points: 10, reason: 'Daily wellness check-in completed', created_at: '2026-06-08T08:00:00Z' }
-      ]);
-      setCampusLeaderboard([
-        { name: 'Khushal Gehlot', roll: 'CS23B1024', dept: 'Computer Science', points: 340 },
-        { name: 'Alok Kumar', roll: 'EE23B2014', dept: 'Electrical Engineering', points: 280 },
-        { name: 'Vikram Singh', roll: 'ME23B3052', dept: 'Mechanical Engineering', points: 150 }
-      ]);
+      console.log('Error loading challenges or points data');
+      setChallenges([]);
+      setFitPointsTotal(0);
+      setFitPointsLogs([]);
+      setCampusLeaderboard([]);
     } finally {
       setLoading(false);
     }

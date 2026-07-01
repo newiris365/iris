@@ -53,21 +53,10 @@ export default function CollegeMessPage() {
       if (res && res.success && res.allocations && res.allocations.length > 0) {
         setIsHosteller(true);
       } else {
-        // Fallback for mock sandbox profiles
-        if (user && (user.email === 'khushal@gmail.com' || user.email === 'khushal@iris365.edu')) {
-          setIsHosteller(true);
-        } else {
-          setIsHosteller(false);
-        }
-      }
-    } catch {
-      const userStr = localStorage.getItem('iris_user_profile');
-      const user = userStr ? JSON.parse(userStr) : null;
-      if (user && (user.email === 'khushal@gmail.com' || user.email === 'khushal@iris365.edu')) {
-        setIsHosteller(true);
-      } else {
         setIsHosteller(false);
       }
+    } catch {
+      setIsHosteller(false);
     } finally {
       setLoading(false);
     }

@@ -3,58 +3,26 @@ import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Users, GraduationCap, Target, Calendar, ChevronDown, Download } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
-const mockData = {
+const emptyData = {
   keyMetrics: {
-    totalStudents: 842,
-    avgAttendance: 78.5,
-    passRate: 91.2,
-    placementRate: 85.7,
-    avgCGPA: 7.6,
+    totalStudents: 0,
+    avgAttendance: 0,
+    passRate: 0,
+    placementRate: 0,
+    avgCGPA: 0,
   },
-  attendanceTrend: [
-    { month: 'Jan', rate: 72 },
-    { month: 'Feb', rate: 75 },
-    { month: 'Mar', rate: 78 },
-    { month: 'Apr', rate: 80 },
-    { month: 'May', rate: 76 },
-    { month: 'Jun', rate: 82 },
-  ],
-  resultTrend: [
-    { semester: 'Sem 1', passRate: 88 },
-    { semester: 'Sem 2', passRate: 90 },
-    { semester: 'Sem 3', passRate: 91 },
-    { semester: 'Sem 4', passRate: 94 },
-  ],
-  subjectPerformance: [
-    { subject: 'Mathematics', avgScore: 72, passRate: 85 },
-    { subject: 'Physics', avgScore: 68, passRate: 80 },
-    { subject: 'Computer Science', avgScore: 78, passRate: 92 },
-    { subject: 'Electronics', avgScore: 74, passRate: 88 },
-    { subject: 'Mechanics', avgScore: 65, passRate: 78 },
-  ],
-  departmentComparison: [
-    { name: 'Computer Science', avgCGPA: 8.1, placementRate: 92 },
-    { name: 'Electronics', avgCGPA: 7.8, placementRate: 87 },
-    { name: 'Mechanical', avgCGPA: 7.2, placementRate: 78 },
-    { name: 'Civil', avgCGPA: 7.0, placementRate: 72 },
-    { name: 'Chemical', avgCGPA: 7.4, placementRate: 80 },
-  ],
-  yearOverYear: {
-    studentGrowth: 12.5,
-    attendanceGrowth: 8.3,
-    passRateGrowth: 3.2,
-    placementGrowth: 15.8,
-  },
-  quickInsights: [
-    { title: 'Top Performer Dept', value: 'Computer Science', trend: 'up' },
-    { title: 'Most Improved', value: 'Mechanical', trend: 'up' },
-    { title: 'Attendance Alert', value: 'Chemical Dept', trend: 'down' },
-    { title: 'Placement Leader', value: '92% CS', trend: 'up' },
-  ],
+  attendanceTrend: [] as {month:string;rate:number}[],
+  resultTrend: [] as {semester:string;passRate:number}[],
+  subjectPerformance: [] as {subject:string;avgScore:number;passRate:number}[],
+  departmentComparison: [] as {name:string;avgCGPA:number;placementRate:number}[],
+  yearOverYear: { studentGrowth: 0, attendanceGrowth: 0, passRateGrowth: 0, placementGrowth: 0 },
+  quickInsights: [] as {title:string;value:string;trend:string}[],
+  topPerformers: [] as {name:string;cgpa:number;dept:string}[],
+  bottomPerformers: [] as {name:string;cgpa:number;dept:string;attendance:number}[],
 };
 
 export default function HodAnalyticsPage() {
-  const [data, setData] = useState(mockData);
+  const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('current');
   const [selectedDept, setSelectedDept] = useState('all');
@@ -360,13 +328,9 @@ export default function HodAnalyticsPage() {
             <div>
               <h4 className="text-sm font-medium text-green-400 mb-3 uppercase tracking-wide">Top 5 Students</h4>
               <div className="space-y-2">
-                {[
-                  { name: 'Priya Sharma', cgpa: 9.8, dept: 'Computer Science' },
-                  { name: 'Rahul Verma', cgpa: 9.6, dept: 'Electronics' },
-                  { name: 'Ananya Patel', cgpa: 9.5, dept: 'Computer Science' },
-                  { name: 'Vikram Singh', cgpa: 9.4, dept: 'Mechanical' },
-                  { name: 'Neha Gupta', cgpa: 9.3, dept: 'Civil' },
-                ].map((student, i) => (
+                {(data.topPerformers || []).length === 0 ? (
+                  <div className="text-xs text-gray-500 py-4 text-center">No data available</div>
+                ) : (data.topPerformers || []).map((student, i) => (
                   <div key={i} className="flex items-center justify-between bg-[#0D0A1A] rounded-lg px-4 py-3 border border-gray-700 hover:border-green-500/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-green-900/50 flex items-center justify-center text-green-400 text-sm font-bold">
@@ -388,13 +352,9 @@ export default function HodAnalyticsPage() {
             <div>
               <h4 className="text-sm font-medium text-red-400 mb-3 uppercase tracking-wide">Students Need Attention</h4>
               <div className="space-y-2">
-                {[
-                  { name: 'Amit Kumar', cgpa: 4.2, dept: 'Mechanical', attendance: 45 },
-                  { name: 'Suresh Reddy', cgpa: 4.8, dept: 'Civil', attendance: 52 },
-                  { name: 'Deepak Joshi', cgpa: 5.1, dept: 'Chemical', attendance: 48 },
-                  { name: 'Ravi Shankar', cgpa: 5.3, dept: 'Electronics', attendance: 55 },
-                  { name: 'Manoj Tiwari', cgpa: 5.5, dept: 'Computer Science', attendance: 58 },
-                ].map((student, i) => (
+                {(data.bottomPerformers || []).length === 0 ? (
+                  <div className="text-xs text-gray-500 py-4 text-center">No data available</div>
+                ) : (data.bottomPerformers || []).map((student, i) => (
                   <div key={i} className="flex items-center justify-between bg-[#0D0A1A] rounded-lg px-4 py-3 border border-gray-700 hover:border-red-500/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-red-900/50 flex items-center justify-center text-red-400 text-sm font-bold">

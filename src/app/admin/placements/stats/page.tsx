@@ -21,58 +21,36 @@ interface DashboardData {
   ctc_segments: Record<string, number>
 }
 
-const defaultData: DashboardData = {
-  total_eligible: 645,
-  total_placed: 489,
-  total_companies: 87,
-  avg_ctc: 8.4,
-  median_ctc: 6.2,
-  highest_ctc: 45.0,
-  lowest_ctc: 3.5,
-  branch_placement_rates: { CSE: 92, ECE: 78, ME: 65, CE: 71, EE: 69, IT: 88, CH: 58 },
-  ctc_segments: { Dream: 78, Core: 245, Mass: 166 }
-}
-
-const monthlyOffers = [
-  { month: "Aug", offers: 12 }, { month: "Sep", offers: 34 }, { month: "Oct", offers: 56 },
-  { month: "Nov", offers: 78 }, { month: "Dec", offers: 45 }, { month: "Jan", offers: 89 },
-  { month: "Feb", offers: 67 }, { month: "Mar", offers: 56 }, { month: "Apr", offers: 34 },
-  { month: "May", offers: 18 }
-]
-
-const companyOffers = [
-  { company: "TCS", offers: 89 }, { company: "Infosys", offers: 76 }, { company: "Wipro", offers: 64 },
-  { company: "Amazon", offers: 23 }, { company: "Microsoft", offers: 18 }, { company: "Google", offers: 12 },
-  { company: "Flipkart", offers: 15 }, { company: "Accenture", offers: 45 }, { company: "Cognizant", offers: 52 },
-  { company: "HCL", offers: 38 }
-]
-
-const recentPlacements = [
-  { name: "Aarav Sharma", company: "Amazon", ctc: 26.5, branch: "CSE", date: "2026-04-15" },
-  { name: "Priya Patel", company: "Microsoft", ctc: 32.0, branch: "CSE", date: "2026-04-14" },
-  { name: "Rohan Gupta", company: "Google", ctc: 45.0, branch: "CSE", date: "2026-04-13" },
-  { name: "Sneha Reddy", company: "Flipkart", ctc: 18.5, branch: "ECE", date: "2026-04-12" },
-  { name: "Vikram Singh", company: "TCS", ctc: 4.2, branch: "ME", date: "2026-04-11" },
-  { name: "Ananya Nair", company: "Infosys", ctc: 3.8, branch: "CE", date: "2026-04-10" }
-]
-
 const segmentColors = ["#6C2BD9", "#A78BFA", "#C4B5FD"]
 
+
 export default function AdminPlacementStats() {
-  const [data, setData] = useState<DashboardData>(defaultData)
+  const emptyData: DashboardData = {
+    total_eligible: 0, total_placed: 0, total_companies: 0,
+    avg_ctc: 0, median_ctc: 0, highest_ctc: 0, lowest_ctc: 0,
+    branch_placement_rates: {}, ctc_segments: {}
+  }
+  const [data, setData] = useState<DashboardData>(emptyData)
   const [loading, setLoading] = useState(true)
   const [year, setYear] = useState("2026")
-
-
-
-
+  const [recentPlacements, setRecentPlacements] = useState<{name:string;company:string;ctc:number;branch:string;date:string}[]>([])
+  const [monthlyOffers, setMonthlyOffers] = useState<{month:string;offers:number}[]>([])
+  const [companyOffers, setCompanyOffers] = useState<{company:string;offers:number}[]>([])
   const [downloadingReport, setDownloadingReport] = useState(false)
 
   useEffect(() => {
     setLoading(true)
-    apiGet("/placements/analytics/dashboard")
-      .then((res: any) => {
-        if (res && res.total_eligible) setData(res)
+    Promise.all([
+      apiGet("/placements/analytics/dashboard"),
+      apiGet("/placements/analytics/recent"),
+      apiGet("/placements/analytics/monthly-offers"),
+      apiGet("/placements/analytics/company-offers"),
+    ])
+      .then(([dashboard, recent, monthly, company]) => {
+        if (dashboard?.total_eligible) setData(dashboard as unknown as DashboardData)
+        if (recent?.placements) setRecentPlacements(recent.placements)
+        if (monthly?.offers) setMonthlyOffers(monthly.offers)
+        if (company?.offers) setCompanyOffers(company.offers)
       })
       .catch(() => {})
       .finally(() => setTimeout(() => setLoading(false), 600))
@@ -238,30 +216,34 @@ export default function AdminPlacementStats() {
               </button>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-xs text-[#C4B5FD]/60 border-b border-white/5">
-                  <th className="pb-3 font-medium">Student</th>
-                  <th className="pb-3 font-medium">Company</th>
-                  <th className="pb-3 font-medium">CTC (₹L)</th>
-                  <th className="pb-3 font-medium">Branch</th>
-                  <th className="pb-3 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentPlacements.map((p, i) => (
-                  <tr key={i} className="border-b border-white/5 last:border-0">
-                    <td className="py-3 text-white text-sm">{p.name}</td>
-                    <td className="py-3 text-[#C4B5FD] text-sm">{p.company}</td>
-                    <td className="py-3 text-green-400 text-sm font-medium">₹{p.ctc}L</td>
-                    <td className="py-3 text-[#C4B5FD]/70 text-sm">{p.branch}</td>
-                    <td className="py-3 text-[#C4B5FD]/50 text-sm">{p.date}</td>
+          {recentPlacements.length === 0 ? (
+            <div className="py-10 text-center text-[#C4B5FD]/40 text-sm">No placement records found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-xs text-[#C4B5FD]/60 border-b border-white/5">
+                    <th className="pb-3 font-medium">Student</th>
+                    <th className="pb-3 font-medium">Company</th>
+                    <th className="pb-3 font-medium">CTC (₹L)</th>
+                    <th className="pb-3 font-medium">Branch</th>
+                    <th className="pb-3 font-medium">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentPlacements.map((p, i) => (
+                    <tr key={i} className="border-b border-white/5 last:border-0">
+                      <td className="py-3 text-white text-sm">{p.name}</td>
+                      <td className="py-3 text-[#C4B5FD] text-sm">{p.company}</td>
+                      <td className="py-3 text-green-400 text-sm font-medium">₹{p.ctc}L</td>
+                      <td className="py-3 text-[#C4B5FD]/70 text-sm">{p.branch}</td>
+                      <td className="py-3 text-[#C4B5FD]/50 text-sm">{p.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

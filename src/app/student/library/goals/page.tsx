@@ -45,24 +45,9 @@ export default function ReadingGoalsPage() {
       }
     } catch (err) {
       console.error(err);
-      // Fallback Mock data
-      setGoal({ target_books: 12, completed_books: 3, streak_days: 5, points: 640 });
-      setStats({
-        pages_per_day: 12.5,
-        streak: 5,
-        completed: 3,
-        points: 640,
-        genres: [
-          { genre: 'Computer Science', count: 5 },
-          { genre: 'Mathematics', count: 2 },
-          { genre: 'Fiction', count: 1 }
-        ]
-      });
-      setLeaderboard([
-        { id: '1', students: { name: 'Khushal Patel', roll_number: 'CS101' }, pages_read_total: 450, completed_books: 4, points: 900 },
-        { id: '2', students: { name: 'Aarav Mehta', roll_number: 'EC202' }, pages_read_total: 380, completed_books: 3, points: 760 },
-        { id: '3', students: { name: 'Ananya Iyer', roll_number: 'ME303' }, pages_read_total: 320, completed_books: 2, points: 640 }
-      ]);
+      setGoal(null);
+      setStats(null);
+      setLeaderboard([]);
     } finally {
       setLoading(false);
     }

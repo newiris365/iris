@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect } from 'react';
 import { FileText, TrendingUp, Award, AlertTriangle, Download, Filter, ChevronDown, BarChart3, Users, GraduationCap } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
@@ -34,41 +34,7 @@ interface GradeDistribution {
   percentage: number;
 }
 
-const mockSubjects: SubjectPerformance[] = [
-  { id: '1', name: 'Data Structures', code: 'CS201', avgMarks: 72, passRate: 85, highest: 98, lowest: 32, totalStudents: 60, passedStudents: 51 },
-  { id: '2', name: 'Operating Systems', code: 'CS301', avgMarks: 68, passRate: 78, highest: 95, lowest: 28, totalStudents: 60, passedStudents: 47 },
-  { id: '3', name: 'Database Management', code: 'CS302', avgMarks: 75, passRate: 88, highest: 99, lowest: 35, totalStudents: 60, passedStudents: 53 },
-  { id: '4', name: 'Computer Networks', code: 'CS303', avgMarks: 70, passRate: 82, highest: 96, lowest: 30, totalStudents: 60, passedStudents: 49 },
-  { id: '5', name: 'Software Engineering', code: 'CS304', avgMarks: 73, passRate: 86, highest: 97, lowest: 33, totalStudents: 60, passedStudents: 52 },
-  { id: '6', name: 'Web Technologies', code: 'CS305', avgMarks: 78, passRate: 90, highest: 100, lowest: 38, totalStudents: 60, passedStudents: 54 },
-];
 
-const mockStudents: StudentPerformance[] = [
-  { id: '1', name: 'Aarav Patel', rollNumber: 'CS2024001', totalMarks: 542, avgMarks: 90.3, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A+', 'CS301': 'A', 'CS302': 'A+', 'CS303': 'A', 'CS304': 'A+', 'CS305': 'A+' } },
-  { id: '2', name: 'Priya Sharma', rollNumber: 'CS2024002', totalMarks: 538, avgMarks: 89.7, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A', 'CS301': 'A+', 'CS302': 'A', 'CS303': 'A+', 'CS304': 'A', 'CS305': 'A+' } },
-  { id: '3', name: 'Rohan Kumar', rollNumber: 'CS2024003', totalMarks: 535, avgMarks: 89.2, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A+', 'CS301': 'A', 'CS302': 'A', 'CS303': 'A', 'CS304': 'A+', 'CS305': 'A' } },
-  { id: '4', name: 'Sneha Gupta', rollNumber: 'CS2024004', totalMarks: 530, avgMarks: 88.3, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A', 'CS301': 'A', 'CS302': 'A+', 'CS303': 'A', 'CS304': 'A', 'CS305': 'A' } },
-  { id: '5', name: 'Vikram Singh', rollNumber: 'CS2024005', totalMarks: 525, avgMarks: 87.5, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A', 'CS301': 'A', 'CS302': 'A', 'CS303': 'A+', 'CS304': 'A', 'CS305': 'B+' } },
-  { id: '6', name: 'Ananya Reddy', rollNumber: 'CS2024006', totalMarks: 520, avgMarks: 86.7, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A', 'CS301': 'B+', 'CS302': 'A', 'CS303': 'A', 'CS304': 'A+', 'CS305': 'A' } },
-  { id: '7', name: 'Aditya Verma', rollNumber: 'CS2024007', totalMarks: 515, avgMarks: 85.8, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'B+', 'CS301': 'A', 'CS302': 'A', 'CS303': 'A', 'CS304': 'A', 'CS305': 'A' } },
-  { id: '8', name: 'Neha Joshi', rollNumber: 'CS2024008', totalMarks: 508, avgMarks: 84.7, subjectsPassed: 6, subjectsFailed: 0, grades: { 'CS201': 'A', 'CS301': 'B+', 'CS302': 'B+', 'CS303': 'A', 'CS304': 'A', 'CS305': 'A' } },
-  { id: '9', name: 'Karthik Nair', rollNumber: 'CS2024009', totalMarks: 502, avgMarks: 83.7, subjectsPassed: 5, subjectsFailed: 1, grades: { 'CS201': 'B+', 'CS301': 'F', 'CS302': 'A', 'CS303': 'B+', 'CS304': 'A', 'CS305': 'A' } },
-  { id: '10', name: 'Divya Menon', rollNumber: 'CS2024010', totalMarks: 495, avgMarks: 82.5, subjectsPassed: 5, subjectsFailed: 1, grades: { 'CS201': 'B+', 'CS301': 'B+', 'CS302': 'F', 'CS303': 'A', 'CS304': 'B+', 'CS305': 'A' } },
-  { id: '11', name: 'Rahul Desai', rollNumber: 'CS2024011', totalMarks: 488, avgMarks: 81.3, subjectsPassed: 5, subjectsFailed: 1, grades: { 'CS201': 'B', 'CS301': 'B+', 'CS302': 'B+', 'CS303': 'B+', 'CS304': 'F', 'CS305': 'A' } },
-  { id: '12', name: 'Pooja Malhotra', rollNumber: 'CS2024012', totalMarks: 480, avgMarks: 80.0, subjectsPassed: 5, subjectsFailed: 1, grades: { 'CS201': 'B', 'CS301': 'B', 'CS302': 'B+', 'CS303': 'B+', 'CS304': 'B+', 'CS305': 'F' } },
-  { id: '13', name: 'Amitabh Ranjan', rollNumber: 'CS2024013', totalMarks: 385, avgMarks: 64.2, subjectsPassed: 4, subjectsFailed: 2, grades: { 'CS201': 'C', 'CS301': 'F', 'CS302': 'C', 'CS303': 'F', 'CS304': 'B', 'CS305': 'B+' } },
-  { id: '14', name: 'Sakshi Agarwal', rollNumber: 'CS2024014', totalMarks: 370, avgMarks: 61.7, subjectsPassed: 3, subjectsFailed: 3, grades: { 'CS201': 'F', 'CS301': 'F', 'CS302': 'C', 'CS303': 'C', 'CS304': 'F', 'CS305': 'B' } },
-  { id: '15', name: 'Manish Tiwari', rollNumber: 'CS2024015', totalMarks: 355, avgMarks: 59.2, subjectsPassed: 2, subjectsFailed: 4, grades: { 'CS201': 'F', 'CS301': 'F', 'CS302': 'F', 'CS303': 'C', 'CS304': 'F', 'CS305': 'C' } },
-];
-
-const mockGradeDistribution: GradeDistribution[] = [
-  { grade: 'A+', count: 45, percentage: 25 },
-  { grade: 'A', count: 54, percentage: 30 },
-  { grade: 'B+', count: 36, percentage: 20 },
-  { grade: 'B', count: 27, percentage: 15 },
-  { grade: 'C', count: 12, percentage: 7 },
-  { grade: 'F', count: 6, percentage: 3 },
-];
 
 export default function DepartmentExamResults() {
   const [selectedExam, setSelectedExam] = useState<ExamType>('CIE 1');
@@ -96,22 +62,22 @@ export default function DepartmentExamResults() {
             id: String(idx + 1),
             name: course.courseName || course.name || `Subject ${idx + 1}`,
             code: course.courseCode || course.code || `SUB${100 + idx}`,
-            avgMarks: Math.floor(Math.random() * 30) + 60,
-            passRate: Math.floor(Math.random() * 25) + 70,
-            highest: Math.floor(Math.random() * 10) + 90,
-            lowest: Math.floor(Math.random() * 20) + 25,
-            totalStudents: 60,
-            passedStudents: Math.floor(Math.random() * 15) + 45,
+            avgMarks: course.avgMarks ?? 0,
+            passRate: course.passRate ?? 0,
+            highest: course.highest ?? 0,
+            lowest: course.lowest ?? 0,
+            totalStudents: course.totalStudents ?? 0,
+            passedStudents: course.passedStudents ?? 0,
           }));
           setSubjects(mapped);
         } else {
-          setSubjects(mockSubjects);
+          setSubjects([]);
         }
       } catch {
-        setSubjects(mockSubjects);
+        setSubjects([]);
       }
-      setStudents(mockStudents);
-      setGradeDistribution(mockGradeDistribution);
+      setStudents([]);
+      setGradeDistribution([]);
       setLoading(false);
     };
     fetchData();

@@ -29,15 +29,20 @@ export default function AdminGuardShiftsPage() {
     setTimeout(() => setAlertMsg({ text: '', type: '' }), 5000);
   };
 
-  const loadShifts = () => {
+  const loadShifts = async () => {
     setLoading(true);
-    // Mock shifts data store
-    setShifts([
-      { id: 'sh-1', guard_name: 'Security Officer Ramesh', gate_number: 'Main Gate 1', shift_start: '08:00 AM', shift_end: '16:00 PM', handover_notes: 'Monitor student RFID logs during morning entry' },
-      { id: 'sh-2', guard_name: 'Officer Sunita Sen', gate_number: 'Girls Hostel Gate', shift_start: '16:00 PM', shift_end: '00:00 AM', handover_notes: 'Confirm visitors checkout details before hostel gate locks' },
-      { id: 'sh-3', guard_name: 'Officer Rajesh Kumar', gate_number: 'Academic Block 2', shift_start: '00:00 AM', shift_end: '08:00 AM', handover_notes: 'Patrol academic labs and confirm RFID bypass is deactivated' }
-    ]);
-    setLoading(false);
+    try {
+      const res = await apiGet('/gate/guards/shifts');
+      if (res.success) {
+        setShifts(res.shifts || []);
+      } else {
+        setShifts([]);
+      }
+    } catch {
+      setShifts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreateShift = (e: React.FormEvent) => {
@@ -101,16 +106,13 @@ export default function AdminGuardShiftsPage() {
 
               <div>
                 <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Assign Guard</label>
-                <select
+                <input
+                  type="text"
                   value={guardName}
                   onChange={e => setGuardName(e.target.value)}
+                  placeholder="Enter guard name"
                   className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-3 text-xs text-white"
-                >
-                  <option value="Security Officer Ramesh">Security Officer Ramesh</option>
-                  <option value="Officer Sunita Sen">Officer Sunita Sen</option>
-                  <option value="Officer Rajesh Kumar">Officer Rajesh Kumar</option>
-                  <option value="Officer Amit Singh">Officer Amit Singh</option>
-                </select>
+                />
               </div>
 
               <div>

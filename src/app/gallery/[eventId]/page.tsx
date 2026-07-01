@@ -37,13 +37,8 @@ export default function PublicEventGalleryPage() {
         throw new Error('API failure');
       }
     } catch {
-      // Mock Fallbacks
-      setEvent({ id: eventId, title: 'TechFest 2026 — AI & Robotics Summit' });
-      setPhotos([
-        { id: 'p1', photo_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800', caption: 'Opening keynote session with full house.', is_featured: true, tagged_students: ['Aarav Sharma'] },
-        { id: 'p2', photo_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800', caption: 'Hackathon team debugging code late night.', is_featured: false, tagged_students: ['Neha Gupta', 'Rahul Verma'] },
-        { id: 'p3', photo_url: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=800', caption: 'Speaker panel discussion on AI Ethics.', is_featured: false, tagged_students: [] }
-      ]);
+      setEvent({ id: eventId, title: 'Event Gallery' });
+      setPhotos([]);
     } finally {
       setLoading(false);
     }

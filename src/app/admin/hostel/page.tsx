@@ -5,17 +5,7 @@ import { Shield, Home, Settings, BarChart2, Layers, Users, ShieldAlert, IndianRu
 import { apiGet } from '../../../lib/api';
 import Link from 'next/link';
 
-// Mock student names for sandbox mode
-const MOCK_STUDENT_NAMES = [
-  { name: 'Khushal Gehlot', enrollment: '23CSE051', phone: '+91 98765 43210', email: 'khushal.g@iris.edu', year: '2nd Year', branch: 'CSE', parentName: 'Mr. Ramesh Gehlot', parentPhone: '+91 94561 23456', photo: null },
-  { name: 'Arjun Mehra', enrollment: '23CSE019', phone: '+91 87654 32109', email: 'arjun.m@iris.edu', year: '2nd Year', branch: 'CSE', parentName: 'Mr. Sunil Mehra', parentPhone: '+91 93456 78901', photo: null },
-  { name: 'Priya Sharma', enrollment: '23ECE034', phone: '+91 76543 21098', email: 'priya.s@iris.edu', year: '2nd Year', branch: 'ECE', parentName: 'Mrs. Kavita Sharma', parentPhone: '+91 92345 67890', photo: null },
-  { name: 'Rohan Patel', enrollment: '22ME041', phone: '+91 65432 10987', email: 'rohan.p@iris.edu', year: '3rd Year', branch: 'ME', parentName: 'Mr. Dinesh Patel', parentPhone: '+91 91234 56789', photo: null },
-  { name: 'Simran Kaur', enrollment: '23EEE012', phone: '+91 54321 09876', email: 'simran.k@iris.edu', year: '2nd Year', branch: 'EEE', parentName: 'Mr. Harpreet Singh', parentPhone: '+91 90123 45678', photo: null },
-  { name: 'Vikram Singh', enrollment: '22CSE078', phone: '+91 43210 98765', email: 'vikram.s@iris.edu', year: '3rd Year', branch: 'CSE', parentName: 'Mr. Rajveer Singh', parentPhone: '+91 89012 34567', photo: null },
-  { name: 'Ananya Verma', enrollment: '23IT025', phone: '+91 32109 87654', email: 'ananya.v@iris.edu', year: '2nd Year', branch: 'IT', parentName: 'Mr. Anil Verma', parentPhone: '+91 88901 23456', photo: null },
-  { name: 'Devansh Joshi', enrollment: '22CE055', phone: '+91 21098 76543', email: 'devansh.j@iris.edu', year: '3rd Year', branch: 'CE', parentName: 'Mr. Manoj Joshi', parentPhone: '+91 87890 12345', photo: null },
-];
+
 
 export default function AdminHostelOverview() {
   const [stats, setStats] = useState<any>(null);
@@ -52,28 +42,8 @@ export default function AdminHostelOverview() {
         throw new Error('No blocks returned');
       }
     } catch {
-      // Mock stats
-      setStats({
-        total_blocks: 3,
-        total_rooms: 120,
-        total_capacity: 240,
-        occupied_count: 185,
-        available_count: 55,
-        occupancy_rate: '77.1%',
-        open_complaints: 8,
-        visitors_inside: 3,
-        monthly_revenue_est: 1202500
-      });
-
-      // Mock blocks
-      const mockB = [
-        { id: 'b1', name: 'Aryabhata Boys Hostel (Block A)', type: 'boys', total_rooms: 45, total_floors: 3, staff: { name: 'Dr. Alok Verma' } },
-        { id: 'b2', name: 'Gargi Girls Hostel (Block B)', type: 'girls', total_rooms: 45, total_floors: 3, staff: { name: 'Prof. Sunita Rao' } },
-        { id: 'b3', name: 'Kalpana Staff Quarters', type: 'staff', total_rooms: 30, total_floors: 2, staff: { name: 'Mr. Rajesh Dixit' } }
-      ];
-      setBlocks(mockB);
-      setSelectedBlock(mockB[0]);
-      loadRoomsMock(mockB[0].id);
+      setStats(null);
+      setBlocks([]);
     } finally {
       setLoading(false);
     }
@@ -86,35 +56,13 @@ export default function AdminHostelOverview() {
       if (res.success) {
         setRooms(res.rooms || []);
       } else {
-        loadRoomsMock(blockId);
+        setRooms([]);
       }
     } catch {
-      loadRoomsMock(blockId);
+      setRooms([]);
     } finally {
       setRoomsLoading(false);
     }
-  };
-
-  const loadRoomsMock = (blockId: string) => {
-    const prefix = blockId === 'b1' ? 'A-' : blockId === 'b2' ? 'B-' : 'S-';
-    const capacity = blockId === 'b3' ? 1 : 2;
-    const roomType = blockId === 'b3' ? 'single' : 'double';
-    const blockMockRooms = Array.from({ length: 18 }).map((_, i) => {
-      const roomNum = 101 + i + Math.floor(i / 6) * 94; // Floors 1, 2, 3
-      const floor = Math.floor(i / 6) + 1;
-      const occupied = Math.floor(Math.random() * (capacity + 1));
-      return {
-        id: `r-${blockId}-${i}`,
-        room_number: `${prefix}${roomNum}`,
-        floor,
-        capacity,
-        occupied,
-        room_type: roomType,
-        monthly_rent: blockId === 'b3' ? 12000 : 6500,
-        is_active: true
-      };
-    });
-    setRooms(blockMockRooms);
   };
 
   const handleBlockChange = (block: any) => {
@@ -134,22 +82,7 @@ export default function AdminHostelOverview() {
         throw new Error('No students data');
       }
     } catch {
-      // Generate mock students based on occupancy
-      const mockStudents = [];
-      const seedIndex = parseInt(room.id.replace(/[^0-9]/g, '') || '0', 10);
-      for (let i = 0; i < room.occupied; i++) {
-        const studentIndex = (seedIndex + i) % MOCK_STUDENT_NAMES.length;
-        const student = MOCK_STUDENT_NAMES[studentIndex];
-        mockStudents.push({
-          id: `s-${room.id}-${i}`,
-          ...student,
-          bed_number: i + 1,
-          check_in_date: new Date(Date.now() - (Math.random() * 180 + 30) * 86400000).toISOString(),
-          fee_status: Math.random() > 0.3 ? 'paid' : 'pending',
-          hostel_fee: room.monthly_rent
-        });
-      }
-      setRoomStudents(mockStudents);
+      setRoomStudents([]);
     } finally {
       setRoomDetailLoading(false);
     }
