@@ -23,8 +23,7 @@ export default function StudentHostelDashboard() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      // Force demo student ID so the seeded data always shows up for testing
-      const studentId = 'c0000000-0000-0000-0000-000000000006';
+      const studentId = user?.student_id || user?.id || 'c0000000-0000-0000-0000-000000000006';
 
       const [allocRes, noticesRes] = await Promise.all([
         apiGet(`/hostel/allocations?studentId=${studentId}`),
@@ -44,47 +43,19 @@ export default function StudentHostelDashboard() {
           setRoommates(roomies);
         }
       } else {
-        throw new Error('No active allocation found');
+        setAllocation(null);
+        setRoommates([]);
       }
 
       if (noticesRes.success) {
         setNotices(noticesRes.notices || []);
+      } else {
+        setNotices([]);
       }
     } catch (err) {
-      // Mock data fallbacks
-      setAllocation({
-        id: 'mock-allocation-id',
-        allotted_date: '2025-07-15',
-        deposit_amount: 10000,
-        deposit_status: 'paid',
-        hostel_rooms: {
-          room_number: 'B-304',
-          floor: 3,
-          room_type: 'double',
-          monthly_rent: 6500,
-          amenities: ['Wi-Fi', 'Attached Bathroom', 'Study Table', 'AC'],
-          hostel_blocks: {
-            name: 'Aryabhata Boys Hostel (Block A)',
-            type: 'boys'
-          }
-        }
-      });
-
-      setRoommates([
-        {
-          students: {
-            name: 'Priyansh Mehta',
-            roll_number: 'CS23B1042',
-            department: 'Computer Science',
-            email: 'priyansh.m@iris.edu'
-          }
-        }
-      ]);
-
-      setNotices([
-        { id: '1', title: 'Water Supply Maintenance', content: 'Water supply will be suspended in Block A on 12th June from 10:00 AM to 2:00 PM due to tank cleaning.', posted_at: '2026-06-09T08:00:00Z' },
-        { id: '2', title: 'Hostel Fees Due Date', content: 'Hostel fees for the month of June must be paid online by 15th June to avoid late fine.', posted_at: '2026-06-05T12:00:00Z' }
-      ]);
+      setAllocation(null);
+      setRoommates([]);
+      setNotices([]);
     } finally {
       setLoading(false);
     }
@@ -122,7 +93,7 @@ export default function StudentHostelDashboard() {
         {/* Main Side: Room Details & Roommates */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           {/* Room Allocation Info */}
-          {allocation && (
+          {allocation ? (
             <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-[#13102A] to-[#1A1538] p-6 relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 w-64 h-64 bg-[#6C2BD9]/5 rounded-full blur-3xl" />
               
@@ -167,6 +138,12 @@ export default function StudentHostelDashboard() {
                   <FileText className="w-3.5 h-3.5" /> Download
                 </Link>
               </div>
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-[#13102A] to-[#1A1538] p-6 relative overflow-hidden shadow-2xl text-center py-12">
+              <Home className="w-12 h-12 text-[#C4B5FD]/30 mx-auto mb-4" />
+              <h3 className="text-sm font-bold text-white">No Active Room Allocation</h3>
+              <p className="text-xs text-[#C4B5FD]/50 mt-1">Please contact the warden or administration office for room allocation details.</p>
             </div>
           )}
 

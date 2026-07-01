@@ -16,64 +16,81 @@ const TransitMap = dynamic(() => import('./TransitMap'), { ssr: false, loading: 
   </div>
 ) });
 
-// ─── Mock route fallbacks ───────────────────────────────────────────────────────
-const MOCK_ROUTES = [
-  {
-    id: 'mock-route-1',
-    name: 'City Center → SIET Campus',
-    route_number: 'ROUTE-101',
-    monthly_fee: 1200,
-    distance_km: 18.5,
-    duration_minutes: 45,
-    stops: [
-      { name: 'City Center Bus Stand', scheduled_time_morning: '07:00 AM', scheduled_time_evening: '05:00 PM', lat: 26.2941, lng: 73.0169 },
-      { name: 'Sardarpura Circle', scheduled_time_morning: '07:10 AM', scheduled_time_evening: '04:50 PM', lat: 26.2891, lng: 73.0198 },
-      { name: 'Shastri Nagar', scheduled_time_morning: '07:20 AM', scheduled_time_evening: '04:40 PM', lat: 26.2731, lng: 73.0224 },
-      { name: 'SIET Campus', scheduled_time_morning: '07:45 AM', scheduled_time_evening: '04:15 PM', lat: 26.2389, lng: 73.0243 },
-    ],
-    buses: [{ vehicle_number: 'RJ-19-PB-4050', model: 'Tata Starbus 40-Seater', users: { name: 'Rajesh Kumar', phone: '+91 98290 12347' } }],
-  },
-  {
-    id: 'mock-route-2',
-    name: 'Paota → SIET Campus',
-    route_number: 'ROUTE-102',
-    monthly_fee: 1400,
-    distance_km: 22.0,
-    duration_minutes: 55,
-    stops: [
-      { name: 'Paota Bus Stop', scheduled_time_morning: '08:00 AM', scheduled_time_evening: '06:00 PM', lat: 26.3011, lng: 73.0056 },
-      { name: 'Chopasni Housing Board', scheduled_time_morning: '08:15 AM', scheduled_time_evening: '05:45 PM', lat: 26.2810, lng: 73.0134 },
-      { name: 'Basni Main Road', scheduled_time_morning: '08:25 AM', scheduled_time_evening: '05:35 PM', lat: 26.2593, lng: 73.0211 },
-      { name: 'SIET Campus', scheduled_time_morning: '08:45 AM', scheduled_time_evening: '05:15 PM', lat: 26.2389, lng: 73.0243 },
-    ],
-    buses: [{ vehicle_number: 'RJ-19-PB-8820', model: 'Tata Starbus 40-Seater', users: { name: 'Suresh Meena', phone: '+91 98290 98765' } }],
-  },
-  {
-    id: 'mock-route-3',
-    name: 'Shastri Nagar → SIET Campus',
-    route_number: 'ROUTE-103',
-    monthly_fee: 1000,
-    distance_km: 14.0,
-    duration_minutes: 35,
-    stops: [
-      { name: 'Shastri Nagar Terminal', scheduled_time_morning: '07:30 AM', scheduled_time_evening: '05:30 PM', lat: 26.2731, lng: 73.0224 },
-      { name: 'Mogra Chowk', scheduled_time_morning: '07:40 AM', scheduled_time_evening: '05:20 PM', lat: 26.2570, lng: 73.0235 },
-      { name: 'SIET Campus', scheduled_time_morning: '08:05 AM', scheduled_time_evening: '05:00 PM', lat: 26.2389, lng: 73.0243 },
-    ],
-    buses: [{ vehicle_number: 'RJ-19-PB-6630', model: 'Tata Starbus 30-Seater', users: { name: 'Anil Singh', phone: '+91 98290 55123' } }],
-  },
-];
+interface BusDriver {
+  name: string;
+  phone: string;
+}
+
+interface BusInfo {
+  id?: string;
+  vehicle_number: string;
+  model?: string;
+  users?: BusDriver;
+}
+
+interface RouteStop {
+  name: string;
+  scheduled_time_morning: string;
+  scheduled_time_evening: string;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface TransitRoute {
+  id: string;
+  name: string;
+  route_number: string;
+  monthly_fee: number;
+  distance_km: number;
+  duration_minutes: number;
+  stops: RouteStop[];
+  buses?: BusInfo[];
+}
+
+interface DelayFactor {
+  factor: string;
+  weight: number;
+}
+
+interface PredictionData {
+  success: boolean;
+  predicted_delay_minutes: number;
+  confidence_score: number;
+  delay_factors?: DelayFactor[];
+}
+
+interface TripData {
+  id: string;
+  status: string;
+  trip_type: string;
+  passenger_count?: number;
+  delay_minutes: number;
+  notes?: string;
+}
+
+interface BusSubscription {
+  id: string;
+  route_id: string;
+  stop_name: string;
+  start_date: string;
+  end_date: string;
+  amount_paid: number;
+  transaction_id?: string;
+  bus_routes?: TransitRoute;
+}
 
 // ─── Component ──────────────────────────────────────────────────────────────────
 export default function StudentTransitPage() {
-  const [subscription, setSubscription] = useState<any>(null);
+  const [subscription, setSubscription] = useState<BusSubscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTrip, setActiveTrip] = useState<any>(null);
-  const [prediction, setPrediction] = useState<any>(null);
+  const [activeTrip, setActiveTrip] = useState<TripData | null>(null);
+  const [prediction, setPrediction] = useState<PredictionData | null>(null);
 
   // Subscription flow
-  const [routes, setRoutes] = useState<any[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<any>(null);
+  const [routes, setRoutes] = useState<TransitRoute[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<TransitRoute | null>(null);
   const [selectedStop, setSelectedStop] = useState<string>('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -84,7 +101,13 @@ export default function StudentTransitPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || user?.id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
+
+      if (!studentId) {
+        setSubscription(null);
+        setLoading(false);
+        return;
+      }
 
       // 1. Check for active subscription
       const subRes = await apiGet(`/transit/subscriptions/student/${studentId}`);
@@ -97,50 +120,49 @@ export default function StudentTransitPage() {
           apiGet(`/transit/routes/${routeId}/predictive-arrival`),
           busId ? apiGet(`/transit/trips/${busId}`) : Promise.resolve({ success: false } as any),
         ]);
-        if (predRes.success) setPrediction(predRes);
+        if (predRes.success) setPrediction(predRes as unknown as PredictionData);
         if (tripRes.success && tripRes.trips?.length > 0) {
-          setActiveTrip(tripRes.trips.find((t: any) => t.status === 'active') || tripRes.trips[0]);
+          setActiveTrip(tripRes.trips.find((t: TripData) => t.status === 'active') || tripRes.trips[0]);
         }
       } else {
         // 2. No subscription — load routes for purchase
+        setSubscription(null);
         setRoutesLoading(true);
         try {
           const routesRes = await apiGet('/transit/routes');
           const liveRoutes = routesRes.success ? (routesRes.routes || []) : [];
-          const finalRoutes = liveRoutes.length > 0 ? liveRoutes : MOCK_ROUTES;
-          setRoutes(finalRoutes);
-          setSelectedRoute(finalRoutes[0]);
-          setSelectedStop(finalRoutes[0]?.stops?.[0]?.name || '');
-        } catch {
-          setRoutes(MOCK_ROUTES);
-          setSelectedRoute(MOCK_ROUTES[0]);
-          setSelectedStop(MOCK_ROUTES[0].stops[0].name);
+          setRoutes(liveRoutes);
+          if (liveRoutes.length > 0) {
+            setSelectedRoute(liveRoutes[0]);
+            setSelectedStop(liveRoutes[0]?.stops?.[0]?.name || '');
+          }
+        } catch (err) {
+          console.error('Failed to load routes', err);
+          setRoutes([]);
         } finally {
           setRoutesLoading(false);
         }
       }
     } catch {
-      // Full fallback — show mock subscription view
-      setSubscription({
-        id: 'mock-sub-1',
-        stop_name: 'Sardarpura Circle',
-        start_date: '2026-06-01',
-        end_date: '2026-06-30',
-        amount_paid: 1200,
-        bus_routes: MOCK_ROUTES[0],
-      });
-      setActiveTrip({
-        id: 'mock-trip-1', status: 'active', trip_type: 'morning',
-        passenger_count: 24, delay_minutes: 5,
-        notes: 'Slight traffic near Sardarpura bridge.',
-      });
-      setPrediction({
-        predicted_delay_minutes: 8, confidence_score: 91,
-        delay_factors: [
-          { factor: 'Historical baseline avg', weight: 4 },
-          { factor: 'Weather slowdown (Rain/Wet roads)', weight: 4 },
-        ],
-      });
+      // API error or no subscription: clear active subscription and load routes for purchase
+      setSubscription(null);
+      setActiveTrip(null);
+      setPrediction(null);
+      setRoutesLoading(true);
+      try {
+        const routesRes = await apiGet('/transit/routes');
+        const liveRoutes = routesRes.success ? (routesRes.routes || []) : [];
+        setRoutes(liveRoutes);
+        if (liveRoutes.length > 0) {
+          setSelectedRoute(liveRoutes[0]);
+          setSelectedStop(liveRoutes[0]?.stops?.[0]?.name || '');
+        }
+      } catch (err) {
+        console.error('Failed to load routes', err);
+        setRoutes([]);
+      } finally {
+        setRoutesLoading(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -148,7 +170,7 @@ export default function StudentTransitPage() {
 
   useEffect(() => { loadTransitDetails(); }, [loadTransitDetails]);
 
-  const handleRouteSelect = (route: any) => {
+  const handleRouteSelect = (route: TransitRoute) => {
     setSelectedRoute(route);
     setSelectedStop(route.stops?.[0]?.name || '');
   };
@@ -156,9 +178,10 @@ export default function StudentTransitPage() {
   const handlePaymentSubmit = async () => {
     setPaying(true);
     try {
+      if (!selectedRoute) return;
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || user?.id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const startDate = new Date().toISOString().split('T')[0];
       const endDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0];
@@ -184,22 +207,9 @@ export default function StudentTransitPage() {
       } else {
         throw new Error(res.error || 'Checkout failed');
       }
-    } catch {
-      // Mock success fallback
-      setPaySuccess(true);
-      setTimeout(() => {
-        setSubscription({
-          id: 'mock-sub-' + Date.now(),
-          stop_name: selectedStop,
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
-          amount_paid: selectedRoute?.monthly_fee || 1200,
-          status: 'active',
-          bus_routes: selectedRoute,
-        });
-        setShowPaymentModal(false);
-        setPaySuccess(false);
-      }, 1500);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Checkout failed. Please try again.';
+      alert(errorMsg);
     } finally {
       setPaying(false);
     }
@@ -269,6 +279,11 @@ export default function StudentTransitPage() {
                     <Loader2 className="w-6 h-6 animate-spin text-[#A78BFA] mx-auto" />
                     <p className="text-xs text-[#C4B5FD]/50 mt-2">Loading available routes...</p>
                   </div>
+                ) : routes.length === 0 ? (
+                  <div className="text-center py-10 border border-white/5 rounded-2xl bg-[#13102A]/20">
+                    <AlertCircle className="w-6 h-6 text-[#C4B5FD]/30 mx-auto" />
+                    <p className="text-xs text-[#C4B5FD]/50 mt-2">No available bus routes found.</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {routes.map(route => {
@@ -334,7 +349,7 @@ export default function StudentTransitPage() {
                         onChange={e => setSelectedStop(e.target.value)}
                         className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
                       >
-                        {selectedRoute.stops?.map((stop: any, idx: number) => (
+                        {selectedRoute.stops?.map((stop: RouteStop, idx: number) => (
                           <option key={idx} value={stop.name}>
                             {stop.name} (AM: {stop.scheduled_time_morning})
                           </option>
@@ -348,7 +363,7 @@ export default function StudentTransitPage() {
                         <MapPin className="w-4 h-4 text-[#A78BFA]" /> Stops Timeline
                       </h4>
                       <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/10">
-                        {selectedRoute.stops?.map((stop: any, idx: number) => {
+                        {selectedRoute.stops?.map((stop: RouteStop, idx: number) => {
                           const isBoarding = stop.name === selectedStop;
                           return (
                             <div key={idx} className="flex gap-4 items-start relative pl-8 text-xs">
@@ -452,7 +467,7 @@ export default function StudentTransitPage() {
                       </div>
                       {prediction.delay_factors && (
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                          {prediction.delay_factors.map((df: any, idx: number) => (
+                          {prediction.delay_factors.map((df: DelayFactor, idx: number) => (
                             <span key={idx} className="px-2 py-0.5 rounded bg-white/5 text-[8px] text-[#C4B5FD]/70 border border-white/10">
                               {df.factor} (+{df.weight}m)
                             </span>
@@ -482,7 +497,7 @@ export default function StudentTransitPage() {
                   <MapPin className="w-5 h-5 text-[#A78BFA]" /> Route Stops
                 </h3>
                 <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/10">
-                  {stops.map((stop: any, idx: number) => {
+                  {stops.map((stop: RouteStop, idx: number) => {
                     const isYours = stop.name === subscription.stop_name;
                     return (
                       <div key={idx} className="flex gap-4 items-start relative pl-8">

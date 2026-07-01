@@ -6,9 +6,42 @@ import { apiGet, apiPost } from '../../../lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+interface BusDriver {
+  name: string;
+  phone: string;
+}
+
+interface BusInfo {
+  id?: string;
+  vehicle_number: string;
+  model?: string;
+  users?: BusDriver;
+}
+
+interface RouteStop {
+  name: string;
+  scheduled_time_morning: string;
+  scheduled_time_evening: string;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface TransitRoute {
+  id: string;
+  name: string;
+  route_number: string;
+  monthly_fee: number;
+  distance_km: number;
+  duration_minutes: number;
+  stops: RouteStop[];
+  buses?: BusInfo[];
+}
+
 export default function BrowseRoutesPage() {
-  const [routes, setRoutes] = useState<any[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<any>(null);
+  const [routes, setRoutes] = useState<TransitRoute[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<TransitRoute | null>(null);
   const [selectedStop, setSelectedStop] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -23,57 +56,26 @@ export default function BrowseRoutesPage() {
     try {
       const res = await apiGet('/transit/routes');
       if (res.success) {
-        setRoutes(res.routes || []);
-        if (res.routes?.length > 0) {
-          setSelectedRoute(res.routes[0]);
-          if (res.routes[0].stops?.length > 0) {
-            setSelectedStop(res.routes[0].stops[0].name);
+        const liveRoutes = res.routes || [];
+        setRoutes(liveRoutes);
+        if (liveRoutes.length > 0) {
+          setSelectedRoute(liveRoutes[0]);
+          if (liveRoutes[0].stops?.length > 0) {
+            setSelectedStop(liveRoutes[0].stops[0].name);
           }
         }
+      } else {
+        setRoutes([]);
       }
-    } catch {
-      // Mock routes fallbacks
-      const mockRoutes = [
-        {
-          id: '80000000-0000-0000-0000-000000000001',
-          name: 'Jodhpur Central Route',
-          route_number: 'ROUTE-101',
-          monthly_fee: 1200.00,
-          distance_km: 18.5,
-          duration_minutes: 45,
-          stops: [
-            { name: "Sardarpura 4th Road", scheduled_time_morning: "08:00 AM", scheduled_time_evening: "05:30 PM", latitude: 26.2912, longitude: 73.0156 },
-            { name: "Shastri Nagar Circle", scheduled_time_morning: "08:15 AM", scheduled_time_evening: "05:15 PM", latitude: 26.2647, longitude: 73.0012 },
-            { name: "Mogra Highway Stop", scheduled_time_morning: "08:30 AM", scheduled_time_evening: "05:00 PM", latitude: 26.1543, longitude: 73.0234 },
-            { name: "SIET Campus Terminal", scheduled_time_morning: "08:45 AM", scheduled_time_evening: "04:45 PM", latitude: 26.1200, longitude: 73.0500 }
-          ],
-          buses: [{ vehicle_number: 'RJ-19-PB-4050' }]
-        },
-        {
-          id: '80000000-0000-0000-0000-000000000002',
-          name: 'Mandore Outskirts Route',
-          route_number: 'ROUTE-102',
-          monthly_fee: 1500.00,
-          distance_km: 24.2,
-          duration_minutes: 55,
-          stops: [
-            { name: "Mandore Garden Stop", scheduled_time_morning: "07:50 AM", scheduled_time_evening: "05:40 PM", latitude: 26.3400, longitude: 73.0400 },
-            { name: "Paota Circle Hub", scheduled_time_morning: "08:10 AM", scheduled_time_evening: "05:20 PM", latitude: 26.2990, longitude: 73.0390 },
-            { name: "Basni Industrial Zone", scheduled_time_morning: "08:25 AM", scheduled_time_evening: "05:05 PM", latitude: 26.2410, longitude: 72.9990 },
-            { name: "SIET Campus Terminal", scheduled_time_morning: "08:45 AM", scheduled_time_evening: "04:45 PM", latitude: 26.1200, longitude: 73.0500 }
-          ],
-          buses: [{ vehicle_number: 'RJ-19-PB-8820' }]
-        }
-      ];
-      setRoutes(mockRoutes);
-      setSelectedRoute(mockRoutes[0]);
-      setSelectedStop(mockRoutes[0].stops[0].name);
+    } catch (err) {
+      console.error('Failed to load routes', err);
+      setRoutes([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRouteSelect = (route: any) => {
+  const handleRouteSelect = (route: TransitRoute) => {
     setSelectedRoute(route);
     if (route.stops?.length > 0) {
       setSelectedStop(route.stops[0].name);
@@ -83,9 +85,10 @@ export default function BrowseRoutesPage() {
   const handlePaymentSubmit = async () => {
     setPaying(true);
     try {
+      if (!selectedRoute) return;
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
 
       const startDate = new Date().toISOString().split('T')[0];
       const endDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0]; // 30 days validation
@@ -106,9 +109,9 @@ export default function BrowseRoutesPage() {
       } else {
         alert(res.error || 'Failed to complete checkout.');
       }
-    } catch {
-      // Offline fallback
-      router.push('/transit');
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Checkout failed. Please try again.';
+      alert(errorMsg);
     } finally {
       setPaying(false);
     }
@@ -144,35 +147,42 @@ export default function BrowseRoutesPage() {
         {/* Left Columns: Available Routes List */}
         <div className="lg:col-span-1 space-y-4">
           <h3 className="text-sm font-bold text-white">Select Transit Route</h3>
-          <div className="space-y-3.5">
-            {routes.map(route => {
-              const isSelected = selectedRoute?.id === route.id;
-              return (
-                <button
-                  key={route.id}
-                  onClick={() => handleRouteSelect(route)}
-                  className={`text-left w-full p-4.5 rounded-2xl border transition-all ${
-                    isSelected
-                      ? 'border-[#6C2BD9] bg-[#1A1538] shadow-lg shadow-[#6C2BD9]/10'
-                      : 'border-white/5 bg-[#13102A]/60 hover:bg-[#13102A]'
-                  }`}
-                >
-                  <span className="text-[9px] font-extrabold bg-[#6C2BD9]/20 border border-[#6C2BD9]/20 text-[#A78BFA] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {route.route_number}
-                  </span>
-                  <h4 className="text-sm font-bold text-white mt-2.5">{route.name}</h4>
-                  <div className="flex justify-between items-center text-[10px] text-[#C4B5FD]/50 mt-3">
-                    <span>{route.stops?.length || 0} Stops • {route.distance_km} km</span>
-                    <span className="text-emerald-400 font-bold">₹{route.monthly_fee}/mo</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          {routes.length === 0 ? (
+            <div className="text-center py-10 border border-white/5 rounded-2xl bg-[#13102A]/20">
+              <Info className="w-6 h-6 text-[#C4B5FD]/30 mx-auto" />
+              <p className="text-xs text-[#C4B5FD]/50 mt-2">No available bus routes found.</p>
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              {routes.map(route => {
+                const isSelected = selectedRoute?.id === route.id;
+                return (
+                  <button
+                    key={route.id}
+                    onClick={() => handleRouteSelect(route)}
+                    className={`text-left w-full p-4.5 rounded-2xl border transition-all ${
+                      isSelected
+                        ? 'border-[#6C2BD9] bg-[#1A1538] shadow-lg shadow-[#6C2BD9]/10'
+                        : 'border-white/5 bg-[#13102A]/60 hover:bg-[#13102A]'
+                    }`}
+                  >
+                    <span className="text-[9px] font-extrabold bg-[#6C2BD9]/20 border border-[#6C2BD9]/20 text-[#A78BFA] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      {route.route_number}
+                    </span>
+                    <h4 className="text-sm font-bold text-white mt-2.5">{route.name}</h4>
+                    <div className="flex justify-between items-center text-[10px] text-[#C4B5FD]/50 mt-3">
+                      <span>{route.stops?.length || 0} Stops • {route.distance_km} km</span>
+                      <span className="text-emerald-400 font-bold">₹{route.monthly_fee}/mo</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Right Columns: Route stops details and Booking trigger */}
-        {selectedRoute && (
+        {selectedRoute ? (
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-6 shadow-xl space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
@@ -194,7 +204,7 @@ export default function BrowseRoutesPage() {
                   onChange={e => setSelectedStop(e.target.value)}
                   className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
                 >
-                  {selectedRoute.stops?.map((stop: any, idx: number) => (
+                  {selectedRoute.stops?.map((stop: RouteStop, idx: number) => (
                     <option key={idx} value={stop.name}>
                       {stop.name} (AM: {stop.scheduled_time_morning})
                     </option>
@@ -207,7 +217,7 @@ export default function BrowseRoutesPage() {
                 <h4 className="text-xs font-bold text-white flex items-center gap-1.5"><MapPin className="w-4 h-4 text-[#A78BFA]" /> Stops timeline</h4>
                 
                 <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/10">
-                  {selectedRoute.stops?.map((stop: any, idx: number) => (
+                  {selectedRoute.stops?.map((stop: RouteStop, idx: number) => (
                     <div key={idx} className="flex gap-4 items-start relative pl-8 text-xs">
                       <div className="absolute left-1.5 w-3 h-3 rounded-full border border-white/25 bg-[#0D0A1A] transform -translate-x-1/2" />
                       <div className="flex-1 flex justify-between">
@@ -228,12 +238,17 @@ export default function BrowseRoutesPage() {
               </button>
             </div>
           </div>
+        ) : (
+          <div className="lg:col-span-2 rounded-3xl border border-dashed border-white/10 p-12 text-center bg-[#13102A]/20">
+            <Info className="w-8 h-8 text-[#C4B5FD]/35 mx-auto mb-3" />
+            <p className="text-xs text-[#C4B5FD]/50">Please select a route from the list to see stops and details.</p>
+          </div>
         )}
 
       </div>
 
       {/* Razorpay Simulation Modal */}
-      {showPaymentModal && (
+      {showPaymentModal && selectedRoute && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl border border-white/5 bg-[#13102A] p-6 shadow-2xl space-y-6">
             <div className="text-center">
@@ -247,7 +262,7 @@ export default function BrowseRoutesPage() {
             <div className="space-y-3.5 text-xs border-y border-white/5 py-4">
               <div className="flex justify-between">
                 <span className="text-[#C4B5FD]/50">Selected Route</span>
-                <span className="font-bold text-white">{selectedRoute.name}</span>
+                <span className="font-bold text-white text-right ml-4">{selectedRoute.name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#C4B5FD]/50">Boarding Point</span>

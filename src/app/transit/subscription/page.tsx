@@ -6,8 +6,49 @@ import { apiGet, apiDelete } from '../../../lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+interface BusDriver {
+  name: string;
+  phone: string;
+}
+
+interface BusInfo {
+  id?: string;
+  vehicle_number: string;
+  model?: string;
+  users?: BusDriver;
+}
+
+interface RouteStop {
+  name: string;
+  scheduled_time_morning: string;
+  scheduled_time_evening: string;
+}
+
+interface TransitRoute {
+  id: string;
+  name: string;
+  route_number: string;
+  monthly_fee: number;
+  distance_km: number;
+  duration_minutes: number;
+  stops: RouteStop[];
+  buses?: BusInfo[];
+}
+
+interface BusSubscription {
+  id: string;
+  route_id: string;
+  stop_name: string;
+  start_date: string;
+  end_date: string;
+  amount_paid: number;
+  transaction_id?: string;
+  status: string;
+  bus_routes?: TransitRoute;
+}
+
 export default function SubscriptionDetailPage() {
-  const [subscription, setSubscription] = useState<any>(null);
+  const [subscription, setSubscription] = useState<BusSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [msg, setMsg] = useState('');
@@ -21,48 +62,43 @@ export default function SubscriptionDetailPage() {
     try {
       const userStr = localStorage.getItem('iris_user_profile');
       const user = userStr ? JSON.parse(userStr) : null;
-      const studentId = user?.student_id || 's0000000-0000-0000-0000-000000000001';
+      const studentId = user?.student_id || user?.id || '';
+
+      if (!studentId) {
+        setSubscription(null);
+        setLoading(false);
+        return;
+      }
 
       const res = await apiGet(`/transit/subscriptions/student/${studentId}`);
       if (res.success && res.has_subscription) {
         setSubscription(res.subscription);
+      } else {
+        setSubscription(null);
       }
-    } catch {
-      // Mock active subscription
-      setSubscription({
-        id: 'mock-sub-1',
-        stop_name: 'Sardarpura 4th Road',
-        start_date: '2026-06-01',
-        end_date: '2026-06-30',
-        amount_paid: 1200.00,
-        transaction_id: 'TXN_TRANSIT_UPI_1',
-        status: 'active',
-        bus_routes: {
-          name: 'Jodhpur Central Route',
-          route_number: 'ROUTE-101'
-        }
-      });
+    } catch (err) {
+      console.error('Failed to load subscription details', err);
+      setSubscription(null);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancelSub = async () => {
+    if (!subscription) return;
     if (!confirm('Are you sure you want to cancel your monthly bus subscription?')) return;
     setCancelling(true);
     try {
       const res = await apiDelete(`/transit/subscriptions/${subscription.id}`);
       if (res.success) {
         setMsg('Subscription successfully cancelled. Access will end on expiration date.');
-        loadSubscription();
+        await loadSubscription();
+      } else {
+        alert(res.error || 'Failed to cancel subscription.');
       }
-    } catch {
-      // Mock Cancel
-      setSubscription({
-        ...subscription,
-        status: 'cancelled'
-      });
-      setMsg('Subscription status updated: Cancelled (Mock Mode)');
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Cancellation failed. Please try again.';
+      alert(errorMsg);
     } finally {
       setCancelling(false);
     }
@@ -137,73 +173,40 @@ export default function SubscriptionDetailPage() {
                   </div>
                   <div>
                     <span className="text-[#C4B5FD]/40 block">Transaction ID</span>
-                    <span className="font-mono text-[#A78BFA] font-bold">{subscription.transaction_id}</span>
+                    <span className="font-mono text-[#A78BFA] font-bold">{subscription.transaction_id || 'N/A'}</span>
                   </div>
                   <div>
-                    <span className="text-[#C4B5FD]/40 block">Activation Date</span>
-                    <span className="font-bold text-white">{new Date(subscription.start_date).toLocaleDateString()}</span>
+                    <span className="text-[#C4B5FD]/40 block">Start Date</span>
+                    <span className="font-semibold text-white">{new Date(subscription.start_date).toLocaleDateString()}</span>
                   </div>
                   <div>
-                    <span className="text-[#C4B5FD]/40 block">Expiry Date</span>
-                    <span className="font-bold text-white">{new Date(subscription.end_date).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Transactions History Ledger */}
-              <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-6 shadow-xl space-y-4">
-                <h4 className="text-xs font-bold text-white flex items-center gap-1.5"><FileText className="w-4 h-4 text-[#A78BFA]" /> Payment Invoices History</h4>
-                
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center text-xs">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-white">Transport Pass Monthly Renewal</span>
-                    <p className="text-[10px] text-[#C4B5FD]/50">Date: {new Date(subscription.start_date).toLocaleDateString()} • Method: Razorpay</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-extrabold text-emerald-400 block">₹{subscription.amount_paid}</span>
-                    <span className="text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-extrabold">PAID</span>
+                    <span className="text-[#C4B5FD]/40 block">End Date</span>
+                    <span className="font-semibold text-white">{new Date(subscription.end_date).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Right Action Column */}
-            <div className="md:col-span-1 space-y-6">
-              <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-5 shadow-xl space-y-4">
-                <h4 className="text-xs font-bold text-white">Subscription Management</h4>
-
-                {subscription.status === 'active' ? (
+            <div className="space-y-6">
+              <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-6 shadow-xl space-y-4">
+                <h3 className="text-xs font-bold text-[#C4B5FD]/70 uppercase tracking-wider">Subscription Actions</h3>
+                
+                {subscription.status === 'active' && (
                   <button
                     disabled={cancelling}
                     onClick={handleCancelSub}
-                    className="w-full py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold transition-all flex justify-center items-center gap-1.5"
+                    className="w-full py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/25 text-red-400 font-bold text-xs transition-all flex items-center justify-center gap-1.5"
                   >
-                    <Trash2 className="w-4 h-4" /> Cancel Pass subscription
+                    <Trash2 className="w-4 h-4" />
+                    {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
                   </button>
-                ) : (
-                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 flex items-start gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <span>Pass has been cancelled or has expired. You will no longer be charged.</span>
-                  </div>
                 )}
 
-                <button
-                  onClick={() => alert('Route transfer request log captured. Campus transit team will verify availability.')}
-                  className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold transition-all flex justify-center items-center gap-1.5"
-                >
-                  <RefreshCcw className="w-4 h-4" /> Request Stop/Route Transfer
-                </button>
-              </div>
-
-              {/* RFID Tag verification */}
-              <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-5 shadow-xl space-y-3 text-center">
-                <Award className="w-8 h-8 text-[#A78BFA] mx-auto mb-1" />
-                <h4 className="text-xs font-bold text-white">RFID Card Status</h4>
-                <p className="text-[10px] text-[#C4B5FD]/50">
-                  Your student identity card is linked for automated door gate pass tracking.
-                </p>
-                <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-extrabold uppercase inline-block">
-                  LINKED & VALID
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 text-[10px] text-[#C4B5FD]/50 space-y-2">
+                  <p className="font-semibold text-white">Billing Info:</p>
+                  <p>Subscriptions automatically renew every 30 days unless cancelled.</p>
+                  <p>Cancellation stops future billing but active pass benefits continue until the end date.</p>
                 </div>
               </div>
             </div>

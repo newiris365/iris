@@ -260,35 +260,6 @@ export async function listAllocations(req: Request, res: Response) {
 
     console.log(`[listAllocations] DB returned ${data?.length} allocations for student ${studentId}`);
     
-    // If DB mysteriously returns empty array for our demo student, force it!
-    if ((!data || data.length === 0) && studentId === 'c0000000-0000-0000-0000-000000000006') {
-      console.log(`[listAllocations] Forcing dummy allocation data for c000...06`);
-      return res.status(200).json({
-        success: true,
-        allocations: [{
-          id: 'b032fe42-8004-4975-b019-eec4ca676d37',
-          student_id: studentId,
-          room_id: 'e4000000-0000-0000-0000-000000000001',
-          allotted_date: new Date().toISOString(),
-          is_current: true,
-          hostel_rooms: {
-            id: 'e4000000-0000-0000-0000-000000000001',
-            room_number: 'A-101',
-            floor: 1,
-            capacity: 2,
-            occupied: 1,
-            monthly_rent: 5500,
-            room_type: 'double',
-            hostel_blocks: {
-              id: 'e3000000-0000-0000-0000-000000000001',
-              name: 'Tagore Boys Hostel',
-              type: 'Boys'
-            }
-          }
-        }]
-      });
-    }
-
     return res.status(200).json({ success: true, allocations: data || [] });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal server error.' });
@@ -1143,16 +1114,25 @@ export async function createNotice(req: Request, res: Response) {
 export async function generateGatePassPdf(req: Request, res: Response) {
   try {
     const { visitorId } = req.params;
+    const institution_id = req.user?.institution_id;
+    if (!institution_id) {
+      return res.status(400).json({ success: false, error: 'No institution context.' });
+    }
+
     const PDFDocument = require('pdfkit');
 
     // Fetch visitor
     const { data: visitor } = await supabaseAdmin
       .from('hostel_visitors')
-      .select('*, students(name, roll_number)')
+      .select('*, students(name, roll_number, institution_id)')
       .eq('id', visitorId)
       .single();
 
     if (!visitor) return res.status(404).json({ success: false, error: 'Visitor not found.' });
+
+    if (visitor.students?.institution_id !== institution_id) {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
 
     const doc = new PDFDocument({ margin: 50, size: 'A6' }); // Small card format
     res.setHeader('Content-Type', 'application/pdf');
@@ -1186,38 +1166,52 @@ export async function generateGatePassPdf(req: Request, res: Response) {
   }
 }
 
+interface AllocationPdfData {
+  allotted_date: string;
+  students: {
+    name: string;
+    roll_number: string;
+    institution_id: string;
+  } | null;
+  hostel_rooms: {
+    room_number: string;
+    monthly_rent: number;
+    hostel_blocks: {
+      name: string;
+    } | null;
+  } | null;
+}
+
 export async function generateAllotmentLetterPdf(req: Request, res: Response) {
   try {
     const { allocationId } = req.params;
-    const PDFDocument = require('pdfkit');
-
-    // Fetch allocation with mock fallback support
-    let alloc: any = null;
-    if (allocationId === 'mock-allocation-id' || allocationId.startsWith('mock') || !allocationId) {
-      alloc = {
-        allotted_date: '2025-07-15',
-        students: {
-          name: 'Khushal Gehlot (Mock Sandbox)',
-          roll_number: 'CS23B1042'
-        },
-        hostel_rooms: {
-          room_number: 'B-304',
-          monthly_rent: 6500,
-          hostel_blocks: {
-            name: 'Aryabhata Boys Hostel (Block A)'
-          }
-        }
-      };
-    } else {
-      const { data } = await supabaseAdmin
-        .from('hostel_allocations')
-        .select('*, students(name, roll_number), hostel_rooms(room_number, monthly_rent, hostel_blocks(name))')
-        .eq('id', allocationId)
-        .single();
-      alloc = data;
+    const institution_id = req.user?.institution_id;
+    if (!institution_id) {
+      return res.status(400).json({ success: false, error: 'No institution context.' });
     }
 
-    if (!alloc) return res.status(404).json({ success: false, error: 'Allocation record not found.' });
+    const PDFDocument = require('pdfkit');
+
+    const { data, error } = await supabaseAdmin
+      .from('hostel_allocations')
+      .select('*, students(name, roll_number, institution_id), hostel_rooms(room_number, monthly_rent, hostel_blocks(name))')
+      .eq('id', allocationId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ success: false, error: 'Allocation record not found.' });
+    }
+
+    const alloc = data as unknown as AllocationPdfData;
+
+    // Verify tenant scoping
+    if (alloc.students?.institution_id !== institution_id) {
+      return res.status(403).json({ success: false, error: 'Access denied.' });
+    }
+
+    if (!alloc.students || !alloc.hostel_rooms || !alloc.hostel_rooms.hostel_blocks) {
+      return res.status(404).json({ success: false, error: 'Incomplete allocation details.' });
+    }
 
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -1235,15 +1229,15 @@ export async function generateAllotmentLetterPdf(req: Request, res: Response) {
     // Content
     doc.fontSize(12).fillColor('#333');
     doc.text(`This is to certify that student `, { continued: true })
-       .font('Helvetica-Bold').text(alloc.students?.name)
+       .font('Helvetica-Bold').text(alloc.students.name)
        .font('Helvetica').text(` (Roll Number: `, { continued: true })
-       .font('Helvetica-Bold').text(alloc.students?.roll_number)
+       .font('Helvetica-Bold').text(alloc.students.roll_number)
        .font('Helvetica').text(`) has been officially allotted room details in the institution hostel:`);
     doc.moveDown(1);
 
     // Block/Room specifications box
     doc.rect(50, doc.y, doc.page.width - 100, 100).fill('#13102A');
-    doc.fillColor('#white');
+    doc.fillColor('white');
     
     let boxY = doc.y + 15;
     doc.fontSize(11).fillColor('#C4B5FD').text(`Hostel Block: ${alloc.hostel_rooms.hostel_blocks.name}`, 70, boxY);
@@ -1262,7 +1256,8 @@ export async function generateAllotmentLetterPdf(req: Request, res: Response) {
 
     doc.end();
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to generate allotment letter PDF.' });
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: `Failed to generate allotment letter PDF: ${errorMsg}` });
   }
 }
 
@@ -2313,8 +2308,9 @@ export async function getNightlyHeadcount(req: Request, res: Response) {
       },
       blocks,
     });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2383,8 +2379,9 @@ export async function getNightlyHeadcountAlerts(req: Request, res: Response) {
       missing: missingStudents.length,
       missing_students: missingStudents,
     });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2415,8 +2412,9 @@ export async function getHostelSettings(req: Request, res: Response) {
     }
 
     return res.status(200).json({ success: true, settings: data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2459,8 +2457,9 @@ export async function saveHostelSettings(req: Request, res: Response) {
 
     if (result.error) return res.status(500).json({ success: false, error: result.error.message });
     return res.status(200).json({ success: true, settings: result.data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2524,8 +2523,9 @@ export async function markHostelAttendance(req: Request, res: Response) {
     }
 
     return res.status(201).json({ success: true, message: 'Hostel attendance marked successfully.', attendance: data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2542,8 +2542,9 @@ export async function getDailyHostelAttendance(req: Request, res: Response) {
 
     if (error) return res.status(500).json({ success: false, error: error.message });
     return res.status(200).json({ success: true, attendance: data || [] });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2561,8 +2562,9 @@ export async function getLatestMessNotice(req: Request, res: Response) {
 
     if (error) return res.status(500).json({ success: false, error: error.message });
     return res.status(200).json({ success: true, notice: data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -2584,8 +2586,9 @@ export async function broadcastMessNotice(req: Request, res: Response) {
 
     if (error) return res.status(500).json({ success: false, error: error.message });
     return res.status(201).json({ success: true, notice: data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 

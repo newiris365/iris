@@ -6,13 +6,13 @@ const ALL_ROLES = [
   'SuperAdmin', 'Admin', 'Director', 'HOD', 'Teacher', 'Staff',
   'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver',
   'TPO', 'Librarian', 'Gym Trainer', 'IQAC Coordinator', 'Admissions Officer', 'Principal'
-];
+] as const;
 
 const createUserSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   email: z.string().email('Valid email required'),
   phone: z.string().optional(),
-  role: z.enum(ALL_ROLES as any),
+  role: z.enum(ALL_ROLES),
   department_id: z.string().uuid().optional(),
   employee_id: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -21,7 +21,7 @@ const createUserSchema = z.object({
 const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
   phone: z.string().optional(),
-  role: z.enum(ALL_ROLES as any).optional(),
+  role: z.enum(ALL_ROLES).optional(),
   department_id: z.string().uuid().optional().nullable(),
   employee_id: z.string().optional().nullable(),
   is_active: z.boolean().optional(),
@@ -63,8 +63,9 @@ export async function listUsers(req: Request, res: Response) {
       page: pageNum,
       limit: limitNum,
     });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -84,8 +85,9 @@ export async function getUserById(req: Request, res: Response) {
 
     if (error || !data) return res.status(404).json({ success: false, error: 'User not found.' });
     return res.json({ success: true, user: data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -106,7 +108,7 @@ export async function createUser(req: Request, res: Response) {
       .select('id')
       .eq('institution_id', institution_id)
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       return res.status(409).json({ success: false, error: 'A user with this email already exists in your institution.' });
@@ -121,17 +123,19 @@ export async function createUser(req: Request, res: Response) {
     });
 
     if (authErr) {
-      // If auth creation fails, still create the profile row (sandbox mode)
-      console.warn('Auth user creation failed (sandbox mode):', authErr.message);
+      return res.status(500).json({ success: false, error: `Auth user creation failed: ${authErr.message}` });
     }
 
-    const userId = authUser?.user?.id || undefined;
+    const userId = authUser?.user?.id;
+    if (!userId) {
+      return res.status(500).json({ success: false, error: 'Auth user creation failed: No user ID returned.' });
+    }
 
     // Create user profile row
     const { data: user, error: uErr } = await supabaseAdmin
       .from('users')
       .insert({
-        ...(userId ? { id: userId } : {}),
+        id: userId,
         institution_id,
         name,
         email,
@@ -145,31 +149,13 @@ export async function createUser(req: Request, res: Response) {
       .single();
 
     if (uErr) {
-      // If duplicate id, try without explicit id
-      if (uErr.code === '23505') {
-        const { data: user2, error: uErr2 } = await supabaseAdmin
-          .from('users')
-          .insert({
-            institution_id,
-            name,
-            email,
-            phone: phone || null,
-            role,
-            department_id: department_id || null,
-            employee_id: employee_id || null,
-            is_active: true,
-          })
-          .select()
-          .single();
-        if (uErr2) throw uErr2;
-        return res.json({ success: true, user: user2, message: `User created with role ${role}. Default password: ${password}` });
-      }
       throw uErr;
     }
 
     return res.json({ success: true, user, message: `User created with role ${role}. Default password: ${password}` });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -185,7 +171,7 @@ export async function updateUser(req: Request, res: Response) {
     const updates = parse.data;
 
     // Remove undefined values
-    const cleanUpdates: Record<string, any> = {};
+    const cleanUpdates: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(updates)) {
       if (v !== undefined) cleanUpdates[k] = v;
     }
@@ -201,8 +187,9 @@ export async function updateUser(req: Request, res: Response) {
 
     if (error) throw error;
     return res.json({ success: true, user: data });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -228,8 +215,9 @@ export async function deactivateUser(req: Request, res: Response) {
 
     if (error) throw error;
     return res.json({ success: true, user: data, message: 'User deactivated.' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -250,8 +238,9 @@ export async function reactivateUser(req: Request, res: Response) {
 
     if (error) throw error;
     return res.json({ success: true, user: data, message: 'User reactivated.' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -261,7 +250,7 @@ export async function resetUserPassword(req: Request, res: Response) {
   try {
     const { userId } = req.params;
     const { password } = req.body;
-    if (!password || password.length < 8) {
+    if (!password || typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({ success: false, error: 'Password must be at least 8 characters.' });
     }
 
@@ -280,12 +269,13 @@ export async function resetUserPassword(req: Request, res: Response) {
     // Update auth password
     const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     if (authErr) {
-      console.warn('Auth password reset failed (sandbox):', authErr.message);
+      return res.status(500).json({ success: false, error: `Auth password update failed: ${authErr.message}` });
     }
 
     return res.json({ success: true, message: 'Password reset successfully.' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -310,8 +300,9 @@ export async function getUserRoleStats(req: Request, res: Response) {
     }
 
     return res.json({ success: true, stats });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
 
@@ -332,18 +323,9 @@ export async function getDepartments(req: Request, res: Response) {
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      return res.json({ success: true, departments: data });
-    } else {
-      // Fallback default departments to ensure dropdown is never empty
-      const fallbackDepts = [
-        { id: 'd0000000-0000-0000-0000-000000000001', name: 'Computer Science & Engineering' },
-        { id: 'd0000000-0000-0000-0000-000000000002', name: 'Electronics & Communication Engineering' },
-        { id: 'd0000000-0000-0000-0000-000000000003', name: 'Mechanical Engineering' }
-      ];
-      return res.json({ success: true, departments: fallbackDepts });
-    }
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.json({ success: true, departments: data || [] });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
   }
 }
