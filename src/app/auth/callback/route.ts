@@ -45,6 +45,8 @@ const ROLE_CASING_MAP: Record<string, string> = {
   'iqac coordinator': 'IQAC Coordinator',
   'admissions officer': 'Admissions Officer',
   'principal': 'Principal',
+  'vice principal': 'Vice Principal',
+  'vp': 'Vice Principal',
   'hr admin': 'HR Admin',
   'applicant': 'Applicant',
   'company hr': 'Company HR',
@@ -71,6 +73,9 @@ const getRedirectPath = (role: string): string => {
     case 'Teacher': return '/teacher/timetable';
     case 'HOD': return '/hod/dashboard';
     case 'Vendor': return '/vendor/dashboard';
+    case 'Principal': return '/principal/dashboard';
+    case 'Vice Principal': return '/vp/dashboard';
+    case 'VP': return '/vp/dashboard';
     default: return '/dashboard';
   }
 };

@@ -2116,6 +2116,7 @@ export async function getNotices(req: Request, res: Response) {
     const { data, error } = await supabaseAdmin
       .from('notices')
       .select('*, notice_reads(user_id)')
+      .eq('institution_id', req.user?.institution_id)
       .order('published_at', { ascending: false });
 
     if (error) return res.status(500).json({ success: false, error: error.message });
@@ -2142,6 +2143,15 @@ export async function createNotice(req: Request, res: Response) {
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
     const { title, content, category, target_audience, expires_at } = parse.data;
 
+    let finalAudience = 'All';
+    if (target_audience) {
+      if (Array.isArray(target_audience)) {
+        finalAudience = target_audience[0] || 'All';
+      } else if (typeof target_audience === 'string') {
+        finalAudience = target_audience;
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('notices')
       .insert({
@@ -2149,7 +2159,7 @@ export async function createNotice(req: Request, res: Response) {
         title,
         content,
         category: category || 'Academic',
-        target_audience: target_audience || 'All',
+        target_audience: finalAudience,
         published_by: req.user?.id,
         expires_at
       })

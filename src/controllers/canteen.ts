@@ -1009,21 +1009,7 @@ export async function getOrderById(req: Request, res: Response) {
     if (error) throw error;
     return res.status(200).json({ success: true, order: data });
   } catch (err: any) {
-    const mockOrder = {
-      id: req.params.orderId,
-      order_number: 'ORD-MOCK1234',
-      total_amount: 120,
-      final_amount: 110,
-      discount_amount: 10,
-      status: 'preparing',
-      payment_method: 'Wallet',
-      payment_status: 'paid',
-      token_number: 42,
-      estimated_ready_minutes: 15,
-      items: [{ menu_id: '1', item_name: 'Masala Dosa', qty: 1, price: 100 }, { menu_id: '2', item_name: 'Samosa', qty: 1, price: 20 }],
-      order_time: new Date().toISOString()
-    };
-    return res.status(200).json({ success: true, order: mockOrder });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch order details.' });
   }
 }
 
@@ -1090,7 +1076,7 @@ export async function cancelOrder(req: Request, res: Response) {
 
     return res.status(200).json({ success: true, message: 'Order cancelled and refunded.', order });
   } catch (err: any) {
-    return res.status(200).json({ success: true, message: 'Order cancelled successfully (Mock refund).' });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to cancel order.' });
   }
 }
 
@@ -1104,11 +1090,7 @@ export async function getOrdersQueue(req: Request, res: Response) {
     if (error) throw error;
     return res.status(200).json({ success: true, queue: data || [] });
   } catch (err: any) {
-    const mockQueue = [
-      { id: 'o-1', order_number: 'ORD-8A9F', items: [{ item_name: 'Masala Dosa', qty: 2 }], total_amount: 200, status: 'preparing', token_number: 104, students: { name: 'Alok Kumar' }, order_time: new Date(Date.now() - 5 * 60 * 1000).toISOString() },
-      { id: 'o-2', order_number: 'ORD-9B2C', items: [{ item_name: 'Kachori', qty: 3 }], total_amount: 60, status: 'placed', token_number: 105, students: { name: 'Vikram Singh' }, order_time: new Date().toISOString() }
-    ];
-    return res.status(200).json({ success: true, queue: mockQueue });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch orders queue.' });
   }
 }
 
@@ -1135,33 +1117,27 @@ export async function initiateWalletTopup(req: Request, res: Response) {
 
     const receipt = `topup_${Date.now()}`;
 
-    if (rzp) {
-      const order = await rzp.orders.create({
-        amount: Math.round(Number(amount) * 100),
-        currency: 'INR',
-        receipt,
-        notes: {
-          type: 'canteen_topup',
-          student_id: resolvedStudentId,
-          amount: String(amount),
-          institution_id: req.user?.institution_id || req.body.institution_id || ''
-        }
-      });
-      return res.status(200).json({
-        success: true,
-        order_id: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        key_id: process.env.RAZORPAY_KEY_ID
-      });
+    if (!rzp) {
+      return res.status(500).json({ success: false, error: 'Razorpay integration is not configured on the server.' });
     }
 
+    const order = await rzp.orders.create({
+      amount: Math.round(Number(amount) * 100),
+      currency: 'INR',
+      receipt,
+      notes: {
+        type: 'canteen_topup',
+        student_id: resolvedStudentId,
+        amount: String(amount),
+        institution_id: req.user?.institution_id || req.body.institution_id || ''
+      }
+    });
     return res.status(200).json({
       success: true,
-      order_id: `order_mock_${Math.random().toString(36).substring(2, 9)}`,
-      amount: amount * 100,
-      currency: 'INR',
-      key_id: 'rzp_mock_key_123'
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: process.env.RAZORPAY_KEY_ID
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message || 'Razorpay initiation failed.' });
@@ -1175,7 +1151,7 @@ export async function verifyWalletTopup(req: Request, res: Response) {
     
     // Verify payment signature
     const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (secret && razorpay_order_id && !razorpay_order_id.startsWith('order_mock_')) {
+    if (secret && razorpay_order_id) {
       const generatedSignature = crypto
         .createHmac('sha256', secret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -1237,11 +1213,7 @@ export async function getMealPlans(req: Request, res: Response) {
     if (error) throw error;
     return res.status(200).json({ success: true, plans: data || [] });
   } catch (err: any) {
-    const mockPlans = [
-      { id: 'p-1', name: 'Standard Monthly Breakfast', description: 'Covers healthy breakfast daily for 30 days.', meal_types: ['breakfast'], price: 999, duration_days: 30, meals_included: 30 },
-      { id: 'p-2', name: 'Hassle-Free Complete Subscription', description: 'Covers breakfast, lunch, and snacks daily for 30 days.', meal_types: ['breakfast', 'lunch', 'snacks'], price: 2999, duration_days: 30, meals_included: 90 }
-    ];
-    return res.status(200).json({ success: true, plans: mockPlans });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch meal plans.' });
   }
 }
 
@@ -1329,21 +1301,7 @@ export async function subscribeMealPlan(req: Request, res: Response) {
 
     return res.status(201).json({ success: true, subscription: data });
   } catch (err: any) {
-    const fallbackId = await resolveStudentId(req.body.student_id).catch(() => req.body.student_id);
-    return res.status(201).json({
-      success: true,
-      subscription: {
-        id: 'sub_mock_' + Math.random().toString(36).substring(2, 9),
-        student_id: fallbackId,
-        plan_id: req.params.id,
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
-        meals_total: 30,
-        meals_used: 0,
-        amount_paid: 999,
-        status: 'active'
-      }
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to subscribe to meal plan.' });
   }
 }
 
@@ -1366,19 +1324,7 @@ export async function selectDailyMeal(req: Request, res: Response) {
     if (error) throw error;
     return res.status(201).json({ success: true, selection: data });
   } catch (err: any) {
-    const fallbackId = await resolveStudentId(req.body.student_id).catch(() => req.body.student_id);
-    return res.status(201).json({
-      success: true,
-      selection: {
-        id: 'sel_mock_' + Math.random().toString(36).substring(2, 9),
-        subscription_id: req.body.subscription_id,
-        student_id: fallbackId,
-        date: req.body.date,
-        meal_type: req.body.meal_type,
-        items: req.body.items,
-        is_opted_out: req.body.is_opted_out || false
-      }
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to submit daily meal selection.' });
   }
 }
 
@@ -1647,11 +1593,7 @@ export async function getNutritionSummary(req: Request, res: Response) {
     if (error) throw error;
     return res.status(200).json({ success: true, logs: log || [] });
   } catch (err: any) {
-    const mockNutrition = [
-      { date: new Date().toISOString().split('T')[0], total_calories: 1840, protein_g: 54, carbs_g: 220, fat_g: 45 },
-      { date: new Date(Date.now() - 24*3600*1000).toISOString().split('T')[0], total_calories: 2100, protein_g: 62, carbs_g: 270, fat_g: 50 }
-    ];
-    return res.status(200).json({ success: true, logs: mockNutrition });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch nutrition summary.' });
   }
 }
 
@@ -1676,15 +1618,7 @@ export async function submitHygieneChecklist(req: Request, res: Response) {
     if (error) throw error;
     return res.status(201).json({ success: true, checklist: data });
   } catch (err: any) {
-    return res.status(201).json({
-      success: true,
-      checklist: {
-        id: 'hyg_mock_' + Math.random().toString(36).substring(2, 9),
-        date: new Date().toISOString().split('T')[0],
-        cleanliness_score: req.body.cleanliness_score || 92,
-        passed: req.body.passed !== false
-      }
-    });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to submit hygiene checklist.' });
   }
 }
 
@@ -1699,12 +1633,7 @@ export async function getHygieneReport(req: Request, res: Response) {
     if (error) throw error;
     return res.status(200).json({ success: true, report: data || [] });
   } catch (err: any) {
-    const mockReport = [
-      { date: '2026-06-10', cleanliness_score: 95, passed: true },
-      { date: '2026-06-09', cleanliness_score: 88, passed: true },
-      { date: '2026-06-08', cleanliness_score: 91, passed: true }
-    ];
-    return res.status(200).json({ success: true, report: mockReport });
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch hygiene report.' });
   }
 }
 
@@ -1713,30 +1642,27 @@ export async function faceCheckout(req: Request, res: Response) {
     const { face_embedding } = req.body;
     if (!face_embedding) return res.status(400).json({ success: false, error: 'Embedding vector key required.' });
 
-    const mockStudentId = 'b0000000-0000-0000-0000-000000000006';
-    const { data: student } = await supabaseAdmin
+    const { data: student, error } = await supabaseAdmin
       .from('students')
       .select('*, users(*)')
-      .eq('id', mockStudentId)
+      .eq('face_embedding', face_embedding)
       .single();
 
-    if (!student) return res.status(404).json({ success: false, error: 'No student matches face biometric key.' });
+    if (error || !student) {
+      return res.status(404).json({ success: false, error: 'No student matches face biometric key.' });
+    }
 
     return res.status(200).json({
       success: true,
       matched: true,
       student: {
         id: student.id,
-        name: student.name,
+        name: student.users?.name || student.name,
         roll_number: student.roll_number
-      },
-      favorite_order: {
-        items: [{ menu_id: 'dosa-uuid', item_name: 'Masala Dosa', price: 100, qty: 1 }],
-        total_amount: 100
       }
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: 'Face checkout logic failed.' });
+    return res.status(500).json({ success: false, error: err.message || 'Face checkout logic failed.' });
   }
 }
 
