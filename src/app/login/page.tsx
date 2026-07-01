@@ -663,20 +663,61 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <div className="mb-2 mt-4 text-[10px] font-bold text-white/50 uppercase tracking-wider pl-1">College Roles</div>
           <div className="grid grid-cols-3 gap-1.5">
             {[
-              { email: 'khushalkhatri0019@gmail.com', role: 'Principal', label: 'Principal', bg: 'bg-violet-500/10', border: 'border-violet-500/25', hoverBorder: 'hover:border-violet-500', hoverBg: 'hover:bg-violet-500/20', text: 'text-violet-400', hoverText: 'hover:text-violet-300' },
-              { email: 'director@siet.edu.in', role: 'Admin', label: 'Admin (VP)', bg: 'bg-blue-500/10', border: 'border-blue-500/25', hoverBorder: 'hover:border-blue-500', hoverBg: 'hover:bg-blue-500/20', text: 'text-blue-400', hoverText: 'hover:text-blue-300' },
-              { email: 'raipriyansh45@gmail.com', role: 'Teacher', label: 'Teacher', bg: 'bg-purple-500/10', border: 'border-purple-500/25', hoverBorder: 'hover:border-purple-500', hoverBg: 'hover:bg-purple-500/20', text: 'text-purple-400', hoverText: 'hover:text-purple-300' },
+              { email: 'siddharth@sin.education', role: 'SuperAdmin', label: 'SuperAdmin', bg: 'bg-rose-500/10', border: 'border-rose-500/25', hoverBorder: 'hover:border-rose-500', hoverBg: 'hover:bg-rose-500/20', text: 'text-rose-400', hoverText: 'hover:text-rose-300' },
+              { email: 'director@siet.edu.in', role: 'Admin', label: 'Admin', bg: 'bg-blue-500/10', border: 'border-blue-500/25', hoverBorder: 'hover:border-blue-500', hoverBg: 'hover:bg-blue-500/20', text: 'text-blue-400', hoverText: 'hover:text-blue-300' },
               { email: 'priyansh.24jics153@jietjodhpur.ac.in', role: 'Student', label: 'Student', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', hoverBorder: 'hover:border-emerald-500', hoverBg: 'hover:bg-emerald-500/20', text: 'text-emerald-400', hoverText: 'hover:text-emerald-300' },
+              { email: 'raipriyansh45@gmail.com', role: 'Teacher', label: 'Teacher', bg: 'bg-purple-500/10', border: 'border-purple-500/25', hoverBorder: 'hover:border-purple-500', hoverBg: 'hover:bg-purple-500/20', text: 'text-purple-400', hoverText: 'hover:text-purple-300' },
               { email: 'pariharnakshtra21@gmail.com', role: 'Parent', label: 'Parent', bg: 'bg-pink-500/10', border: 'border-pink-500/25', hoverBorder: 'hover:border-pink-500', hoverBg: 'hover:bg-pink-500/20', text: 'text-pink-400', hoverText: 'hover:text-pink-300' },
+              { email: 'hod@sin.education', role: 'HOD', label: 'HOD', bg: 'bg-cyan-500/10', border: 'border-cyan-500/25', hoverBorder: 'hover:border-cyan-500', hoverBg: 'hover:bg-cyan-500/20', text: 'text-cyan-400', hoverText: 'hover:text-cyan-300' },
+              { email: 'warden@siet.edu.in', role: 'Warden', label: 'Warden', bg: 'bg-amber-500/10', border: 'border-amber-500/25', hoverBorder: 'hover:border-amber-500', hoverBg: 'hover:bg-amber-500/20', text: 'text-amber-400', hoverText: 'hover:text-amber-300' },
+              { email: 'librarian@sin.education', role: 'Librarian', label: 'Librarian', bg: 'bg-teal-500/10', border: 'border-teal-500/25', hoverBorder: 'hover:border-teal-500', hoverBg: 'hover:bg-teal-500/20', text: 'text-teal-400', hoverText: 'hover:text-teal-300' },
+              { email: 'canteen@siet.edu.in', role: 'Vendor', label: 'Vendor', bg: 'bg-lime-500/10', border: 'border-lime-500/25', hoverBorder: 'hover:border-lime-500', hoverBg: 'hover:bg-lime-500/20', text: 'text-lime-400', hoverText: 'hover:text-lime-300' },
+              { email: 'security@siet.edu.in', role: 'Security', label: 'Security', bg: 'bg-slate-500/10', border: 'border-slate-500/25', hoverBorder: 'hover:border-slate-500', hoverBg: 'hover:bg-slate-500/20', text: 'text-slate-400', hoverText: 'hover:text-slate-300' },
               { email: 'raip32380@gmail.com', role: 'Driver', label: 'Driver', bg: 'bg-orange-500/10', border: 'border-orange-500/25', hoverBorder: 'hover:border-orange-500', hoverBg: 'hover:bg-orange-500/20', text: 'text-orange-400', hoverText: 'hover:text-orange-300' },
             ].map((item) => (
               <button
-                key={item.role}
+                key={`college-${item.role}`}
                 type="button"
                 onClick={() => {
                   const mockProfile = getMockProfile(item.email, item.role);
+                  mockProfile.institute_type = 'college';
+                  const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+                  const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
+                  localStorage.setItem('iris_jwt_token', mockToken);
+                  localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+                  window.location.href = getRedirectPath(mockProfile.role);
+                }}
+                className={`p-2 rounded-xl ${item.bg} border ${item.border} ${item.hoverBorder} ${item.hoverBg} transition-all text-left flex flex-col group`}
+              >
+                <span className={`text-[10px] font-bold ${item.text} ${item.hoverText} transition-colors`}>
+                  {item.label}
+                </span>
+                <span className="text-[7px] text-[#C4B5FD]/50 font-mono truncate w-full mt-0.5">
+                  {item.email}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-2 mt-4 text-[10px] font-bold text-white/50 uppercase tracking-wider pl-1">School Roles</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { email: 'khushalkhatri0019@gmail.com', role: 'Principal', label: 'Principal', bg: 'bg-violet-500/10', border: 'border-violet-500/25', hoverBorder: 'hover:border-violet-500', hoverBg: 'hover:bg-violet-500/20', text: 'text-violet-400', hoverText: 'hover:text-violet-300' },
+              { email: 'khushal.24jiaiml067@jietjodhpur.ac.in', role: 'Vice Principal', label: 'Vice Principal', bg: 'bg-indigo-500/10', border: 'border-indigo-500/25', hoverBorder: 'hover:border-indigo-500', hoverBg: 'hover:bg-indigo-500/20', text: 'text-indigo-400', hoverText: 'hover:text-indigo-300' },
+              { email: 'teacher@school.edu.in', role: 'Teacher', label: 'Teacher', bg: 'bg-purple-500/10', border: 'border-purple-500/25', hoverBorder: 'hover:border-purple-500', hoverBg: 'hover:bg-purple-500/20', text: 'text-purple-400', hoverText: 'hover:text-purple-300' },
+              { email: 'student@school.edu.in', role: 'Student', label: 'Student', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', hoverBorder: 'hover:border-emerald-500', hoverBg: 'hover:bg-emerald-500/20', text: 'text-emerald-400', hoverText: 'hover:text-emerald-300' },
+              { email: 'parent@school.edu.in', role: 'Parent', label: 'Parent', bg: 'bg-pink-500/10', border: 'border-pink-500/25', hoverBorder: 'hover:border-pink-500', hoverBg: 'hover:bg-pink-500/20', text: 'text-pink-400', hoverText: 'hover:text-pink-300' },
+              { email: 'driver@school.edu.in', role: 'Driver', label: 'Driver', bg: 'bg-orange-500/10', border: 'border-orange-500/25', hoverBorder: 'hover:border-orange-500', hoverBg: 'hover:bg-orange-500/20', text: 'text-orange-400', hoverText: 'hover:text-orange-300' },
+            ].map((item) => (
+              <button
+                key={`school-${item.role}`}
+                type="button"
+                onClick={() => {
+                  const mockProfile = getMockProfile(item.email, item.role);
+                  mockProfile.institute_type = 'school';
                   const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
                   const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
                   localStorage.setItem('iris_jwt_token', mockToken);
