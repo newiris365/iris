@@ -183,29 +183,92 @@ export default function StudentTransitPage() {
       const user = userStr ? JSON.parse(userStr) : null;
       const studentId = user?.student_id || user?.id || '';
 
-      const startDate = new Date().toISOString().split('T')[0];
-      const endDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0];
+      if (!studentId) {
+        alert('Student session not found.');
+        return;
+      }
 
-      const res = await apiPost('/transit/subscriptions', {
+      // 1. Initiate subscription payment
+      const initRes = await apiPost('/transit/subscriptions/initiate', {
         student_id: studentId,
         route_id: selectedRoute.id,
         stop_name: selectedStop,
-        start_date: startDate,
-        end_date: endDate,
-        amount_paid: selectedRoute.monthly_fee || 1200,
-        transaction_id: 'TXN_TRANSIT_' + Math.random().toString(36).substring(2, 10).toUpperCase(),
       });
 
-      if (res.success) {
-        setPaySuccess(true);
-        setTimeout(async () => {
-          setShowPaymentModal(false);
-          setPaySuccess(false);
-          setLoading(true);
-          await loadTransitDetails();
-        }, 1500);
+      if (!initRes.success) {
+        throw new Error(initRes.error || 'Failed to initiate payment.');
+      }
+
+      // 2. Trigger Razorpay checkout
+      if (initRes.order_id && !initRes.order_id.startsWith('order_mock_') && initRes.key_id && typeof window !== 'undefined' && (window as any).Razorpay) {
+        const options = {
+          key: initRes.key_id,
+          amount: initRes.amount,
+          currency: initRes.currency || 'INR',
+          name: 'IRIS 365',
+          description: `Transit Pass: ${selectedRoute.name}`,
+          order_id: initRes.order_id,
+          handler: async (response: any) => {
+            setPaying(true);
+            try {
+              const verifyRes = await apiPost('/transit/subscriptions/verify', {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                student_id: studentId,
+                route_id: selectedRoute.id,
+                stop_name: selectedStop,
+                amount_paid: selectedRoute.monthly_fee || 1200,
+              });
+
+              if (verifyRes.success) {
+                setPaySuccess(true);
+                setTimeout(async () => {
+                  setShowPaymentModal(false);
+                  setPaySuccess(false);
+                  setLoading(true);
+                  await loadTransitDetails();
+                }, 1500);
+              } else {
+                alert(verifyRes.error || 'Verification failed');
+              }
+            } catch (err: unknown) {
+              const errorMsg = err instanceof Error ? err.message : 'Verification failed. Please try again.';
+              alert(errorMsg);
+            } finally {
+              setPaying(false);
+            }
+          },
+          theme: { color: '#6C2BD9' }
+        };
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+        setPaying(false);
       } else {
-        throw new Error(res.error || 'Checkout failed');
+        // Razorpay simulator fallback
+        alert(`Razorpay Simulator:\nOrder ID: ${initRes.order_id}\nAmount: ₹${initRes.amount / 100}\nClick OK to confirm payment.`);
+        
+        const verifyRes = await apiPost('/transit/subscriptions/verify', {
+          razorpay_order_id: initRes.order_id,
+          razorpay_payment_id: 'pay_rzp_' + Math.random().toString(36).substring(2, 12),
+          razorpay_signature: 'sig_mock_verification_hash',
+          student_id: studentId,
+          route_id: selectedRoute.id,
+          stop_name: selectedStop,
+          amount_paid: selectedRoute.monthly_fee || 1200,
+        });
+
+        if (verifyRes.success) {
+          setPaySuccess(true);
+          setTimeout(async () => {
+            setShowPaymentModal(false);
+            setPaySuccess(false);
+            setLoading(true);
+            await loadTransitDetails();
+          }, 1500);
+        } else {
+          throw new Error(verifyRes.error || 'Verification failed');
+        }
       }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Checkout failed. Please try again.';

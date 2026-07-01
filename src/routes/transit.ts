@@ -42,7 +42,9 @@ import {
   ingestGpsTelemetry,
   recordStudentTransitTap,
   getLiveBuses,
-  getMyBuses
+  getMyBuses,
+  initiateBusSubscription,
+  verifyBusSubscription
 } from '../controllers/transit';
 import { authMiddleware, requireRole } from '../middleware/auth';
 
@@ -85,6 +87,8 @@ router.get('/tracking/:busId/history', getTrackingHistory);
 
 // --- SUBSCRIPTIONS ---
 router.post('/subscriptions', subscribeToBus);
+router.post('/subscriptions/initiate', initiateBusSubscription);
+router.post('/subscriptions/verify', verifyBusSubscription);
 router.delete('/subscriptions/:id', deleteSubscription);
 router.get('/subscriptions/student/:studentId', getMySubscription);
 

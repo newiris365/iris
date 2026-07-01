@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase';
 import { sendTextMessage } from '../services/whatsapp';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 // ========== ZOD VALIDATION SCHEMAS ==========
 
@@ -48,6 +50,22 @@ export const subscribeTransportSchema = z.object({
   end_date: z.string(),
   amount_paid: z.number().positive(),
   transaction_id: z.string().min(1)
+});
+
+export const initiateBusSubscriptionSchema = z.object({
+  student_id: z.string().uuid(),
+  route_id: z.string().uuid(),
+  stop_name: z.string().min(1)
+});
+
+export const verifyBusSubscriptionSchema = z.object({
+  razorpay_order_id: z.string(),
+  razorpay_payment_id: z.string(),
+  razorpay_signature: z.string(),
+  student_id: z.string().uuid(),
+  route_id: z.string().uuid(),
+  stop_name: z.string().min(1),
+  amount_paid: z.number().positive()
 });
 
 export const startTripSchema = z.object({
@@ -658,6 +676,147 @@ export async function subscribeToBus(req: Request, res: Response) {
   }
 }
 
+let razorpayInstance: Razorpay | null = null;
+function getRazorpay(): Razorpay | null {
+  if (!razorpayInstance && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpayInstance = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
+    });
+  }
+  return razorpayInstance;
+}
+
+export async function initiateBusSubscription(req: Request, res: Response) {
+  try {
+    const parseResult = initiateBusSubscriptionSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
+    }
+
+    const { student_id, route_id, stop_name } = parseResult.data;
+
+    // Get monthly fee
+    const { data: route } = await supabaseAdmin
+      .from('bus_routes')
+      .select('monthly_fee, name')
+      .eq('id', route_id)
+      .single();
+
+    if (!route) {
+      return res.status(400).json({ success: false, error: 'Route not found.' });
+    }
+
+    const amount = Math.round((route.monthly_fee || 1200) * 100); // paise
+
+    const razorpay = getRazorpay();
+    if (razorpay) {
+      const order = await razorpay.orders.create({
+        amount,
+        currency: 'INR',
+        receipt: `bus_${route_id}_${student_id}`.slice(0, 40),
+        notes: {
+          type: 'bus_subscription',
+          route_id,
+          student_id,
+          stop_name,
+          institution_id: req.user?.institution_id || ''
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        key_id: process.env.RAZORPAY_KEY_ID
+      });
+    }
+
+    // Mock/Sandbox Mode
+    const mockOrderId = 'order_mock_' + Math.random().toString(36).substring(2, 12);
+    return res.status(200).json({
+      success: true,
+      order_id: mockOrderId,
+      amount,
+      currency: 'INR',
+      key_id: 'rzp_test_mock',
+      mock: true
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Internal server error initiating payment.' });
+  }
+}
+
+export async function verifyBusSubscription(req: Request, res: Response) {
+  try {
+    const parseResult = verifyBusSubscriptionSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ success: false, error: parseResult.error.errors[0].message });
+    }
+
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, student_id, route_id, stop_name, amount_paid } = parseResult.data;
+
+    // Verify signature if not mock
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (secret && !razorpay_order_id.startsWith('order_mock_')) {
+      const generatedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+
+      if (generatedSignature !== razorpay_signature) {
+        return res.status(400).json({ success: false, error: 'Razorpay signature validation failed.' });
+      }
+    }
+
+    // Calculate dates
+    const startDate = new Date().toISOString().split('T')[0];
+    const endDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0];
+
+    // Check for existing active subscription
+    const { data: existingSub } = await supabaseAdmin
+      .from('transport_subscriptions')
+      .select('id, end_date')
+      .eq('student_id', student_id)
+      .eq('route_id', route_id)
+      .eq('status', 'active')
+      .gte('end_date', new Date().toISOString().split('T')[0])
+      .maybeSingle();
+
+    if (existingSub) {
+      return res.status(409).json({
+        success: false,
+        error: `Active subscription already exists for this route until ${existingSub.end_date}.`
+      });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('transport_subscriptions')
+      .insert({
+        institution_id: req.user?.institution_id,
+        student_id,
+        route_id,
+        stop_name,
+        start_date: startDate,
+        end_date: endDate,
+        amount_paid,
+        transaction_id: razorpay_payment_id,
+        status: 'active'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    return res.status(200).json({ success: true, message: 'Transport subscription created successfully.', subscription: data });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Internal server error verifying payment.' });
+  }
+}
+
 // ========== 16. CANCEL SUBSCRIPTION ==========
 export async function deleteSubscription(req: Request, res: Response) {
   try {
@@ -688,7 +847,13 @@ export async function getMySubscription(req: Request, res: Response) {
 
     const { data, error } = await supabaseAdmin
       .from('transport_subscriptions')
-      .select('*, bus_routes(*)')
+      .select('*, bus_routes(*, buses(*, users(name, phone))))')
+      .eq('student_id', studentId)
+      .eq('status', 'active')
+      .gte('end_date', new Date().toISOString().split('T')[0])
+      .order('end_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
       .eq('student_id', studentId)
       .eq('status', 'active')
       .gte('end_date', new Date().toISOString().split('T')[0])
