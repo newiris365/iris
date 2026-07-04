@@ -958,8 +958,9 @@ export default function SuperAdminConsole() {
                 </div>
               </div>
             </div>
-          </>
-        )}
+              </>
+              );
+            })()}
 
         {/* TAB: FEATURE TOGGLES */}
         {activeTab === 'features' && (
@@ -1111,20 +1112,26 @@ export default function SuperAdminConsole() {
               </div>
             )}
 
-            {selectedInstForPerms && !permsLoading && !permsError && allRoles.length > 0 && (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {allRoles.filter(r => ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver'].includes(r)).map(role => (
-                    <button key={role} onClick={() => setSelectedRole(role)}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
-                        selectedRole === role
-                          ? `bg-violet-600/20 border-violet-500/40 text-violet-400`
-                          : 'bg-white/5 border-white/10 text-[#C4B5FD]/50 hover:text-white hover:bg-white/10'
-                      }`}>
-                      {role}
-                    </button>
-                  ))}
-                </div>
+            {selectedInstForPerms && !permsLoading && !permsError && allRoles.length > 0 && (() => {
+              const selectedInst = institutions.find(i => i.id === selectedInstForPerms);
+              const isSchool = selectedInst?.institute_type === 'school';
+              const allowedRoles = isSchool
+                ? ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver']
+                : ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver', 'HOD', 'Director', 'Principal', 'TPO'];
+              return (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {allRoles.filter(r => allowedRoles.includes(r)).map(role => (
+                      <button key={role} onClick={() => setSelectedRole(role)}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                          selectedRole === role
+                            ? `bg-violet-600/20 border-violet-500/40 text-violet-400`
+                            : 'bg-white/5 border-white/10 text-[#C4B5FD]/50 hover:text-white hover:bg-white/10'
+                        }`}>
+                        {role}
+                      </button>
+                    ))}
+                  </div>
 
                 {selectedRole && (
                   <div className="overflow-x-auto w-full">
@@ -1160,12 +1167,13 @@ export default function SuperAdminConsole() {
                         })}
                       </tbody>
                     </table>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                   </div>
+                 )}
+               </>
+               );
+             })()}
+           </div>
+         )}
 
         {/* TAB: NOTIFICATIONS */}
         {activeTab === 'notifications' && (

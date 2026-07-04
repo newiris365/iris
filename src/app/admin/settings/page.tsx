@@ -84,6 +84,7 @@ export default function AdminSettingsPage() {
   const [allModules, setAllModules] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState('');
   const [showSqlModal, setShowSqlModal] = useState(false);
+  const [instituteType, setInstituteType] = useState('college');
 
   useEffect(() => {
     const profile = localStorage.getItem('iris_user_profile');
@@ -92,6 +93,7 @@ export default function AdminSettingsPage() {
         const parsed = JSON.parse(profile);
         setInstitutionId(parsed.institution_id || '');
         setUserRole(parsed.role || '');
+        setInstituteType(parsed.institute_type || 'college');
       } catch {}
     }
   }, []);
@@ -393,7 +395,10 @@ export default function AdminSettingsPage() {
               <>
                 {/* Role selector */}
                 <div className="flex flex-wrap gap-2">
-                  {['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver'].map(role => (
+                  {(instituteType === 'school'
+                    ? ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver']
+                    : ['Admin', 'Staff', 'Teacher', 'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver', 'HOD', 'Director', 'Principal', 'TPO']
+                  ).map(role => (
                     <button key={role} onClick={() => setSelectedRole(role)}
                       className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
                         selectedRole === role

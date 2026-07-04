@@ -12,6 +12,7 @@ export interface MessageContext {
   notices: { title: string }[];
   hostel_room?: string;
   subscription_status?: any;
+  canteen_wallet?: number;
   // SuperAdmin
   total_students?: number;
   total_revenue?: number;
@@ -21,6 +22,7 @@ export interface MessageContext {
   campus_staff?: number;
   campus_attendance_rate?: number;
   campus_fee_collection?: number;
+  pending_leaves?: number;
   // HOD
   dept_students?: number;
   dept_attendance?: number;
@@ -116,7 +118,7 @@ async function askGemini(
         },
         contents
       }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(30000)
     });
 
     if (response.ok) {
@@ -163,7 +165,7 @@ async function askOpenAI(
         messages,
         max_tokens: 500
       }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(30000)
     });
 
     if (response.ok) {
@@ -202,12 +204,9 @@ async function askClaudeWithKey(
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: 500,
         system: buildSystemPrompt(userContext),
-        messages: [
-          ...history.slice(-10).map(msg => ({ role: msg.role, content: msg.content })),
-          { role: 'user', content: userMessage }
-        ]
+        messages: sanitizeClaudeMessages(history, userMessage)
       }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(30000)
     });
 
     if (response.ok) {
@@ -285,8 +284,8 @@ export async function askClaude(
     if (res) return res;
   }
 
-  logger.warn('No active API key configured or API calls failed. Returning empty response.');
-  return 'Sorry, I am having trouble connecting to my brain right now. Please verify that the AI API keys are properly configured.';
+  logger.warn('No active API key configured or API calls failed. Falling back to smart mock response.');
+  return generateSmartMockResponse(userMessage, userContext);
 }
 
 
@@ -341,9 +340,27 @@ Campus-Level Context:
 - Total Staff: ${ctx.campus_staff ?? 'N/A'}
 - Overall Attendance Rate: ${ctx.campus_attendance_rate ?? 'N/A'}%
 - Fee Collection (this month): ₹${ctx.campus_fee_collection?.toLocaleString('en-IN') ?? 'N/A'}
+- Pending Leaves: ${ctx.pending_leaves ?? 'N/A'}
 - Active Notices: ${noticesStr}
 
 Scope: You manage a single campus. Respond with campus-level student stats, staff summaries, fee collection figures, and attendance reports.
+${rules}`;
+  }
+
+  // ── PRINCIPAL ────────────────────────────────────────────────────────────
+  if (roleUpper === 'principal') {
+    return `You are IRIS, the AI campus assistant for ${ctx.institution}.
+User: ${ctx.name} | Role: Principal | Date: ${date}
+
+Campus-Level Context:
+- Total Students: ${ctx.campus_students ?? 'N/A'}
+- Total Staff: ${ctx.campus_staff ?? 'N/A'}
+- Overall Attendance Rate: ${ctx.campus_attendance_rate ?? 'N/A'}%
+- Fee Collection: ₹${ctx.campus_fee_collection?.toLocaleString('en-IN') ?? 'N/A'}
+- Pending Leaves: ${ctx.pending_leaves ?? 'N/A'}
+- Active Notices: ${noticesStr}
+
+Scope: You oversee the entire campus. Respond with campus-wide insights, student/staff stats, academic performance, and administrative summaries.
 ${rules}`;
   }
 
@@ -549,4 +566,199 @@ export async function getEmbeddings(text: string): Promise<number[]> {
   }
 
   return [];
+}
+
+/**
+ * Sanitizes and formats history messages for Anthropic Claude.
+ * Merges consecutive messages with the same role and ensures the list starts with a user message.
+ */
+function sanitizeClaudeMessages(history: ChatMessage[], userMessage: string): { role: string; content: string }[] {
+  const rawMessages: { role: string; content: string }[] = [];
+  
+  history.forEach(msg => {
+    const role = msg.role === 'assistant' ? 'assistant' : 'user';
+    if (msg.content && msg.content.trim()) {
+      rawMessages.push({ role, content: msg.content.trim() });
+    }
+  });
+
+  rawMessages.push({ role: 'user', content: userMessage.trim() });
+
+  const mergedMessages: { role: string; content: string }[] = [];
+  for (const current of rawMessages) {
+    if (mergedMessages.length > 0 && mergedMessages[mergedMessages.length - 1].role === current.role) {
+      mergedMessages[mergedMessages.length - 1].content += "\n" + current.content;
+    } else {
+      mergedMessages.push(current);
+    }
+  }
+
+  while (mergedMessages.length > 0 && mergedMessages[0].role !== 'user') {
+    mergedMessages.shift();
+  }
+
+  return mergedMessages;
+}
+
+/**
+ * Dynamically generates a mock response using details from the user context depending on role.
+ */
+export function generateSmartMockResponse(message: string, context: MessageContext): string {
+  const msg = message.toLowerCase();
+  const role = (context.role || 'Student').toLowerCase();
+
+  if (msg.includes('attendance') || msg.includes('present') || msg.includes('absent')) {
+    if (role === 'superadmin') {
+      return context.campus_attendance_rate
+        ? `The overall system-wide average attendance rate is **${context.campus_attendance_rate}%** across all campuses.`
+        : `I don't have campus-wide attendance data available right now. Please check the attendance dashboard for real-time numbers.`;
+    }
+    if (role === 'admin' || role === 'principal') {
+      return context.campus_attendance_rate
+        ? `The campus-wide average attendance rate is **${context.campus_attendance_rate}%** today.`
+        : `I don't have attendance data for your campus yet. Please check the attendance dashboard.`;
+    }
+    if (role === 'hod') {
+      return context.dept_attendance
+        ? `Your department's average attendance rate is **${context.dept_attendance}%** today.`
+        : `I don't have department attendance data yet. Please check the department dashboard.`;
+    }
+    if (role === 'teacher') {
+      return `I don't have class-level attendance data available. Please check your class roster in the Teacher portal.`;
+    }
+    if (role === 'parent') {
+      return context.child_attendance
+        ? `Your child **${context.child_name || 'your child'}** has an attendance rate of **${context.child_attendance}%**.`
+        : `I don't have attendance data for your child yet. Please check the parent portal for updates.`;
+    }
+    return context.attendance
+      ? `Your current overall attendance is **${context.attendance}%**. You need to maintain at least 75% to be eligible for final examinations.`
+      : `I don't have your attendance data yet. Please check the student portal for your attendance record.`;
+  }
+
+  if (msg.includes('fee') || msg.includes('revenue') || msg.includes('income') || msg.includes('payment') || msg.includes('dues')) {
+    if (role === 'superadmin') {
+      return context.total_revenue
+        ? `Total platform revenue collected this financial year is **₹${context.total_revenue.toLocaleString('en-IN')}** across all campuses.`
+        : `I don't have revenue data available. Please check the financial dashboard.`;
+    }
+    if (role === 'admin' || role === 'principal') {
+      return context.campus_fee_collection
+        ? `Total fee collection for this campus is **₹${context.campus_fee_collection.toLocaleString('en-IN')}**.`
+        : `I don't have fee collection data for your campus yet. Please check the finance dashboard.`;
+    }
+    if (role === 'hod') {
+      return `Fee collection tracking is managed at the campus level. Please contact the accounts section for department-wise recovery.`;
+    }
+    if (role === 'parent') {
+      return context.child_fees
+        ? `Your child **${context.child_name || 'your child'}** has an outstanding fee balance of **₹${context.child_fees.toLocaleString('en-IN')}**.`
+        : `I don't have fee information for your child yet. Please check the parent portal.`;
+    }
+    if (context.pending_fees !== undefined && context.pending_fees !== null) {
+      if (context.pending_fees > 0) {
+        return `Your outstanding fee balance is **₹${context.pending_fees.toLocaleString('en-IN')}**. Please clear it under the Fee Ledger section.`;
+      }
+      return `Your hostel and academic fees are fully cleared. No outstanding dues found.`;
+    }
+    return `I don't have your fee data available. Please check the student portal for fee details.`;
+  }
+
+  if (msg.includes('timetable') || msg.includes('schedule') || msg.includes('class') || msg.includes('time table')) {
+    if (role === 'teacher') {
+      return context.my_classes?.length
+        ? `Your schedule today: **${context.my_classes.join(', ')}**.`
+        : `I don't have your timetable data yet. Please check the teacher portal.`;
+    }
+    if (role === 'student') {
+      return context.timetable?.length
+        ? `Your timetable for today:\n${context.timetable.map((t: string) => `- ${t}`).join('\n')}`
+        : `I don't have your timetable data yet. Please check the student portal.`;
+    }
+    if (role === 'superadmin' || role === 'admin' || role === 'principal' || role === 'hod') {
+      return `Please view the academic timetable dashboard to see schedules.`;
+    }
+    return `I don't have timetable data available. Please check the relevant portal.`;
+  }
+
+  if (msg.includes('campus') || msg.includes('branch') || msg.includes('institutions')) {
+    if (role === 'superadmin') {
+      return context.total_campuses
+        ? `There are currently **${context.total_campuses}** active campuses under management.`
+        : `I don't have campus count data available. Please check the super admin dashboard.`;
+    }
+  }
+
+  if (msg.includes('hostel') || msg.includes('room') || msg.includes('accommodation')) {
+    if (role === 'warden' || role === 'hostelwarden') {
+      return context.room_occupancy
+        ? `Current room occupancy: **${context.room_occupancy}**.`
+        : `I don't have hostel occupancy data yet. Please check the warden dashboard.`;
+    }
+    if (role === 'student') {
+      return context.hostel_room
+        ? `Your assigned hostel room is **${context.hostel_room}**.`
+        : `I don't have hostel allocation data for you. Please check the student portal.`;
+    }
+  }
+
+  if (msg.includes('notice') || msg.includes('announcement') || msg.includes('update')) {
+    const notices = context.notices?.length
+      ? context.notices.map((n) => `- ${n.title}`).join('\n')
+      : null;
+    return notices
+      ? `Here are the latest notices:\n${notices}`
+      : `I don't have any active notices at the moment.`;
+  }
+
+  if (msg.includes('wallet') || msg.includes('canteen') || msg.includes('food') || msg.includes('mess')) {
+    if (role === 'student') {
+      return context.canteen_wallet !== undefined
+        ? `Your canteen wallet balance is **₹${context.canteen_wallet}**.`
+        : `I don't have your canteen wallet data. Please check the student portal.`;
+    }
+    if (role === 'warden' || role === 'hostelwarden') {
+      return `Please check the mess dashboard for today's menu and meal timings.`;
+    }
+  }
+
+  if (msg.includes('bus') || msg.includes('transport') || msg.includes('transit')) {
+    if (role === 'student') {
+      return `Please check the transport dashboard for bus routes and schedules.`;
+    }
+    if (role === 'driver') {
+      return context.today_route
+        ? `Your route today: **${context.today_route}**.`
+        : `I don't have route data for you. Please check with the transport admin.`;
+    }
+  }
+
+  if (msg.includes('library') || msg.includes('book')) {
+    if (role === 'librarian') {
+      return context.book_inventory
+        ? `Total books in inventory: **${context.book_inventory}**. Pending returns: **${context.pending_returns || 0}**.`
+        : `I don't have library data yet. Please check the librarian dashboard.`;
+    }
+    return `Please check the library portal for book availability and issues.`;
+  }
+
+  if (msg.includes('visitor') || msg.includes('gate') || msg.includes('security')) {
+    if (role === 'security' || role === 'gatesecurity') {
+      return `Visitor logs today: **${context.visitor_logs_today || 'N/A'}**. RFID scans: **${context.rfid_scans_today || 'N/A'}**.`;
+    }
+  }
+
+  const notices = context.notices?.length
+    ? context.notices.map((n) => `- ${n.title}`).join('\n')
+    : null;
+
+  return `Hello ${context.name || 'User'}! I am IRIS, your AI concierge.
+I am running in local fallback mode (no API key configured). Here is what I know about your role (**${context.role || 'Guest'}**):
+${role === 'superadmin' ? `- Total Campuses: ${context.total_campuses || 'N/A'}\n- System Revenue: ₹${context.total_revenue?.toLocaleString('en-IN') || 'N/A'}` : ''}
+${role === 'admin' || role === 'principal' ? `- Campus Students: ${context.campus_students || 'N/A'}\n- Attendance Rate: ${context.campus_attendance_rate || 'N/A'}%` : ''}
+${role === 'hod' ? `- Department Students: ${context.dept_students || 'N/A'}\n- Department Attendance: ${context.dept_attendance || 'N/A'}%` : ''}
+${role === 'student' ? `- Outstanding Fees: ₹${context.pending_fees || 'N/A'}\n- Attendance: ${context.attendance || 'N/A'}%` : ''}
+${role === 'parent' ? `- Child: ${context.child_name || 'N/A'}\n- Child Attendance: ${context.child_attendance || 'N/A'}%` : ''}
+${notices ? `\n**Active Notices:**\n${notices}` : ''}
+How else can I assist you?`;
 }

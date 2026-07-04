@@ -86,7 +86,7 @@ export default function StudentCertificatesPage() {
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24">
       {/* Background elements */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#6C2BD9]/5 rounded-full blur-[120px]" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#6C2BD9]/5 rounded-full blur-[120px] pointer-events-none" />
       
       <div className="max-w-7xl mx-auto px-6 pt-8 relative z-10">
         <Link href="/student/dashboard" className="inline-flex items-center gap-2 text-xs font-bold text-[#C4B5FD]/50 hover:text-[#A78BFA] transition-colors mb-6">

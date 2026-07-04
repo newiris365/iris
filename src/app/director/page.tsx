@@ -65,20 +65,18 @@ export default function DirectorDashboard() {
       if (feedRes.success) setFeed(feedRes.feed || []);
       if (alertRes.success) setAlerts(alertRes.alerts || []);
     } catch {
-      // Sandbox Fallbacks
+      // No mock data - show zeros
       setKpis({
-        attendance_rate: 82,
-        fee_collected_today: 185000,
-        fee_target_percent: 78,
-        students_on_campus: 48,
-        open_complaints: 6,
-        active_bus_trips: 3,
-        events_today: 2
+        attendance_rate: 0,
+        fee_collected_today: 0,
+        fee_target_percent: 0,
+        students_on_campus: 0,
+        open_complaints: 0,
+        active_bus_trips: 0,
+        events_today: 0
       });
       setFeed([]);
-      setAlerts([
-        { id: 'a1', severity: 'warning', title: 'Low Attendance Alert', message: 'Sophomore attendance rate stands at 72%, below threshold.', created_at: new Date().toISOString() }
-      ]);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -144,7 +142,7 @@ export default function DirectorDashboard() {
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="font-extrabold text-2xl lg:text-3xl text-white">Director Intelligence Operations</h1>

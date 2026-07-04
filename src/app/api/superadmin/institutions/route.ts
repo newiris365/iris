@@ -131,6 +131,13 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, ...updates } = body;
 
+    // Synchronize type and institute_type columns so both are updated in sync
+    if ('institute_type' in updates) {
+      updates.type = updates.institute_type;
+    } else if ('type' in updates) {
+      updates.institute_type = updates.type;
+    }
+
     if (!id) {
       return NextResponse.json({ error: 'Institution ID is required.' }, { status: 400 });
     }

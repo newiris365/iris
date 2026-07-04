@@ -46,7 +46,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // ──── EMPLOYEES ────────────────────────────────────────────────
-router.get('/employees', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Principal']), getEmployees);
+router.get('/employees', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Principal', 'HOD']), getEmployees);
 router.post('/employees', requireRole(['Admin', 'SuperAdmin', 'HR Admin']), createEmployee);
 router.get('/employees/:id', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'HOD', 'Staff', 'Principal']), getEmployee);
 router.put('/employees/:id', requireRole(['Admin', 'SuperAdmin', 'HR Admin', 'Staff']), updateEmployee);

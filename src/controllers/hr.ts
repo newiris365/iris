@@ -124,12 +124,41 @@ export const attendanceRegularizeSchema = z.object({
 
 export async function getEmployees(req: Request, res: Response) {
   try {
-    const { data, error } = await supabaseAdmin
+    const userId = req.user?.id;
+    const instId = req.user?.institution_id;
+    let deptId: string | null = null;
+
+    if (req.user?.role === 'HOD' && userId) {
+      const { data: staff } = await supabaseAdmin
+        .from('staff')
+        .select('department_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (staff) {
+        deptId = staff.department_id;
+      }
+    }
+
+    let query = supabaseAdmin
       .from('employee_profiles')
       .select('*, employment_details(*)');
 
+    if (instId) {
+      query = query.eq('institution_id', instId);
+    }
+
+    if (deptId) {
+      query = supabaseAdmin
+        .from('employee_profiles')
+        .select('*, employment_details!inner(*)')
+        .eq('institution_id', instId)
+        .eq('employment_details.department_id', deptId);
+    }
+
+    const { data, error } = await query;
+
     if (error) throw error;
-    return res.status(200).json({ success: true, employees: data || [] });
+    return res.status(200).json({ success: true, employees: data || [], data: data || [] });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

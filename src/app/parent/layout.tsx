@@ -3,14 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Calendar, Link2, Bell, Bus, Wallet, UserCircle, Upload } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Calendar, Link2, Bell, Bus, Wallet, UserCircle, Upload, AlertCircle, ClipboardList } from 'lucide-react';
 
 const parentLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
   { label: 'Attendance', href: '/parent/attendance', icon: CalendarDays },
   { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
   { label: 'Exam Results', href: '/parent/results', icon: FileText },
-  { label: 'Wallet Top-Up', href: '/parent/dashboard', icon: Wallet },
+  { label: 'Wallet', href: '/parent/wallet', icon: Wallet },
+  { label: 'Complaints', href: '/parent/complaints', icon: AlertCircle },
   { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
   { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },
   { label: 'Link Child', href: '/parent/link', icon: Link2 },
@@ -59,6 +60,9 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
               { label: 'Transit GPS', href: '/parent/transit', icon: Bus },
               { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
               { label: 'Exam Results', href: '/parent/results', icon: FileText },
+              { label: 'Leave Application', href: '/parent/leave', icon: ClipboardList },
+              { label: 'Wallet', href: '/parent/wallet', icon: Wallet },
+              { label: 'Complaints', href: '/parent/complaints', icon: AlertCircle },
               { label: 'Notices', href: '/parent/notices', icon: Bell },
               { label: 'Messages', href: '/parent/messages', icon: MessageSquare },
               { label: 'PTM Schedule', href: '/parent/ptm', icon: Calendar },

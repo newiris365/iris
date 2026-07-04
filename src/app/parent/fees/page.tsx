@@ -1,39 +1,41 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { IndianRupee, CheckCircle2, Clock, AlertTriangle, CreditCard, Wallet, Building, Smartphone, Banknote, FileDown } from 'lucide-react';
+import { IndianRupee, CheckCircle2, Clock, AlertTriangle, CreditCard, Wallet, Building, Smartphone, Banknote, ArrowDownRight, ArrowUpRight, ReceiptText, Calendar, AlertCircle } from 'lucide-react';
 import { apiGet, apiPost } from '../../../lib/api';
 import { supabase } from '../../../lib/supabase';
 
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+  'Tuition': { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20', icon: '🎓' },
+  'Hostel': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: '🏠' },
+  'Transportation': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: '🚌' },
+  'Library Fines': { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', icon: '📚' },
+  'Exam': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: '📝' },
+  'Lab': { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', icon: '🔬' },
+  'Other': { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: '📋' },
+};
+
+function getCategoryStyle(name: string) {
+  for (const [key, style] of Object.entries(CATEGORY_COLORS)) {
+    if (name.toLowerCase().includes(key.toLowerCase())) return style;
+  }
+  return CATEGORY_COLORS['Other'];
+}
+
 export default function ParentFeesPage() {
-  const [structures, setStructures] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [concessions, setConcessions] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPaying, setIsPaying] = useState<string | null>(null);
-  const [childIdRef, setChildIdRef] = useState('');
-  const [walletBalance, setWalletBalance] = useState(0);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState('');
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
-  const [showMethodSelect, setShowMethodSelect] = useState<string | null>(null);
 
   useEffect(() => {
-    apiGet('/core/parent/child-info').then(childRes => {
-      if (childRes.success && childRes.child?.student_id) {
-        setChildIdRef(childRes.child.student_id);
-        setWalletBalance(childRes.child.wallet_balance || 0);
-        return apiGet(`/core/fees/student/${childRes.child.student_id}`);
-      }
-      return null;
-    }).then(res => {
-      if (res?.success) {
-        setStructures(res.structures || []);
-        setPayments(res.payments || []);
-        setConcessions(res.concessions || []);
-      }
+    apiGet('/core/parent/fee-summary').then(res => {
+      if (res.success) setSummary(res.summary);
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
 
-    // Load payment config
     try {
       const profile = JSON.parse(localStorage.getItem('iris_user_profile') || '{}');
       const instId = profile.institution_id;
@@ -42,257 +44,355 @@ export default function ParentFeesPage() {
           .select('enabled_methods, bank_account_number, bank_name, bank_ifsc, bank_holder_name, upi_id, razorpay_key_id')
           .eq('institution_id', instId)
           .maybeSingle()
-          .then(({ data }) => {
-            if (data) setPaymentConfig(data);
-          });
+          .then(({ data }) => { if (data) setPaymentConfig(data); });
       }
     } catch {}
   }, []);
 
-  const calculateLateFee = (structure: any) => {
-    if (!structure.due_date) return { daysOverdue: 0, lateFee: 0 };
-    const dueDate = new Date(structure.due_date);
-    const today = new Date();
-    const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / 86400000));
-    const daysAfterGrace = Math.max(0, daysOverdue - (structure.grace_period_days || 0));
-    let lateFee = daysAfterGrace * (structure.late_fee_per_day || 0);
-    if (structure.max_penalty > 0) lateFee = Math.min(lateFee, structure.max_penalty);
-    return { daysOverdue, lateFee };
-  };
-
-  const handlePay = async (structure: any, method: string) => {
-    setIsPaying(structure.id);
-    setShowMethodSelect(null);
-
+  const handlePayAll = async () => {
+    if (!selectedMethod || !summary) return;
+    setIsPaying(true);
     try {
-      if (method === 'wallet') {
-        if (walletBalance < structure.amount) {
-          alert(`Insufficient IRIS Balance. Available: ₹${walletBalance.toLocaleString()}`);
-          setIsPaying(null);
-          return;
-        }
-        if (!confirm(`Pay ₹${structure.amount.toLocaleString()} from child's IRIS Balance?`)) {
-          setIsPaying(null);
-          return;
-        }
-        const res = await apiPost('/core/wallet/deduct', {
-          amount: structure.amount,
-          description: `Fee payment by parent: ${structure.name}`,
-          module: 'fees',
-        });
-        setWalletBalance(prev => prev - structure.amount);
-        const simulatedPayment = {
-          id: `pay-${Math.random()}`,
-          fee_structure_id: structure.id,
-          amount_paid: structure.amount,
-          payment_date: new Date().toISOString(),
-          transaction_id: `iris_bal_${Math.random().toString(36).substring(2, 10)}`,
-          status: 'Completed',
-          receipt_url: '#',
-          method: 'IRIS Balance',
-        };
-        setPayments([...payments, simulatedPayment]);
-        alert('Payment from IRIS Balance successful!');
-      } else if (method === 'razorpay') {
-        const initRes = await apiPost('/core/fees/payment/initiate', {
-          student_id: childIdRef,
-          fee_structure_id: structure.id,
-          amount: structure.amount,
-        });
+      const childRes = await apiGet('/core/parent/child-info');
+      const studentId = childRes.child?.student_id;
+      if (!studentId) { alert('No child linked.'); setIsPaying(false); return; }
 
-        if (initRes.success && initRes.order_id && !initRes.order_id.startsWith('order_mock_') && initRes.key_id) {
+      if (selectedMethod === 'wallet') {
+        if (summary.wallet_balance < summary.pending_amount) {
+          alert(`Insufficient IRIS Balance. Available: ₹${summary.wallet_balance.toLocaleString()}`);
+          setIsPaying(false);
+          return;
+        }
+        await apiPost('/core/wallet/deduct', { amount: summary.pending_amount, description: 'Bulk fee payment from parent', module: 'fees' });
+        alert('Payment from IRIS Balance successful!');
+      } else if (selectedMethod === 'razorpay') {
+        const initRes = await apiPost('/core/fees/payment/initiate', { student_id: studentId, fee_structure_id: 'bulk', amount: summary.pending_amount });
+        if (initRes.success && initRes.order_id && initRes.key_id) {
           if (typeof window !== 'undefined' && (window as any).Razorpay) {
             const options = {
-              key: initRes.key_id,
-              amount: initRes.amount,
-              currency: initRes.currency || 'INR',
-              name: 'IRIS 365',
-              description: `Parent Payment: ${structure.name}`,
-              order_id: initRes.order_id,
+              key: initRes.key_id, amount: initRes.amount, currency: initRes.currency || 'INR',
+              name: 'IRIS 365', description: 'Bulk Fee Payment', order_id: initRes.order_id,
               handler: async (response: any) => {
-                const verifyRes = await apiPost('/core/fees/payment/verify', {
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  student_id: childIdRef,
-                  fee_structure_id: structure.id,
-                  amount_paid: structure.amount,
-                });
-                if (verifyRes.success) {
-                  setPayments([...payments, verifyRes.payment]);
-                  alert('Payment successful!');
-                }
+                await apiPost('/core/fees/payment/verify', { ...response, student_id: studentId, fee_structure_id: 'bulk', amount_paid: summary.pending_amount });
+                alert('Payment successful!');
               },
               theme: { color: '#6C2BD9' },
             };
             const rzp = new (window as any).Razorpay(options);
             rzp.open();
-          } else {
-            throw new Error('mock');
           }
         } else {
-          alert(`Razorpay Simulator:\nOrder ID: ${initRes.order_id}\nAmount: ₹${initRes.amount / 100}\nClick OK to confirm parent payment.`);
-          const verifyRes = await apiPost('/core/fees/payment/verify', {
-            razorpay_order_id: initRes.order_id,
-            razorpay_payment_id: 'pay_rzp_' + Math.random().toString(36).substring(2, 12),
-            razorpay_signature: 'sig_mock_verification_hash',
-            student_id: childIdRef,
-            fee_structure_id: structure.id,
-            amount_paid: structure.amount,
-          });
-          if (verifyRes.success) {
-            setPayments([...payments, verifyRes.payment]);
-          }
+          alert(`Razorpay Simulator:\nAmount: ₹${summary.pending_amount.toLocaleString()}\nClick OK to confirm.`);
         }
-      } else if (method === 'bank_transfer') {
-        alert(`Bank Transfer Details:\n\nBank: ${paymentConfig?.bank_name || 'N/A'}\nAccount: ${paymentConfig?.bank_account_number || 'N/A'}\nIFSC: ${paymentConfig?.bank_ifsc || 'N/A'}\nHolder: ${paymentConfig?.bank_holder_name || 'N/A'}\n\nAmount: ₹${structure.amount.toLocaleString()}\nPlease transfer and notify the institution.`);
-      } else if (method === 'upi') {
-        alert(`UPI Payment:\n\nUPI ID: ${paymentConfig?.upi_id || 'N/A'}\nAmount: ₹${structure.amount.toLocaleString()}\n\nPay using any UPI app.`);
+      } else if (selectedMethod === 'bank_transfer') {
+        alert(`Bank Transfer Details:\n\nBank: ${paymentConfig?.bank_name || 'N/A'}\nAccount: ${paymentConfig?.bank_account_number || 'N/A'}\nIFSC: ${paymentConfig?.bank_ifsc || 'N/A'}\nHolder: ${paymentConfig?.bank_holder_name || 'N/A'}\n\nAmount: ₹${summary.pending_amount.toLocaleString()}`);
+      } else if (selectedMethod === 'upi') {
+        alert(`UPI Payment:\n\nUPI ID: ${paymentConfig?.upi_id || 'N/A'}\nAmount: ₹${summary.pending_amount.toLocaleString()}`);
       }
     } catch (err) {
-      const simulatedPayment = {
-        id: `pay-${Math.random()}`,
-        fee_structure_id: structure.id,
-        amount_paid: structure.amount,
-        payment_date: new Date().toISOString(),
-        transaction_id: `pay_rzp_${Math.random().toString(36).substring(2, 10)}`,
-        status: 'Completed',
-        receipt_url: '#',
-      };
-      setPayments([...payments, simulatedPayment]);
-      alert('Payment processed successfully!');
+      alert('Payment processed.');
     } finally {
-      setIsPaying(null);
+      setIsPaying(false);
+      setShowPayModal(false);
+      setSelectedMethod('');
     }
-  };
-
-  const getPaidStatus = (structureId: string) => {
-    return payments.find(p => p.fee_structure_id === structureId && p.status === 'Completed');
-  };
-
-  const getAppliedConcession = (structureId: string) => {
-    return concessions.find(c => c.fee_structure_id === structureId);
   };
 
   const methods = paymentConfig?.enabled_methods || ['razorpay'];
 
-  return (
-    <div className="max-w-4xl mx-auto py-6 w-full flex flex-col gap-6">
-      <div className="glass-panel rounded-3xl p-8 border border-white/5">
-        <h2 className="font-heading font-extrabold text-2xl text-white">Fee Payments</h2>
-        <p className="text-xs text-[#C4B5FD] mt-1 font-light">Pay your child&apos;s institute fees using any available payment method.</p>
-
-        {/* IRIS Balance */}
-        <div className="mt-4 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-violet-400" />
+  if (isLoading) {
+    return (
+      <div className="max-w-5xl mx-auto py-6 w-full">
+        <div className="glass-panel rounded-3xl p-8 border border-white/5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <ReceiptText className="w-5 h-5 text-violet-400" />
+            </div>
             <div>
-              <span className="text-[10px] text-violet-400/60 uppercase font-semibold">Child&apos;s IRIS Balance</span>
-              <strong className="text-lg font-bold text-white block">₹{walletBalance.toLocaleString('en-IN')}</strong>
+              <h2 className="font-heading font-extrabold text-xl text-white">Fee Status</h2>
+              <p className="text-[10px] text-[#C4B5FD]/50">Loading fee information...</p>
             </div>
           </div>
-          {walletBalance > 0 && (
-            <span className="text-[10px] text-emerald-400 font-semibold">可用 for fee payments</span>
-          )}
+          <div className="text-center py-16 text-xs text-[#C4B5FD]/50">Loading fee data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const s = summary || { total_fees: 0, total_paid: 0, pending_amount: 0, fines: 0, wallet_balance: 0, breakdown: [], installments: [], recent_payments: [], total_concessions: 0 };
+  const hasPending = s.pending_amount > 0;
+
+  return (
+    <div className="max-w-5xl mx-auto py-6 w-full flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+            <ReceiptText className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h2 className="font-heading font-extrabold text-xl text-white">Fee Status</h2>
+            <p className="text-[10px] text-[#C4B5FD]/50">Track your child&apos;s fee payments and pending amounts</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="glass-panel rounded-2xl p-4 border border-white/5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+              <IndianRupee className="w-4 h-4 text-violet-400" />
+            </div>
+            <span className="text-[10px] text-[#C4B5FD]/50 font-semibold uppercase">Total Fees</span>
+          </div>
+          <strong className="text-xl font-extrabold text-white">₹{s.total_fees.toLocaleString('en-IN')}</strong>
         </div>
 
-        <div className="space-y-4 mt-6">
-          {isLoading ? (
-            <div className="text-center text-xs text-[#C4B5FD]/50 py-10">Loading...</div>
+        <div className="glass-panel rounded-2xl p-4 border border-emerald-500/10">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            </div>
+            <span className="text-[10px] text-emerald-400/50 font-semibold uppercase">Paid</span>
+          </div>
+          <strong className="text-xl font-extrabold text-emerald-400">₹{s.total_paid.toLocaleString('en-IN')}</strong>
+        </div>
+
+        <div className={`glass-panel rounded-2xl p-4 border ${hasPending ? 'border-orange-500/20' : 'border-white/5'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg ${hasPending ? 'bg-orange-500/10' : 'bg-slate-500/10'} flex items-center justify-center`}>
+              <Clock className={`w-4 h-4 ${hasPending ? 'text-orange-400' : 'text-slate-400'}`} />
+            </div>
+            <span className={`text-[10px] ${hasPending ? 'text-orange-400/50' : 'text-slate-400/50'} font-semibold uppercase`}>Pending</span>
+          </div>
+          <strong className={`text-xl font-extrabold ${hasPending ? 'text-orange-400' : 'text-white'}`}>₹{s.pending_amount.toLocaleString('en-IN')}</strong>
+        </div>
+
+        <div className={`glass-panel rounded-2xl p-4 border ${s.fines > 0 ? 'border-red-500/20' : 'border-white/5'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg ${s.fines > 0 ? 'bg-red-500/10' : 'bg-slate-500/10'} flex items-center justify-center`}>
+              <AlertCircle className={`w-4 h-4 ${s.fines > 0 ? 'text-red-400' : 'text-slate-400'}`} />
+            </div>
+            <span className={`text-[10px] ${s.fines > 0 ? 'text-red-400/50' : 'text-slate-400/50'} font-semibold uppercase`}>Fines</span>
+          </div>
+          <strong className={`text-xl font-extrabold ${s.fines > 0 ? 'text-red-400' : 'text-white'}`}>₹{s.fines.toLocaleString('en-IN')}</strong>
+        </div>
+      </div>
+
+      {/* Wallet + Pay Action */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="glass-panel rounded-2xl p-5 border border-violet-500/10">
+          <div className="flex items-center gap-2 mb-3">
+            <Wallet className="w-4 h-4 text-violet-400" />
+            <span className="text-xs font-bold text-white">IRIS Wallet Balance</span>
+          </div>
+          <strong className="text-2xl font-extrabold text-violet-400">₹{s.wallet_balance.toLocaleString('en-IN')}</strong>
+          <p className="text-[10px] text-[#C4B5FD]/40 mt-1">可用于 fee payments</p>
+        </div>
+
+        <div className={`glass-panel rounded-2xl p-5 border ${hasPending ? 'border-[#6C2BD9]/30 bg-gradient-to-br from-[#6C2BD9]/10 to-[#8B5CF6]/5' : 'border-white/5'}`}>
+          <div className="flex items-center gap-2 mb-3">
+            <CreditCard className="w-4 h-4 text-[#8B5CF6]" />
+            <span className="text-xs font-bold text-white">{hasPending ? 'Quick Pay' : 'Fee Payment'}</span>
+          </div>
+          {hasPending ? (
+            <>
+              <p className="text-[10px] text-[#C4B5FD]/50 mb-3">Pay all pending fees at once</p>
+              <button
+                onClick={() => setShowPayModal(true)}
+                className="w-full px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
+              >
+                <IndianRupee className="w-4 h-4" /> Pay ₹{s.pending_amount.toLocaleString('en-IN')}
+              </button>
+            </>
           ) : (
-            structures.map((st) => {
-              const paidLog = getPaidStatus(st.id);
-              const concession = getAppliedConcession(st.id);
-              const waiver = concession ? Number(concession.amount) : 0;
-              const { daysOverdue, lateFee } = calculateLateFee(st);
-              const net = Math.max(0, Number(st.amount) - waiver);
-              const totalDue = net + (paidLog ? 0 : lateFee);
-              const isOverdue = daysOverdue > 0 && !paidLog;
-              const showMethods = showMethodSelect === st.id;
-
-              return (
-                <div key={st.id} className={`p-5 rounded-2xl bg-white/5 border flex flex-col gap-3 transition-all ${
-                  isOverdue ? 'border-orange-500/30 bg-orange-500/5' : 'border-white/5 hover:border-[#6C2BD9]/30'
-                }`}>
-                  <div className="flex flex-wrap justify-between items-center gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-white text-base">{st.name}</h4>
-                        {isOverdue && <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">OVERDUE {daysOverdue}d</span>}
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px] text-[#C4B5FD]/70 mt-1 font-light">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Due: {st.due_date}</span>
-                        {concession && <span className="text-emerald-400 font-semibold">Scholarship: -₹{waiver}</span>}
-                      </div>
-                      {isOverdue && lateFee > 0 && (
-                        <div className="mt-2 text-[10px] text-orange-400">
-                          <AlertTriangle className="w-3 h-3 inline mr-1" />
-                          Late fee: +₹{lateFee.toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <strong className="font-heading font-extrabold text-base text-white">₹{totalDue.toLocaleString()}</strong>
-
-                      {paidLog ? (
-                        <span className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold uppercase flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Paid
-                        </span>
-                      ) : (
-                        <div className="relative">
-                          <button
-                            onClick={() => setShowMethodSelect(showMethods ? null : st.id)}
-                            disabled={isPaying === st.id}
-                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all"
-                          >
-                            <IndianRupee className="w-4 h-4" /> {isPaying === st.id ? 'Processing...' : 'Pay Now'}
-                          </button>
-
-                          {showMethods && (
-                            <div className="absolute right-0 top-full mt-2 z-30 bg-[#13102A] border border-violet-500/30 rounded-xl p-2 shadow-2xl min-w-[200px]">
-                              {methods.includes('razorpay') && (
-                                <button onClick={() => handlePay({ ...st, amount: totalDue }, 'razorpay')}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white hover:bg-white/5 transition-all text-left">
-                                  <CreditCard className="w-4 h-4 text-blue-400" /> Pay via Razorpay
-                                </button>
-                              )}
-                              {methods.includes('bank_transfer') && (
-                                <button onClick={() => handlePay({ ...st, amount: totalDue }, 'bank_transfer')}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white hover:bg-white/5 transition-all text-left">
-                                  <Building className="w-4 h-4 text-emerald-400" /> Bank Transfer
-                                </button>
-                              )}
-                              {methods.includes('upi') && (
-                                <button onClick={() => handlePay({ ...st, amount: totalDue }, 'upi')}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white hover:bg-white/5 transition-all text-left">
-                                  <Smartphone className="w-4 h-4 text-sky-400" /> UPI Payment
-                                </button>
-                              )}
-                              {walletBalance >= totalDue && (
-                                <button onClick={() => handlePay({ ...st, amount: totalDue }, 'wallet')}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white hover:bg-white/5 transition-all text-left">
-                                  <Wallet className="w-4 h-4 text-violet-400" /> Pay from IRIS Balance
-                                </button>
-                              )}
-                              {methods.includes('cash') && (
-                                <button onClick={() => handlePay({ ...st, amount: totalDue }, 'cash')}
-                                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white hover:bg-white/5 transition-all text-left">
-                                  <Banknote className="w-4 h-4 text-amber-400" /> Cash at Office
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            <>
+              <p className="text-[10px] text-emerald-400/60 mb-3">No pending fees — all caught up!</p>
+              <button disabled className="w-full px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400/50 font-bold text-xs flex items-center justify-center gap-2 cursor-not-allowed">
+                <CheckCircle2 className="w-4 h-4" /> All Fees Paid
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Fee Breakdown by Category */}
+      {s.breakdown.length > 0 && (
+        <div className="glass-panel rounded-2xl p-5 border border-white/5">
+          <h3 className="text-sm font-bold text-white mb-4">Fee Breakdown</h3>
+          <div className="space-y-3">
+            {s.breakdown.map((item: any, i: number) => {
+              const style = getCategoryStyle(item.category);
+              const paidPct = item.total > 0 ? Math.round((item.paid / item.total) * 100) : 0;
+              return (
+                <div key={i} className={`p-4 rounded-xl ${style.bg} border ${style.border}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{style.icon}</span>
+                      <span className="text-xs font-bold text-white">{item.category}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {item.pending > 0 && (
+                        <span className="text-[10px] font-bold text-orange-400">₹{item.pending.toLocaleString()} pending</span>
+                      )}
+                      {item.pending === 0 && item.total > 0 && (
+                        <span className="text-[10px] font-bold text-emerald-400">Fully Paid</span>
+                      )}
+                      <span className="text-[10px] text-[#C4B5FD]/50">₹{item.total.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${item.pending === 0 ? 'bg-emerald-400' : 'bg-[#8B5CF6]'}`}
+                      style={{ width: `${Math.min(paidPct, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[9px] text-[#C4B5FD]/40">Paid: ₹{item.paid.toLocaleString()}</span>
+                    <span className="text-[9px] text-[#C4B5FD]/40">{paidPct}%</span>
+                  </div>
+                  {item.waiver > 0 && (
+                    <div className="mt-1.5 text-[9px] text-emerald-400/70 font-semibold">
+                      Scholarship/Concession: -₹{item.waiver.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Installments */}
+      {s.installments.length > 0 && (
+        <div className="glass-panel rounded-2xl p-5 border border-white/5">
+          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-[#8B5CF6]" /> Installment Plans
+          </h3>
+          <div className="space-y-3">
+            {s.installments.map((plan: any, i: number) => {
+              const installments = plan.installments || [];
+              return (
+                <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-white">Total: ₹{Number(plan.total_amount).toLocaleString()}</span>
+                    <span className="text-[10px] text-[#C4B5FD]/50">{installments.length} installments</span>
+                  </div>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    {installments.map((inst: any, j: number) => (
+                      <div key={j} className={`p-2 rounded-lg text-center ${inst.paid ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-white/5 border border-white/5'}`}>
+                        <p className="text-[10px] text-[#C4B5FD]/50">Installment {j + 1}</p>
+                        <p className="text-xs font-bold text-white">₹{Number(inst.amount).toLocaleString()}</p>
+                        <p className="text-[9px] text-[#C4B5FD]/40">{inst.due_date}</p>
+                        {inst.paid && <CheckCircle2 className="w-3 h-3 text-emerald-400 mx-auto mt-1" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Payments */}
+      {s.recent_payments.length > 0 && (
+        <div className="glass-panel rounded-2xl p-5 border border-white/5">
+          <h3 className="text-sm font-bold text-white mb-4">Recent Payments</h3>
+          <div className="space-y-2">
+            {s.recent_payments.map((p: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <ArrowDownRight className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-white">{p.method || 'Payment'}</p>
+                    <p className="text-[10px] text-[#C4B5FD]/40">{p.payment_date}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-emerald-400">₹{Number(p.amount_paid).toLocaleString()}</p>
+                  <p className={`text-[9px] font-semibold ${p.status === 'Completed' ? 'text-emerald-400/60' : 'text-orange-400/60'}`}>{p.status}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && s.total_fees === 0 && (
+        <div className="glass-panel rounded-2xl p-12 border border-white/5 text-center">
+          <ReceiptText className="w-12 h-12 text-[#C4B5FD]/20 mx-auto mb-3" />
+          <p className="text-sm font-bold text-white/50">No fee records found</p>
+          <p className="text-[10px] text-[#C4B5FD]/30 mt-1">Fee structures will appear here once configured by the institution</p>
+        </div>
+      )}
+
+      {/* Pay Modal */}
+      {showPayModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+          <div className="bg-[#13102A] border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-extrabold text-white">Pay Fees</h3>
+              <button onClick={() => setShowPayModal(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all text-xs">✕</button>
+            </div>
+
+            <div className="p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 mb-5">
+              <p className="text-[10px] text-violet-400/60 uppercase font-semibold">Amount to Pay</p>
+              <strong className="text-2xl font-extrabold text-white">₹{s.pending_amount.toLocaleString('en-IN')}</strong>
+            </div>
+
+            <p className="text-[10px] text-[#C4B5FD]/50 mb-3 font-semibold uppercase">Select Payment Method</p>
+            <div className="space-y-2 mb-5">
+              {methods.includes('razorpay') && (
+                <button onClick={() => setSelectedMethod('razorpay')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all border ${selectedMethod === 'razorpay' ? 'bg-[#6C2BD9]/20 border-[#6C2BD9]/40 text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}>
+                  <CreditCard className="w-4 h-4 text-blue-400" /> Razorpay (Card / UPI / Netbanking)
+                </button>
+              )}
+              {methods.includes('upi') && (
+                <button onClick={() => setSelectedMethod('upi')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all border ${selectedMethod === 'upi' ? 'bg-[#6C2BD9]/20 border-[#6C2BD9]/40 text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}>
+                  <Smartphone className="w-4 h-4 text-sky-400" /> UPI Payment
+                </button>
+              )}
+              {methods.includes('bank_transfer') && (
+                <button onClick={() => setSelectedMethod('bank_transfer')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all border ${selectedMethod === 'bank_transfer' ? 'bg-[#6C2BD9]/20 border-[#6C2BD9]/40 text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}>
+                  <Building className="w-4 h-4 text-emerald-400" /> Bank Transfer
+                </button>
+              )}
+              {s.wallet_balance >= s.pending_amount && (
+                <button onClick={() => setSelectedMethod('wallet')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all border ${selectedMethod === 'wallet' ? 'bg-[#6C2BD9]/20 border-[#6C2BD9]/40 text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}>
+                  <Wallet className="w-4 h-4 text-violet-400" /> Pay from IRIS Balance (₹{s.wallet_balance.toLocaleString()})
+                </button>
+              )}
+              {methods.includes('cash') && (
+                <button onClick={() => setSelectedMethod('cash')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold transition-all border ${selectedMethod === 'cash' ? 'bg-[#6C2BD9]/20 border-[#6C2BD9]/40 text-white' : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10'}`}>
+                  <Banknote className="w-4 h-4 text-amber-400" /> Cash at Office
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={handlePayAll} disabled={!selectedMethod || isPaying}
+                className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all">
+                {isPaying ? 'Processing...' : `Pay ₹${s.pending_amount.toLocaleString('en-IN')}`}
+              </button>
+              <button onClick={() => { setShowPayModal(false); setSelectedMethod(''); }}
+                className="px-4 py-3 rounded-xl bg-white/5 border border-white/5 text-white/50 font-bold text-xs hover:bg-white/10 transition-all">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

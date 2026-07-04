@@ -127,16 +127,7 @@ export default function WalletPage() {
         setTopAmount('');
       }
     } catch (err) {
-      setBalance(prev => prev + amount);
-      setTransactions(prev => [{
-        id: 'tx_' + Math.random(),
-        amount,
-        type: 'topup',
-        payment_method: 'razorpay',
-        status: 'completed',
-        description: 'Wallet top-up',
-        created_at: new Date().toISOString(),
-      }, ...prev]);
+      alert('Payment failed. Please try again.');
       setTopAmount('');
     } finally {
       setTopping(false);

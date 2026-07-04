@@ -9,11 +9,11 @@ interface Appraisal {
   department: string;
   designation: string;
   self_rating: number;
-  hod_rating: number | null;
+  vp_rating: number | null;
   principal_rating: number | null;
   status: string;
   self_comments: string;
-  hod_comments: string;
+  vp_comments: string;
   cycle_name: string;
 }
 
@@ -38,7 +38,7 @@ export default function PrincipalAppraisals() {
       const data = await res.json();
       if (data.success && data.cycles) {
         // Flatten appraisals from cycles — API returns nested
-        // For principal view, show appraisals that are HOD-reviewed and awaiting finalization
+        // For principal view, show appraisals that are VP-reviewed and awaiting finalization
         setAppraisals([]);
       }
     } catch {
@@ -90,7 +90,7 @@ export default function PrincipalAppraisals() {
     } catch {
       setAiAnalysis(prev => ({
         ...prev,
-        [employeeId]: 'Based on 3-year trend data, this employee demonstrates consistent upward trajectory in teaching effectiveness and research output. Self-assessment aligns well with HOD evaluation, suggesting strong self-awareness. Recommended for standard increment with potential for additional responsibilities in departmental committees.'
+        [employeeId]: 'Based on 3-year trend data, this employee demonstrates consistent upward trajectory in teaching effectiveness and research output. Self-assessment aligns well with Vice Principal evaluation, suggesting strong self-awareness. Recommended for standard increment with potential for additional responsibilities in school committees.'
       }));
     } finally {
       setAiLoading(prev => ({ ...prev, [employeeId]: false }));
@@ -99,11 +99,12 @@ export default function PrincipalAppraisals() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; bg: string; border: string; text: string }> = {
-      hod_reviewed: { label: 'Awaiting Finalization', bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400' },
+      pending_vp: { label: 'Awaiting Finalization', bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400' },
+      completed: { label: 'Finalized', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400' },
       finalized: { label: 'Finalized', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400' },
-      self_submitted: { label: 'Self-Submitted', bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400' }
+      pending_self: { label: 'Self-Submitted', bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400' }
     };
-    const s = config[status] || config.self_submitted;
+    const s = config[status] || config.pending_self;
     return <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md ${s.bg} border ${s.border} ${s.text} font-bold`}>{s.label}</span>;
   };
 
@@ -119,8 +120,8 @@ export default function PrincipalAppraisals() {
     );
   };
 
-  const pendingCount = appraisals.filter(a => a.status === 'hod_reviewed').length;
-  const finalizedCount = appraisals.filter(a => a.status === 'finalized').length;
+  const pendingCount = appraisals.filter(a => a.status === 'pending_principal').length;
+  const finalizedCount = appraisals.filter(a => a.status === 'finalized' || a.status === 'completed').length;
 
   return (
     <div className="max-w-7xl mx-auto py-2 w-full flex flex-col gap-6">
@@ -134,7 +135,7 @@ export default function PrincipalAppraisals() {
               Appraisal Finalization Console
             </h1>
             <p className="text-xs text-[#C4B5FD]/70">
-              Review HOD-evaluated performance appraisals, access AI analysis, and finalize scores for all institutional staff.
+              Review Vice Principal-evaluated performance appraisals, access AI analysis, and finalize scores for all institutional staff.
             </p>
           </div>
           <div className="flex gap-3">
@@ -194,8 +195,8 @@ export default function PrincipalAppraisals() {
                       {renderStars(apr.self_rating)}
                     </div>
                     <div className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-white/5 flex flex-col gap-2">
-                      <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">HOD Rating</span>
-                      {renderStars(apr.hod_rating)}
+                      <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">VP Rating</span>
+                      {renderStars(apr.vp_rating)}
                     </div>
                     <div className="p-4 rounded-xl bg-[#0D0A1A]/80 border border-white/5 flex flex-col gap-2">
                       <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold">Principal Rating</span>
@@ -213,9 +214,9 @@ export default function PrincipalAppraisals() {
                     </div>
                     <div className="p-4 rounded-xl bg-[#0D0A1A]/60 border border-white/5 flex flex-col gap-2">
                       <span className="text-[10px] text-[#C4B5FD]/50 uppercase font-bold flex items-center gap-1">
-                        <Eye className="w-3 h-3" /> HOD Comments
+                        <Eye className="w-3 h-3" /> VP Comments
                       </span>
-                      <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{apr.hod_comments}</p>
+                      <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{apr.vp_comments}</p>
                     </div>
                   </div>
 
@@ -244,10 +245,10 @@ export default function PrincipalAppraisals() {
                   </div>
 
                   {/* Action Buttons */}
-                  {apr.status === 'hod_reviewed' && (
+                  {apr.status === 'pending_principal' && (
                     <div className="flex gap-3 justify-end">
                       <button
-                        onClick={() => setFinalizeForm({ id: apr.id, rating: apr.hod_rating || 3, comments: '' })}
+                        onClick={() => setFinalizeForm({ id: apr.id, rating: apr.vp_rating || 3, comments: '' })}
                         className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-xs shadow-lg shadow-[#6C2BD9]/25 hover:brightness-110 transition-all flex items-center gap-2 border border-[#A78BFA]/20"
                       >
                         <CheckCircle className="w-4 h-4" /> Finalize Appraisal

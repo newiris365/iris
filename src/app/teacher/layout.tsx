@@ -2,12 +2,13 @@
 
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
-  CalendarDays, Dumbbell, FileText, ClipboardList, GraduationCap, UserCircle,
+  LayoutDashboard, CalendarDays, Dumbbell, FileText, ClipboardList, GraduationCap, UserCircle,
   UtensilsCrossed, Bell, MessageSquare, BookOpen, Calendar, FileUp,
   Award, Search, Settings
 } from 'lucide-react';
 
 const teacherLinks: SidebarLink[] = [
+  { label: 'Dashboard', href: '/teacher/dashboard', icon: LayoutDashboard },
   { label: 'Attendance', href: '/teacher/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/teacher/timetable', icon: ClipboardList },
   { label: 'Exam Results', href: '/teacher/results', icon: FileText },

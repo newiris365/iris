@@ -1,30 +1,21 @@
 "use client";
 
-import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, UserCheck, AlertTriangle, Users, Clock, KeyRound, Phone, UserCircle } from 'lucide-react';
-
-const gateLinks: SidebarLink[] = [
-  { label: 'Live Dashboard', href: '/gate', icon: LayoutDashboard },
-  { label: 'Gate History', href: '/gate/history', icon: Clock },
-  { label: 'Currently Inside', href: '/gate/inside', icon: Users },
-  { label: 'Visitors', href: '/gate/visitors', icon: UserCheck },
-  { label: 'Exit Passes', href: '/gate/exit-pass', icon: KeyRound },
-  { label: 'My Pass', href: '/gate/my-pass', icon: KeyRound },
-  { label: 'Incidents', href: '/gate/incidents', icon: AlertTriangle },
-  { label: 'Emergency Muster', href: '/gate/muster', icon: AlertTriangle },
-  { label: 'Smart Intercom', href: '/gate/intercom', icon: Phone },
-  { label: 'Profile', href: '/profile', icon: UserCircle },
-];
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function GateLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/security/dashboard');
+  }, [router]);
+
   return (
-    <PortalShell
-      portalName="Smart Gate"
-      portalBadge="Security"
-      sidebarLinks={gateLinks}
-      accentColor="#EF4444"
-    >
-      {children}
-    </PortalShell>
+    <div className="min-h-screen bg-[#0D0A1A] flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-red-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-slate-400 text-sm">Redirecting to Security Portal...</p>
+      </div>
+    </div>
   );
 }

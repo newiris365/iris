@@ -55,6 +55,7 @@ interface ModuleUsage {
 
 export default function AdminDashboard() {
   const [profile, setProfile] = useState<any>(null);
+  const [instituteType, setInstituteType] = useState<string>('college');
   const [activeSection, setActiveSection] = useState<'overview' | 'analytics' | 'alerts' | 'modules'>('overview');
 
   // Data states
@@ -66,11 +67,14 @@ export default function AdminDashboard() {
   const [modules, setModules] = useState<ModuleUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const isSchool = instituteType === 'school';
 
   useEffect(() => {
     const savedProfile = localStorage.getItem('iris_user_profile');
     if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
+      const p = JSON.parse(savedProfile);
+      setProfile(p);
+      setInstituteType(p.institute_type || 'college');
     }
     loadDashboardData();
   }, []);
@@ -132,70 +136,75 @@ export default function AdminDashboard() {
       console.warn('Backend not reachable, loading sandbox demo data:', err);
     } finally {
       // Always load sandbox fallback data for empty states
-      if (!fetchedOverview) {
-        setOverview({
-          total_students: 1247,
-          total_staff: 89,
-          total_departments: 12,
-          attendance_today: 1089,
-          attendance_rate: 87,
-          total_fee_collected: 24500000,
-          pending_complaints: 14,
-          active_events: 5,
-          hostel_occupancy_rate: 78,
-          total_hostel_capacity: 400,
-          total_hostel_occupied: 312,
-          gate_entries_today: 342,
+      if (fetchedOverview) {
+        setOverview(fetchedOverview);
+      } else {
+        // No data from backend - show zeros
+        setOverview(isSchool ? {
+          total_students: 0,
+          total_staff: 0,
+          total_departments: 0,
+          attendance_today: 0,
+          attendance_rate: 0,
+          total_fee_collected: 0,
+          pending_complaints: 0,
+          active_events: 0,
+          hostel_occupancy_rate: 0,
+          total_hostel_capacity: 0,
+          total_hostel_occupied: 0,
+          gate_entries_today: 0,
+        } : {
+          total_students: 0,
+          total_staff: 0,
+          total_departments: 0,
+          attendance_today: 0,
+          attendance_rate: 0,
+          total_fee_collected: 0,
+          pending_complaints: 0,
+          active_events: 0,
+          hostel_occupancy_rate: 0,
+          total_hostel_capacity: 0,
+          total_hostel_occupied: 0,
+          gate_entries_today: 0,
         });
       }
       if (fetchedAttendanceTrend.length === 0) {
-        const trend: AttendanceTrend[] = [];
-        for (let i = 29; i >= 0; i--) {
-          const d = new Date(Date.now() - i * 86400000);
-          const total = 1200 + Math.floor(Math.random() * 80);
-          const present = Math.floor(total * (0.78 + Math.random() * 0.15));
-          trend.push({
-            date: d.toISOString().split('T')[0],
-            present,
-            absent: total - present,
-            total,
-          });
-        }
-        setAttendanceTrend(trend);
+        // No data from backend - show empty
+        setAttendanceTrend([]);
       }
       if (fetchedFeeByMonth.length === 0) {
         setFeeByMonth([
-          { month: 'Jan', amount: 3200000 },
-          { month: 'Feb', amount: 2800000 },
-          { month: 'Mar', amount: 4100000 },
-          { month: 'Apr', amount: 1900000 },
-          { month: 'May', amount: 3500000 },
-          { month: 'Jun', amount: 4200000 },
-          { month: 'Jul', amount: 2100000 },
-          { month: 'Aug', amount: 3800000 },
-          { month: 'Sep', amount: 4500000 },
-          { month: 'Oct', amount: 3100000 },
-          { month: 'Nov', amount: 2600000 },
+          { month: 'Jan', amount: 0 },
+          { month: 'Feb', amount: 0 },
+          { month: 'Mar', amount: 0 },
+          { month: 'Apr', amount: 0 },
+          { month: 'May', amount: 0 },
+          { month: 'Jun', amount: 0 },
+          { month: 'Jul', amount: 0 },
+          { month: 'Aug', amount: 0 },
+          { month: 'Sep', amount: 0 },
+          { month: 'Oct', amount: 0 },
+          { month: 'Nov', amount: 0 },
           { month: 'Dec', amount: 0 },
         ]);
       }
-      if (fetchedCanteenRevenue === 0) setCanteenRevenue(485000);
+      if (fetchedCanteenRevenue === 0) setCanteenRevenue(0);
       if (fetchedAlerts.length === 0) {
-        setAlerts([
-          { type: 'attendance', severity: 'high', title: 'Low Attendance — CS Sem 6', detail: '18 students below 60% attendance in Computer Science Semester 6. Immediate action required.', created_at: new Date().toISOString() },
-          { type: 'fee', severity: 'high', title: 'Fee Defaulters — ₹12.5L Pending', detail: '47 students have overdue fee payments totaling ₹12,50,000. Escalation stage 3 reached.', created_at: new Date().toISOString() },
-          { type: 'hostel', severity: 'medium', title: 'Hostel Capacity Warning', detail: 'Boys Hostel B is at 95% capacity. 8 new admissions pending room allocation.', created_at: new Date().toISOString() },
-          { type: 'library', severity: 'low', title: '12 Books Overdue > 30 Days', detail: 'Library has 12 books overdue by more than 30 days. Total fine accrued: ₹4,800.', created_at: new Date().toISOString() },
-        ]);
+        setAlerts(isSchool ? [
+          { type: 'attendance', severity: 'high', title: 'Low Attendance — Grade 10', detail: '8 students below 75% attendance in Grade 10. Parent notifications sent.', created_at: new Date().toISOString() },
+          { type: 'fee', severity: 'high', title: 'Fee Defaulters — ₹1.2L Pending', detail: '12 students have overdue fee payments totaling ₹1,20,000.', created_at: new Date().toISOString() },
+          { type: 'bus', severity: 'medium', title: 'Bus Route 3 Delayed', detail: 'Bus RJ-14-AB-1234 on Route 3 is running 15 minutes behind schedule.', created_at: new Date().toISOString() },
+          { type: 'gate', severity: 'low', title: 'Parent Pickup Reminder', detail: '5 students still waiting for pickup. Last bell was 30 minutes ago.', created_at: new Date().toISOString() },
+        ] : []);
       }
       if (!fetchedModules) {
         setModules({
-          canteen: { orders_today: 312 },
-          fitzone: { bookings_this_week: 87 },
-          gate: { entries_today: 342 },
-          library: { issues_this_week: 156 },
-          events: { registrations_this_week: 43 },
-          transit: { active_subscriptions: 234 },
+          canteen: { orders_today: 0 },
+          fitzone: { bookings_this_week: 0 },
+          gate: { entries_today: 0 },
+          library: { issues_this_week: 0 },
+          events: { registrations_this_week: 0 },
+          transit: { active_subscriptions: 0 },
         });
       }
       setLoading(false);
@@ -277,7 +286,16 @@ export default function AdminDashboard() {
         <div className="flex flex-col gap-8">
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
+            {(isSchool ? [
+              { label: 'Total Students', value: overview.total_students, icon: GraduationCap, color: '#6C2BD9', href: '/admin/students' },
+              { label: 'Teachers & Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6', href: '/admin/users' },
+              { label: 'Attendance Today', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444', href: '/admin/attendance' },
+              { label: 'Fee Collected', value: `₹${overview.total_fee_collected.toLocaleString('en-IN')}`, icon: IndianRupee, color: '#F59E0B', href: '/admin/fees' },
+              { label: 'Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/complaints' },
+              { label: 'Bus Tracking', value: overview.gate_entries_today, icon: Bus, color: '#06B6D4', href: '/admin/transit' },
+              { label: 'Gate Entries', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' },
+              { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6', href: '/admin/events' },
+            ] : [
               { label: 'Total Students', value: overview.total_students, icon: GraduationCap, color: '#6C2BD9', href: '/admin/students' },
               { label: 'Total Staff', value: overview.total_staff, icon: Users, color: '#8B5CF6', href: '/admin/hr' },
               { label: 'Attendance Rate', value: `${overview.attendance_rate}%`, icon: CheckCircle, color: overview.attendance_rate >= 75 ? '#10B981' : '#EF4444', href: '/admin/attendance' },
@@ -285,8 +303,8 @@ export default function AdminDashboard() {
               { label: 'Pending Complaints', value: overview.pending_complaints, icon: AlertTriangle, color: overview.pending_complaints > 0 ? '#EF4444' : '#10B981', href: '/admin/complaints' },
               { label: 'Active Events', value: overview.active_events, icon: CalendarDays, color: '#8B5CF6', href: '/admin/events' },
               { label: 'Hostel Occupancy', value: `${overview.hostel_occupancy_rate}%`, icon: DoorOpen, color: '#06B6D4', href: '/admin/hostel' },
-              { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' }
-            ].map((kpi, idx) => (
+              { label: 'Gate Entries Today', value: overview.gate_entries_today, icon: Shield, color: '#A78BFA', href: '/admin/gate' },
+            ]).map((kpi, idx) => (
               <Link key={idx} href={kpi.href} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all cursor-pointer">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">{kpi.label}</span>
@@ -301,20 +319,27 @@ export default function AdminDashboard() {
 
           {/* Quick Stats */}
           <div className="glass-panel rounded-2xl p-6">
-            <h3 className="font-bold text-lg text-white mb-4">Campus Summary</h3>
+            <h3 className="font-bold text-lg text-white mb-4">{isSchool ? 'School Summary' : 'Campus Summary'}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
               <div className="flex flex-col gap-2">
-                <span className="text-[#C4B5FD] text-xs">Departments</span>
-                <span className="font-bold text-white text-xl">{overview.total_departments}</span>
+                <span className="text-[#C4B5FD] text-xs">{isSchool ? 'Grades' : 'Departments'}</span>
+                <span className="font-bold text-white text-xl">{isSchool ? '12 (Grade 1-12)' : overview.total_departments}</span>
               </div>
               <div className="flex flex-col gap-2">
                 <span className="text-[#C4B5FD] text-xs">Present Today</span>
                 <span className="font-bold text-white text-xl">{overview.attendance_today} / {overview.total_students}</span>
               </div>
-              <div className="flex flex-col gap-2">
-                <span className="text-[#C4B5FD] text-xs">Hostel Beds</span>
-                <span className="font-bold text-white text-xl">{overview.total_hostel_occupied} / {overview.total_hostel_capacity}</span>
-              </div>
+              {isSchool ? (
+                <div className="flex flex-col gap-2">
+                  <span className="text-[#C4B5FD] text-xs">Buses Active</span>
+                  <span className="font-bold text-white text-xl">{overview.gate_entries_today}</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <span className="text-[#C4B5FD] text-xs">Hostel Beds</span>
+                  <span className="font-bold text-white text-xl">{overview.total_hostel_occupied} / {overview.total_hostel_capacity}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -447,14 +472,21 @@ export default function AdminDashboard() {
           <h3 className="font-bold text-lg text-white">Module Adoption Metrics</h3>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
+            {(isSchool ? [
+              { label: 'Canteen Orders', sublabel: 'Today', value: modules.canteen.orders_today, icon: ShoppingBag, color: '#F59E0B', href: '/admin/canteen' },
+              { label: 'Gate Entries', sublabel: 'Today', value: modules.gate.entries_today, icon: Shield, color: '#6C2BD9', href: '/admin/gate' },
+              { label: 'Library Issues', sublabel: 'This Week', value: modules.library.issues_this_week, icon: BookOpen, color: '#8B5CF6', href: '/admin/library/bookclubs' },
+              { label: 'Event Registrations', sublabel: 'This Week', value: modules.events.registrations_this_week, icon: CalendarDays, color: '#06B6D4', href: '/admin/events' },
+              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981', href: '/admin/transit' },
+              { label: 'Complaints Open', sublabel: 'Pending', value: overview?.pending_complaints || 0, icon: AlertTriangle, color: '#EF4444', href: '/admin/complaints' },
+            ] : [
               { label: 'Canteen Orders', sublabel: 'Today', value: modules.canteen.orders_today, icon: ShoppingBag, color: '#F59E0B', href: '/admin/canteen' },
               { label: 'FitZone Bookings', sublabel: 'This Week', value: modules.fitzone.bookings_this_week, icon: Dumbbell, color: '#EF4444', href: '/admin/gym' },
               { label: 'Gate Entries', sublabel: 'Today', value: modules.gate.entries_today, icon: Shield, color: '#6C2BD9', href: '/admin/gate' },
               { label: 'Library Issues', sublabel: 'This Week', value: modules.library.issues_this_week, icon: BookOpen, color: '#8B5CF6', href: '/admin/library/bookclubs' },
               { label: 'Event Registrations', sublabel: 'This Week', value: modules.events.registrations_this_week, icon: CalendarDays, color: '#06B6D4', href: '/admin/events' },
-              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981', href: '/admin/transit' }
-            ].map((mod, idx) => (
+              { label: 'Transit Subscriptions', sublabel: 'Active', value: modules.transit.active_subscriptions, icon: Bus, color: '#10B981', href: '/admin/transit' },
+            ]).map((mod, idx) => (
               <Link key={idx} href={mod.href} className="glass-panel rounded-2xl p-5 flex flex-col gap-3 hover:border-[#6C2BD9]/50 transition-all cursor-pointer">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${mod.color}15`, border: `1px solid ${mod.color}30` }}>

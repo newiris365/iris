@@ -40,7 +40,7 @@ export default function CertificateVerificationPage() {
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white flex flex-col justify-between p-6 relative overflow-hidden">
       {/* Background gradients */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#6C2BD9]/5 rounded-full blur-[120px]" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#6C2BD9]/5 rounded-full blur-[120px] pointer-events-none" />
       
       <div className="max-w-md mx-auto w-full my-auto z-10">
         <div className="text-center mb-8">

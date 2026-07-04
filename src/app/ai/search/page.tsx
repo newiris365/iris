@@ -114,7 +114,7 @@ export default function GlobalSearchPage() {
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-[#C4B5FD]">

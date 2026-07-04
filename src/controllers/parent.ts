@@ -3,15 +3,13 @@ import { supabaseAdmin } from '../config/supabase';
 
 export async function getChildToday(req: Request, res: Response) {
   try {
-    const { id } = req.params; // student_id
+    const { id } = req.params;
 
-    // Try fetching child's schedule
     const { data: scheduleData, error: timetableError } = await supabaseAdmin
       .from('timetable')
       .select('*, staff(name)')
       .order('time_slot');
 
-    // Fetch child's today attendance status
     const todayStr = new Date().toISOString().split('T')[0];
     const { data: attendanceData } = await supabaseAdmin
       .from('attendance')
@@ -37,7 +35,6 @@ export async function getChildToday(req: Request, res: Response) {
       attendance_status: attendanceData?.status || 'absent'
     });
   } catch (err: any) {
-    // Local offline mock fallback
     const mockSchedule = [
       { id: 's-1', time_slot: '09:00 AM - 10:00 AM', subject: 'Compiler Design', teacher: 'Dr. Aditya Kumar', room: 'CS-301' },
       { id: 's-2', time_slot: '10:00 AM - 11:00 AM', subject: 'Database Systems', teacher: 'Prof. Sarah Vance', room: 'CS-302' },
@@ -160,7 +157,6 @@ export async function getConversationThreads(req: Request, res: Response) {
       return res.status(401).json({ success: false, error: 'Unauthorized.' });
     }
 
-    // Fetch all messages involving this user
     const { data: messages, error } = await supabaseAdmin
       .from('parent_messages')
       .select('*, sender:sender_id(id, name, email, role), receiver:receiver_id(id, name, email, role)')
@@ -176,7 +172,6 @@ export async function getConversationThreads(req: Request, res: Response) {
       if (!otherUser) continue;
 
       if (!threadsMap.has(otherUser.id)) {
-        // Query to get student name if it's a parent
         let studentName = '';
         if (otherUser.role === 'Parent') {
           const { data: link } = await supabaseAdmin
@@ -210,6 +205,126 @@ export async function getConversationThreads(req: Request, res: Response) {
   }
 }
 
+// ─── PTM: GET TEACHERS FOR THIS PARENT'S CHILD ───────────────
+export async function getPTMTeachers(req: Request, res: Response) {
+  try {
+    const parentId = req.user?.id;
+    const institutionId = req.user?.institution_id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    // Find child via parent_student_links
+    const { data: link } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('student_id')
+      .eq('parent_user_id', parentId)
+      .maybeSingle();
+
+    let teachers: any[] = [];
+
+    if (link?.student_id) {
+      // Get student's department/semester to find relevant teachers
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('department_id, semester')
+        .eq('id', link.student_id)
+        .maybeSingle();
+
+      // Get teachers from same department (or all if no department match)
+      let query = supabaseAdmin
+        .from('users')
+        .select('id, name, email')
+        .eq('role', 'Teacher')
+        .eq('is_active', true);
+
+      if (institutionId) {
+        query = query.eq('institution_id', institutionId);
+      }
+
+      const { data: allTeachers, error } = await query.order('name');
+      if (error) throw error;
+      teachers = allTeachers || [];
+    } else {
+      // No child linked — return all teachers in institution
+      let query = supabaseAdmin
+        .from('users')
+        .select('id, name, email')
+        .eq('role', 'Teacher')
+        .eq('is_active', true);
+
+      if (institutionId) {
+        query = query.eq('institution_id', institutionId);
+      }
+
+      const { data: allTeachers, error } = await query.order('name');
+      if (error) throw error;
+      teachers = allTeachers || [];
+    }
+
+    // Enrich with subjects taught (from timetable if available)
+    const enriched = await Promise.all(teachers.map(async (t) => {
+      const { data: subjects } = await supabaseAdmin
+        .from('timetable')
+        .select('subject')
+        .eq('teacher_id', t.id)
+        .limit(5);
+
+      const uniqueSubjects = Array.from(new Set((subjects || []).map((s: any) => s.subject).filter(Boolean)));
+      return {
+        id: t.id,
+        name: t.name,
+        subject: uniqueSubjects.length > 0 ? uniqueSubjects.join(', ') : 'General',
+      };
+    }));
+
+    return res.status(200).json({ success: true, teachers: enriched });
+  } catch (err: any) {
+    console.error('[getPTMTeachers] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch teachers.' });
+  }
+}
+
+// ─── PTM: GET SLOTS FOR A TEACHER ON A SPECIFIC DATE ─────────
+export async function getPTMSlots(req: Request, res: Response) {
+  try {
+    const { teacherId } = req.params;
+    const dateParam = req.query.date as string | undefined;
+    const targetDate = dateParam || new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabaseAdmin
+      .from('ptm_slots')
+      .select('*')
+      .eq('teacher_id', teacherId)
+      .eq('date', targetDate)
+      .order('slot_time');
+
+    if (error) throw error;
+
+    // Filter out already-booked slots
+    const { data: bookings } = await supabaseAdmin
+      .from('ptm_bookings')
+      .select('slot_time')
+      .eq('teacher_id', teacherId)
+      .eq('date', targetDate)
+      .neq('status', 'cancelled');
+
+    const bookedTimes = new Set((bookings || []).map((b: any) => b.slot_time));
+
+    const slots = (data || []).map(s => ({
+      id: s.id,
+      time: s.slot_time,
+      available: s.available && !bookedTimes.has(s.slot_time),
+      date: s.date,
+    }));
+
+    return res.status(200).json({ success: true, slots });
+  } catch (err: any) {
+    console.error('[getPTMSlots] Error:', err.message);
+    // Return empty array on error — no fake data
+    return res.status(200).json({ success: true, slots: [] });
+  }
+}
+
+// ─── PTM: BOOK A SLOT ────────────────────────────────────────
 export async function bookPTM(req: Request, res: Response) {
   try {
     const { teacher_id, date, slot_time } = req.body;
@@ -217,8 +332,24 @@ export async function bookPTM(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Teacher ID, date, and slot_time are required.' });
     }
 
-    const parentId = req.user?.id || 'parent_id';
-    const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const parentId = req.user?.id;
+    const institutionId = req.user?.institution_id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    // Check for existing booking on same slot
+    const { data: existing } = await supabaseAdmin
+      .from('ptm_bookings')
+      .select('id')
+      .eq('teacher_id', teacher_id)
+      .eq('date', date)
+      .eq('slot_time', slot_time)
+      .neq('status', 'cancelled')
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'This slot is already booked.' });
+    }
+
     const meetLink = `https://meet.jit.si/iris-ptm-${Math.random().toString(36).substring(2, 9)}`;
 
     const { data: booking, error: bookingErr } = await supabaseAdmin
@@ -237,7 +368,7 @@ export async function bookPTM(req: Request, res: Response) {
 
     if (bookingErr) throw bookingErr;
 
-    // Update slot availability if slot table exists
+    // Mark slot as unavailable
     await supabaseAdmin
       .from('ptm_slots')
       .update({ available: false })
@@ -245,66 +376,86 @@ export async function bookPTM(req: Request, res: Response) {
       .eq('date', date)
       .eq('slot_time', slot_time);
 
-    return res.status(200).json({
-      success: true,
-      booking
-    });
+    return res.status(200).json({ success: true, booking });
   } catch (err: any) {
-    return res.status(200).json({
-      success: true,
-      booking: {
-        id: 'ptm_' + Math.random().toString(36).substring(2, 9),
-        teacher_id: req.body.teacher_id,
-        parent_id: req.user?.id || 'parent_id',
-        date: req.body.date,
-        slot_time: req.body.slot_time,
-        meet_link: `https://meet.jit.si/iris-ptm-${Math.random().toString(36).substring(2, 9)}`,
-        status: 'confirmed'
-      }
-    });
+    console.error('[bookPTM] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to book PTM slot.' });
   }
 }
 
-export async function getPTMSlots(req: Request, res: Response) {
+// ─── PTM: GET PARENT'S BOOKINGS ──────────────────────────────
+export async function getParentBookings(req: Request, res: Response) {
   try {
-    const { teacherId } = req.params;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const parentId = req.user?.id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
 
     const { data, error } = await supabaseAdmin
-      .from('ptm_slots')
-      .select('*')
-      .eq('teacher_id', teacherId)
-      .gte('date', todayStr)
-      .eq('available', true)
-      .order('date')
+      .from('ptm_bookings')
+      .select(`
+        id, date, slot_time, meet_link, status, created_at,
+        teacher:teacher_id(id, name, email)
+      `)
+      .eq('parent_id', parentId)
+      .order('date', { ascending: false })
       .order('slot_time');
 
     if (error) throw error;
 
-    const slots = (data || []).map(s => ({
-      id: s.id,
-      time: s.slot_time,
-      available: s.available
+    const bookings = (data || []).map((b: any) => ({
+      id: b.id,
+      teacher_id: b.teacher?.id || b.teacher_id,
+      teacher_name: b.teacher?.name || 'Unknown Teacher',
+      teacher_subject: '',
+      date: b.date,
+      slot_time: b.slot_time,
+      meet_link: b.meet_link,
+      status: b.status,
+      created_at: b.created_at,
     }));
 
-    if (slots.length > 0) {
-      return res.status(200).json({
-        success: true,
-        slots
-      });
+    return res.status(200).json({ success: true, bookings });
+  } catch (err: any) {
+    console.error('[getParentBookings] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch bookings.' });
+  }
+}
+
+// ─── PTM: CANCEL A BOOKING ───────────────────────────────────
+export async function cancelPTMBooking(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const parentId = req.user?.id;
+    if (!parentId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+    const { data: booking, error: findErr } = await supabaseAdmin
+      .from('ptm_bookings')
+      .select('id, teacher_id, date, slot_time')
+      .eq('id', id)
+      .eq('parent_id', parentId)
+      .maybeSingle();
+
+    if (findErr || !booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found.' });
     }
 
-    throw new Error('No slots available');
+    const { error: cancelErr } = await supabaseAdmin
+      .from('ptm_bookings')
+      .update({ status: 'cancelled' })
+      .eq('id', id);
+
+    if (cancelErr) throw cancelErr;
+
+    // Re-enable the slot
+    await supabaseAdmin
+      .from('ptm_slots')
+      .update({ available: true })
+      .eq('teacher_id', booking.teacher_id)
+      .eq('date', booking.date)
+      .eq('slot_time', booking.slot_time);
+
+    return res.status(200).json({ success: true, message: 'Booking cancelled.' });
   } catch (err: any) {
-    const slots = [
-      { id: 'slot_1', time: '04:00 PM - 04:15 PM', available: true },
-      { id: 'slot_2', time: '04:15 PM - 04:30 PM', available: false },
-      { id: 'slot_3', time: '04:30 PM - 04:45 PM', available: true },
-      { id: 'slot_4', time: '04:45 PM - 05:00 PM', available: true }
-    ];
-    return res.status(200).json({
-      success: true,
-      slots
-    });
+    console.error('[cancelPTMBooking] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to cancel booking.' });
   }
 }

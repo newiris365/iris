@@ -110,26 +110,45 @@ export async function getInstitutionAdmissions(req: Request, res: Response) {
   try {
     const { slug } = req.params;
     
-    // In production, lookup institution by slug
-    const institutionId = 'a0000000-0000-0000-0000-000000000001'; 
-    const mockInstitution = {
-      id: institutionId,
-      name: 'SIN Institute of Engineering & Technology (SIET)',
-      banner_url: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=1470&auto=format&fit=crop',
-      logo_url: 'https://api.iris365.in/assets/logo-purple.png',
-      open_cycles: [
-        {
-          id: 'c1111111-1111-1111-1111-111111111111',
-          name: 'Fall Admissions 2026',
-          academic_year: '2026-27',
-          start_date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'open'
-        }
-      ]
+    // Query institution details by slug
+    const { data: inst, error: instErr } = await supabaseAdmin
+      .from('institutions')
+      .select('id, name, banner_url, logo_url')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (instErr) throw instErr;
+    if (!inst) {
+      return res.status(404).json({ success: false, error: 'Institution not found.' });
+    }
+
+    // Query all admission cycles configured for the institution
+    const { data: cycles, error: cyclesErr } = await supabaseAdmin
+      .from('admission_cycles')
+      .select('*')
+      .eq('institution_id', inst.id)
+      .order('created_at', { ascending: false });
+
+    if (cyclesErr) throw cyclesErr;
+
+    const formattedCycles = (cycles || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      academic_year: c.academic_year,
+      start_date: c.start_date,
+      end_date: c.end_date,
+      status: c.status
+    }));
+
+    const institution = {
+      id: inst.id,
+      name: inst.name,
+      banner_url: inst.banner_url || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=1470&auto=format&fit=crop',
+      logo_url: inst.logo_url || 'https://api.iris365.in/assets/logo-purple.png',
+      open_cycles: formattedCycles
     };
     
-    return res.status(200).json({ success: true, institution: mockInstitution });
+    return res.status(200).json({ success: true, institution });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, BookOpen, Search, Plus, Sparkles, AlertCircle, CheckCircle, FileSpreadsheet, Edit3 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Search, Plus, Sparkles, AlertCircle, CheckCircle, FileSpreadsheet, Edit3, Loader2, X } from 'lucide-react';
 import { apiGet, apiPost } from '../../../../lib/api';
 import Link from 'next/link';
 
@@ -9,7 +9,6 @@ export default function LibrarianCataloguePage() {
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Overlays
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
 
@@ -29,6 +28,7 @@ export default function LibrarianCataloguePage() {
   });
 
   const [bulkIsbns, setBulkIsbns] = useState('');
+  const [bulkResults, setBulkResults] = useState<{ isbn: string; status: string; title?: string }[]>([]);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -39,17 +39,17 @@ export default function LibrarianCataloguePage() {
   }, []);
 
   const loadCatalogue = async () => {
+    setLoading(true);
     try {
       const res = await apiGet('/library/books');
       if (res.success) {
         setBooks(res.books || []);
+        setErrorMsg('');
+      } else {
+        setErrorMsg(res.error || 'Failed to load catalogue.');
       }
     } catch {
-      // Mock Fallbacks
-      setBooks([
-        { id: 'b1', title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', category: 'Computer Science', copies_total: 5, copies_available: 4, isbn: '978-0262033848', shelf_location: 'Aisle 3, Shelf B' },
-        { id: 'b2', title: 'Design Patterns', author: 'Erich Gamma', category: 'Computer Science', copies_total: 3, copies_available: 0, isbn: '978-0201633610', shelf_location: 'Aisle 3, Shelf C' }
-      ]);
+      setErrorMsg('Failed to connect to server.');
     } finally {
       setLoading(false);
     }
@@ -65,22 +65,22 @@ export default function LibrarianCataloguePage() {
     try {
       const res = await apiPost('/library/books/isbn-lookup', { isbn: form.isbn });
       if (res.success && res.book) {
-        setForm({
-          ...form,
-          title: res.book.title || '',
-          author: res.book.author || '',
-          publisher: res.book.publisher || '',
-          publication_year: res.book.publication_year || new Date().getFullYear(),
-          category: res.book.category || 'Computer Science',
-          description: res.book.description || '',
-          cover_image_url: res.book.cover_image_url || ''
-        });
-        setSuccessMsg('Book metadata successfully auto-filled from Google Books!');
+        setForm(prev => ({
+          ...prev,
+          title: res.book.title || prev.title,
+          author: res.book.author || prev.author,
+          publisher: res.book.publisher || prev.publisher,
+          publication_year: res.book.publication_year || prev.publication_year,
+          category: res.book.category || prev.category,
+          description: res.book.description || prev.description,
+          cover_image_url: res.book.cover_image_url || prev.cover_image_url
+        }));
+        setSuccessMsg('Book metadata auto-filled from Google Books!');
       } else {
         setErrorMsg('ISBN lookup failed. Please input details manually.');
       }
     } catch {
-      setErrorMsg('ISBN lookup failed (offline fallback). Please enter details manually.');
+      setErrorMsg('ISBN lookup failed. Please enter details manually.');
     } finally {
       setLookingUp(false);
     }
@@ -98,28 +98,36 @@ export default function LibrarianCataloguePage() {
     setSuccessMsg('');
 
     try {
-      const res = await apiPost('/library/books', form);
+      const payload: any = {
+        title: form.title.trim(),
+        author: form.author.trim(),
+        category: form.category,
+        copies_total: form.copies_total,
+        copies_available: form.copies_available,
+        tags: form.tags,
+      };
+      if (form.isbn.trim()) payload.isbn = form.isbn.trim();
+      if (form.publisher.trim()) payload.publisher = form.publisher.trim();
+      if (form.shelf_location.trim()) payload.shelf_location = form.shelf_location.trim();
+      if (form.description.trim()) payload.description = form.description.trim();
+      if (form.cover_image_url.trim()) payload.cover_image_url = form.cover_image_url.trim();
+      if (form.publication_year) payload.publication_year = form.publication_year;
+
+      const res = await apiPost('/library/books', payload);
       if (res.success) {
-        setSuccessMsg('Book registered and catalogue index refreshed.');
+        setSuccessMsg('Book registered successfully!');
         setShowAddForm(false);
         setForm({
           isbn: '', title: '', author: '', publisher: '', publication_year: new Date().getFullYear(),
           category: 'Computer Science', copies_total: 1, copies_available: 1, shelf_location: '',
           cover_image_url: '', description: '', tags: []
         });
-        loadCatalogue();
+        await loadCatalogue();
       } else {
         setErrorMsg(res.error || 'Failed to create book.');
       }
     } catch {
-      // Mock Success
-      const mockBook = {
-        id: 'mock-b-' + Math.random(),
-        ...form
-      };
-      setBooks([mockBook, ...books]);
-      setSuccessMsg('Book registered and catalogue index refreshed! (Mock Mode)');
-      setShowAddForm(false);
+      setErrorMsg('Failed to connect to server.');
     } finally {
       setSubmitting(false);
     }
@@ -127,46 +135,90 @@ export default function LibrarianCataloguePage() {
 
   const handleBulkImport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkIsbns.trim()) return;
+    if (!bulkIsbns.trim()) {
+      setErrorMsg('Please enter at least one ISBN.');
+      return;
+    }
     setSubmitting(true);
     setErrorMsg('');
-    try {
-      const isbnList = bulkIsbns.split('\n').map(i => i.trim()).filter(Boolean);
-      const payloadBooks = isbnList.map(isbn => ({
-        isbn,
-        title: `Algorithms Reference Book (ISBN: ${isbn.slice(-4)})`,
-        author: 'Thomas H. Cormen',
-        category: 'Computer Science',
-        copies_total: 1,
-        copies_available: 1,
-        shelf_location: 'Aisle 3, Shelf B'
-      }));
+    setSuccessMsg('');
+    setBulkResults([]);
 
-      const res = await apiPost('/library/books/import', { books: payloadBooks });
-      if (res.success) {
-        setSuccessMsg(`Bulk imported ${res.count} books successfully!`);
-        setShowBulkImport(false);
-        setBulkIsbns('');
-        loadCatalogue();
-      } else {
-        setErrorMsg(res.error || 'Failed bulk import.');
+    const isbnList = bulkIsbns.split('\n').map(i => i.trim()).filter(Boolean);
+    const results: { isbn: string; status: string; title?: string }[] = [];
+    let successCount = 0;
+
+    for (const isbn of isbnList) {
+      try {
+        const lookupRes = await apiPost('/library/books/isbn-lookup', { isbn });
+        let bookData: any;
+
+        if (lookupRes.success && lookupRes.book) {
+          bookData = {
+            isbn,
+            title: lookupRes.book.title || `Book (${isbn})`,
+            author: lookupRes.book.author || 'Unknown Author',
+            category: lookupRes.book.category || 'General',
+            publisher: lookupRes.book.publisher || null,
+            description: lookupRes.book.description || null,
+            cover_image_url: lookupRes.book.cover_image_url || null,
+            copies_total: 1,
+            copies_available: 1,
+          };
+        } else {
+          bookData = {
+            isbn,
+            title: `Book (${isbn})`,
+            author: 'Unknown Author',
+            category: 'General',
+            copies_total: 1,
+            copies_available: 1,
+          };
+        }
+
+        const importRes = await apiPost('/library/books', bookData);
+        if (importRes.success) {
+          results.push({ isbn, status: 'success', title: bookData.title });
+          successCount++;
+        } else {
+          results.push({ isbn, status: 'failed', title: importRes.error });
+        }
+      } catch {
+        results.push({ isbn, status: 'failed', title: 'Connection error' });
       }
-    } catch {
-      setSuccessMsg('Bulk imported successfully! (Mock confirmation)');
-      setShowBulkImport(false);
-      setBulkIsbns('');
-    } finally {
-      setSubmitting(false);
+
+      setBulkResults([...results]);
     }
+
+    if (successCount > 0) {
+      setSuccessMsg(`Imported ${successCount} of ${isbnList.length} books.`);
+      await loadCatalogue();
+    } else {
+      setErrorMsg(`Failed to import all ${isbnList.length} books.`);
+    }
+
+    setSubmitting(false);
+  };
+
+  const openAddForm = () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setShowAddForm(true);
+  };
+
+  const openBulkImport = () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setBulkResults([]);
+    setShowBulkImport(true);
   };
 
   return (
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24">
-      {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative z-10">
             <Link href="/librarian/library" className="p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-[#C4B5FD]/70 hover:text-white">
               <ArrowLeft className="w-4 h-4" />
             </Link>
@@ -176,15 +228,17 @@ export default function LibrarianCataloguePage() {
             </div>
           </div>
 
-          <div className="flex gap-2.5">
+          <div className="flex gap-2.5 relative z-10">
             <button
-              onClick={() => setShowBulkImport(true)}
+              type="button"
+              onClick={openBulkImport}
               className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-xs font-bold text-[#C4B5FD] transition-all flex items-center gap-1.5"
             >
               <FileSpreadsheet className="w-4 h-4" /> Excel Bulk Import
             </button>
             <button
-              onClick={() => setShowAddForm(true)}
+              type="button"
+              onClick={openAddForm}
               className="px-4 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold text-white transition-all shadow flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" /> Add Book
@@ -195,24 +249,32 @@ export default function LibrarianCataloguePage() {
 
       <div className="max-w-7xl mx-auto px-6 mt-8">
         {successMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 mb-6">
-            {successMsg}
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 mb-6 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{successMsg}</span>
+            <button onClick={() => setSuccessMsg('')} className="ml-auto"><X className="w-3.5 h-3.5" /></button>
           </div>
         )}
 
         {errorMsg && (
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 mb-6">
-            {errorMsg}
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 mb-6 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{errorMsg}</span>
+            <button onClick={() => setErrorMsg('')} className="ml-auto"><X className="w-3.5 h-3.5" /></button>
           </div>
         )}
 
-        {/* Add Book Modal */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-[#0D0A1A]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
             <form onSubmit={handleSubmit} className="rounded-3xl border border-white/10 bg-[#13102A] p-6 max-w-lg w-full space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[#A78BFA]" /> Register New Book
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-[#A78BFA]" /> Register New Book
+                </h3>
+                <button type="button" onClick={() => setShowAddForm(false)} className="text-white/40 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
               <div className="space-y-4">
                 <div className="flex gap-2 items-end">
@@ -223,40 +285,40 @@ export default function LibrarianCataloguePage() {
                       placeholder="e.g. 978-0262033848"
                       value={form.isbn}
                       onChange={e => setForm({ ...form, isbn: e.target.value })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleIsbnLookup}
                     disabled={lookingUp}
-                    className="px-4 py-2.5 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 text-xs font-bold text-[#A78BFA] transition-all flex items-center gap-1"
+                    className="px-4 py-2.5 rounded-xl bg-[#6C2BD9]/20 border border-[#6C2BD9]/30 text-xs font-bold text-[#A78BFA] transition-all flex items-center gap-1 disabled:opacity-50"
                   >
-                    <Sparkles className="w-3.5 h-3.5" /> Lookup
+                    {lookingUp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {lookingUp ? 'Looking...' : 'Lookup'}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Book Title</label>
+                    <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Book Title *</label>
                     <input
                       type="text"
                       placeholder="e.g. Design Patterns"
                       value={form.title}
                       onChange={e => setForm({ ...form, title: e.target.value })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                       required
                     />
                   </div>
-                  
                   <div>
-                    <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Author Name</label>
+                    <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Author Name *</label>
                     <input
                       type="text"
                       placeholder="e.g. Erich Gamma"
                       value={form.author}
                       onChange={e => setForm({ ...form, author: e.target.value })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                       required
                     />
                   </div>
@@ -270,10 +332,9 @@ export default function LibrarianCataloguePage() {
                       placeholder="e.g. Pearson Education"
                       value={form.publisher}
                       onChange={e => setForm({ ...form, publisher: e.target.value })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                     />
                   </div>
-
                   <div>
                     <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Shelf Location</label>
                     <input
@@ -281,7 +342,7 @@ export default function LibrarianCataloguePage() {
                       placeholder="e.g. Aisle 3, Shelf B"
                       value={form.shelf_location}
                       onChange={e => setForm({ ...form, shelf_location: e.target.value })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -291,19 +352,20 @@ export default function LibrarianCataloguePage() {
                     <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Copies Total</label>
                     <input
                       type="number"
+                      min="1"
                       value={form.copies_total}
                       onChange={e => setForm({ ...form, copies_total: parseInt(e.target.value) || 1 })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                     />
                   </div>
-
                   <div>
                     <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1">Copies Available</label>
                     <input
                       type="number"
+                      min="0"
                       value={form.copies_available}
-                      onChange={e => setForm({ ...form, copies_available: parseInt(e.target.value) || 1 })}
-                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white"
+                      onChange={e => setForm({ ...form, copies_available: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-[#6C2BD9] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -315,7 +377,7 @@ export default function LibrarianCataloguePage() {
                     placeholder="Short description summary..."
                     value={form.description}
                     onChange={e => setForm({ ...form, description: e.target.value })}
-                    className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white resize-none"
+                    className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white resize-none focus:border-[#6C2BD9] focus:outline-none"
                   />
                 </div>
               </div>
@@ -331,38 +393,54 @@ export default function LibrarianCataloguePage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold transition-all shadow flex items-center justify-center"
+                  className="flex-1 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold transition-all shadow flex items-center justify-center disabled:opacity-50"
                 >
-                  {submitting ? 'Registering...' : 'Add Book'}
+                  {submitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Registering...</> : 'Add Book'}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Bulk Import Modal */}
         {showBulkImport && (
-          <div className="fixed inset-0 bg-[#0D0A1A]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <form onSubmit={handleBulkImport} className="rounded-3xl border border-white/10 bg-[#13102A] p-6 max-w-md w-full space-y-4 shadow-2xl">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-[#A78BFA]" /> Bulk Import ISBNs
-              </h3>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+            <form onSubmit={handleBulkImport} className="rounded-3xl border border-white/10 bg-[#13102A] p-6 max-w-lg w-full space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-[#A78BFA]" /> Bulk Import Books
+                </h3>
+                <button type="button" onClick={() => setShowBulkImport(false)} className="text-white/40 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
               <p className="text-xs text-[#C4B5FD]/60">
-                Paste a list of book ISBNs (one per line). Google Books API will auto-resolve titles, authors, and cover metadata.
+                Enter one ISBN per line. Each ISBN will be looked up via Google Books for title, author, and category metadata.
               </p>
 
               <div>
                 <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">ISBN List</label>
                 <textarea
                   rows={8}
-                  placeholder="978-0262033848&#10;978-0201633610"
+                  placeholder={"978-0262033848\n978-0201633610\n978-0134685991"}
                   value={bulkIsbns}
                   onChange={e => setBulkIsbns(e.target.value)}
-                  className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-white/10 resize-none font-mono"
-                  required
+                  className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-white/10 resize-none font-mono focus:border-[#6C2BD9] focus:outline-none"
                 />
               </div>
+
+              {bulkResults.length > 0 && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {bulkResults.map((r, i) => (
+                    <div key={i} className={`text-[10px] px-3 py-1.5 rounded-lg flex items-center gap-2 ${r.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                      {r.status === 'success' ? <CheckCircle className="w-3 h-3 flex-shrink-0" /> : <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+                      <span className="font-mono">{r.isbn}</span>
+                      <span className="opacity-60">—</span>
+                      <span className="truncate">{r.title || r.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -370,26 +448,31 @@ export default function LibrarianCataloguePage() {
                   onClick={() => setShowBulkImport(false)}
                   className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold"
                 >
-                  Cancel
+                  {bulkResults.length > 0 ? 'Close' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="flex-1 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold flex items-center justify-center"
+                  disabled={submitting || !bulkIsbns.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-[#6C2BD9] hover:bg-[#8B5CF6] text-xs font-bold flex items-center justify-center disabled:opacity-50"
                 >
-                  {submitting ? 'Importing...' : 'Import List'}
+                  {submitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Importing...</> : 'Import Books'}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Catalog Table */}
         <h2 className="text-sm font-bold text-[#C4B5FD]/80 mb-4">Book catalogue index</h2>
 
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="w-10 h-10 border-2 border-[#6C2BD9] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : books.length === 0 ? (
+          <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 p-12 text-center">
+            <BookOpen className="w-12 h-12 text-[#C4B5FD]/20 mx-auto mb-3" />
+            <p className="text-sm text-[#C4B5FD]/40">No books in the catalogue yet.</p>
+            <p className="text-xs text-[#C4B5FD]/25 mt-1">Click &quot;Add Book&quot; to register your first book.</p>
           </div>
         ) : (
           <div className="rounded-3xl border border-white/5 bg-[#13102A]/60 overflow-hidden shadow-xl">
@@ -411,10 +494,10 @@ export default function LibrarianCataloguePage() {
                       <p className="text-[10px] text-[#C4B5FD]/50 mt-0.5">{bk.author} • {bk.category}</p>
                     </td>
                     <td className="p-4 font-mono">{bk.isbn || '—'}</td>
-                    <td className="p-4 font-mono text-[11px]">{bk.shelf_location || 'Aisle 1'}</td>
+                    <td className="p-4 font-mono text-[11px]">{bk.shelf_location || '—'}</td>
                     <td className="p-4">
                       <span className="font-bold text-white">{bk.copies_available}</span>
-                      <span className="text-[#C4B5FD]/40"> / {bk.copies_total} available</span>
+                      <span className="text-[#C4B5FD]/40"> / {bk.copies_total}</span>
                     </td>
                     <td className="p-4 text-right">
                       <Link

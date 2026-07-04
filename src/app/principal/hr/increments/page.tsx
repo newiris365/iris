@@ -11,7 +11,7 @@ interface IncrementRequest {
   current_basic: number;
   proposed_basic: number;
   increment_percent: number;
-  hod_recommendation: string;
+  vp_recommendation: string;
   appraisal_score: number;
   status: string;
   effective_date: string;
@@ -100,7 +100,7 @@ export default function PrincipalIncrements() {
               Increment Approval Console
             </h1>
             <p className="text-xs text-[#C4B5FD]/70">
-              Review HOD-recommended salary increments, validate appraisal scores, and approve or reject proposals.
+              Review Vice Principal-recommended salary increments, validate appraisal scores, and approve or reject proposals.
             </p>
           </div>
           <button
@@ -174,12 +174,12 @@ export default function PrincipalIncrements() {
                 </div>
               </div>
 
-              {/* HOD Recommendation */}
+              {/* VP Recommendation */}
               <div className="p-3 rounded-xl bg-[#0D0A1A]/60 border border-white/5 flex flex-col gap-1.5">
                 <span className="text-[9px] text-[#C4B5FD]/50 uppercase font-bold flex items-center gap-1">
-                  <User className="w-3 h-3" /> HOD Recommendation
+                  <User className="w-3 h-3" /> VP Recommendation
                 </span>
-                <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{inc.hod_recommendation}</p>
+                <p className="text-xs text-[#C4B5FD]/80 leading-relaxed">{inc.vp_recommendation}</p>
               </div>
 
               {/* Effective Date & Actions */}

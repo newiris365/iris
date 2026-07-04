@@ -76,6 +76,13 @@ const getRedirectPath = (role: string): string => {
     case 'Principal': return '/principal/dashboard';
     case 'Vice Principal': return '/vp/dashboard';
     case 'VP': return '/vp/dashboard';
+    case 'HR Admin': return '/hr/my/dashboard';
+    case 'Company HR': return '/company';
+    case 'IQAC Coordinator': return '/iqac';
+    case 'Admissions Officer': return '/officer';
+    case 'TPO': return '/tpo';
+    case 'Staff': return '/faculty';
+    case 'Applicant': return '/applicant';
     default: return '/dashboard';
   }
 };
@@ -206,50 +213,51 @@ export async function GET(request: NextRequest) {
     let authSession: { access_token: string; refresh_token: string } | null = null;
 
     if (code) {
-      // ─── STEP 4: PKCE code exchange ──────────────────────────────────────
+      // ─── STEP 4: PKCE code exchange via direct HTTP POST ───────────────────
       console.log('[auth/callback] STEP 4 — Attempting PKCE code exchange...');
       const cookieStore = await cookies();
-      const allCookieNames = cookieStore.getAll().map(c => c.name);
-      console.log('[auth/callback] STEP 4 — Available cookies:', allCookieNames);
-      const pkceVerifierCookie = allCookieNames.find(n => n.includes('code_verifier') || n.includes('pkce'));
-      console.log('[auth/callback] STEP 4 — PKCE verifier cookie found:', pkceVerifierCookie || 'NONE (this will cause exchange to fail!)');
+      const allCookies = cookieStore.getAll();
+      console.log('[auth/callback] STEP 4 — Available cookies:', allCookies.map(c => c.name));
+      const verifierCookie = allCookies.find(c => c.name.includes('code-verifier') || c.name.includes('code_verifier') || c.name.includes('pkce'));
+      const code_verifier = verifierCookie?.value;
+      console.log('[auth/callback] STEP 4 — PKCE verifier cookie found:', verifierCookie?.name || 'NONE');
 
-      const supabaseSSR = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        {
-          cookies: {
-            getAll() {
-              return cookieStore.getAll();
-            },
-            setAll(cookiesToSet) {
-              try {
-                cookiesToSet.forEach(({ name, value, options }) => {
-                  cookieStore.set(name, value, options);
-                });
-              } catch {
-                // setAll may throw in read-only contexts (edge middleware).
-              }
-            }
-          },
-          cookieOptions: {
-            name: 'sb-auth-token',
-            path: '/',
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production'
-          }
-        }
-      );
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://api.iris365.in';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-      const { data: authData, error: authError } = await supabaseSSR.auth.exchangeCodeForSession(code);
+      const tokenUrl = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=pkce`;
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({
+          code,
+          code_verifier: code_verifier || ''
+        })
+      });
 
-      // ─── STEP 5: Log exchange result ─────────────────────────────────────
-      if (authError) {
-        console.error('[auth/callback] STEP 5 — exchangeCodeForSession FAILED:', authError.message, '| status:', authError.status);
-        throw new Error(authError.message || 'Failed to exchange auth session code');
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('[auth/callback] STEP 4 — Direct PKCE token exchange failed:', response.status, errText);
+        throw new Error(`Direct PKCE token exchange failed: ${errText}`);
       }
+
+      const tokenData = await response.json();
+      console.log('[auth/callback] STEP 4 — Direct PKCE exchange SUCCESS');
+
+      const authData = {
+        user: tokenData.user,
+        session: {
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600)
+        }
+      };
+
       if (!authData.session || !authData.user) {
-        console.error('[auth/callback] STEP 5 — exchangeCodeForSession returned no session or user. Data:', JSON.stringify({ hasSession: !!authData.session, hasUser: !!authData.user }));
+        console.error('[auth/callback] STEP 5 — Direct PKCE exchange returned no session or user. Data:', JSON.stringify({ hasSession: !!authData.session, hasUser: !!authData.user }));
         throw new Error('Failed to exchange auth session code');
       }
       console.log('[auth/callback] STEP 5 — exchangeCodeForSession SUCCESS:');

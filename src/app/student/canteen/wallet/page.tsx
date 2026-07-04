@@ -82,25 +82,63 @@ export default function StudentWalletPage() {
     }
 
     try {
-      const res = await apiPost('/canteen/wallet/topup', {
+      // Initiate Razorpay payment for canteen wallet top-up
+      const initRes = await apiPost('/canteen/wallet/topup/initiate', {
         student_id: studentId,
         amount
       });
-      
-      if (res && res.success) {
-        // Update locally
-        const newBalance = wallet.balance + amount;
-        setWallet(prev => ({ ...prev, balance: newBalance }));
-        setTransactions(prev => [{
-          id: `t-${Date.now()}`, type: 'credit', amount,
-          description: `Wallet top-up of ₹${amount.toFixed(2)}`,
-          reference_type: 'topup', balance_after: newBalance,
-          created_at: new Date().toISOString()
-        }, ...prev]);
-        setShowTopup(false);
-        setCustomAmount('');
+
+      if (initRes && initRes.success && initRes.order_id) {
+        // Open Razorpay checkout
+        const options = {
+          key: initRes.key_id || initRes.key,
+          amount: initRes.amount || amount * 100,
+          currency: 'INR',
+          name: 'IRIS Canteen Wallet',
+          description: `Add ₹${amount} to canteen wallet`,
+          order_id: initRes.order_id,
+          handler: async (response: any) => {
+            // Verify payment
+            try {
+              const verifyRes = await apiPost('/canteen/wallet/topup/verify', {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              if (verifyRes && verifyRes.success) {
+                fetchWallet();
+                setShowTopup(false);
+                setCustomAmount('');
+              } else {
+                alert('Payment verification failed. Contact support.');
+              }
+            } catch {
+              alert('Payment verification failed. Contact support.');
+            }
+          },
+          prefill: { name: '', email: '', contact: '' },
+          theme: { color: '#6C2BD9' },
+        };
+
+        if (typeof window !== 'undefined' && (window as any).Razorpay) {
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        } else {
+          // Razorpay script not loaded - use direct top-up for sandbox
+          const res = await apiPost('/canteen/wallet/topup', {
+            student_id: studentId,
+            amount
+          });
+          if (res && res.success) {
+            fetchWallet();
+            setShowTopup(false);
+            setCustomAmount('');
+          } else {
+            alert('Top-up failed: ' + (res?.error || 'Unknown error'));
+          }
+        }
       } else {
-        alert('Top-up failed: ' + (res?.error || 'Unknown error'));
+        alert('Failed to initiate payment: ' + (initRes?.error || 'Unknown error'));
       }
     } catch (err) {
       alert('An error occurred during wallet top-up.');

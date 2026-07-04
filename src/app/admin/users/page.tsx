@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Users, UserPlus, Search, Shield, CheckCircle, XCircle, RefreshCw,
-  MoreVertical, Key, UserX, UserCheck, ChevronDown, X, Eye, EyeOff, Mail, Phone, Building2
+  Users, UserPlus, Search, RefreshCw,
+  Key, X, Eye, EyeOff
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '../../../lib/api';
 import { getRoleLabel } from '../../../lib/roleLabels';
@@ -12,19 +12,26 @@ const ALL_ROLES = [
   { value: 'Admin', label: 'Admin', color: 'text-violet-400 bg-violet-500/20' },
   { value: 'Director', label: 'Director', color: 'text-amber-400 bg-amber-500/20' },
   { value: 'Principal', label: 'Principal', color: 'text-purple-400 bg-purple-500/20' },
-  { value: 'HOD', label: 'HOD', color: 'text-cyan-400 bg-cyan-500/20' },
+  { value: 'HOD', label: 'HOD', color: 'text-cyan-400 bg-cyan-500/20', collegeOnly: true },
   { value: 'Teacher', label: 'Teacher', color: 'text-emerald-400 bg-emerald-500/20' },
   { value: 'Staff', label: 'Staff', color: 'text-blue-400 bg-blue-500/20' },
-  { value: 'TPO', label: 'TPO', color: 'text-indigo-400 bg-indigo-500/20' },
+  { value: 'TPO', label: 'TPO', color: 'text-indigo-400 bg-indigo-500/20', collegeOnly: true },
   { value: 'Librarian', label: 'Librarian', color: 'text-teal-400 bg-teal-500/20' },
   { value: 'Gym Trainer', label: 'Gym Trainer', color: 'text-orange-400 bg-orange-500/20' },
-  { value: 'IQAC Coordinator', label: 'IQAC Coordinator', color: 'text-pink-400 bg-pink-500/20' },
+  { value: 'IQAC Coordinator', label: 'IQAC Coordinator', color: 'text-pink-400 bg-pink-500/20', collegeOnly: true },
   { value: 'Admissions Officer', label: 'Admissions Officer', color: 'text-rose-400 bg-rose-500/20' },
   { value: 'Warden', label: 'Warden', color: 'text-green-400 bg-green-500/20' },
   { value: 'Security', label: 'Security', color: 'text-red-400 bg-red-500/20' },
   { value: 'Vendor', label: 'Vendor', color: 'text-yellow-400 bg-yellow-500/20' },
   { value: 'Driver', label: 'Driver', color: 'text-orange-400 bg-orange-500/20' },
 ];
+
+function getVisibleRoles(instituteType: string) {
+  if (instituteType === 'school') {
+    return ALL_ROLES.filter(r => !r.collegeOnly);
+  }
+  return ALL_ROLES;
+}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -33,6 +40,21 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [instituteType, setInstituteType] = useState('college');
+  const [activeFilter, setActiveFilter] = useState('true');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [stats, setStats] = useState<Record<string, number>>({});
+  const [page, setPage] = useState(1);
+
+  const [addForm, setAddForm] = useState({
+    name: '', email: '', phone: '', role: 'Teacher', employee_id: '', password: 'password123',
+  });
+  const [editForm, setEditForm] = useState({ name: '', phone: '', role: '', employee_id: '', is_active: true });
+  const [resetPassword, setResetPassword] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -45,24 +67,8 @@ export default function AdminUsersPage() {
       }
     }
   }, []);
-  const [activeFilter, setActiveFilter] = useState('true');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [stats, setStats] = useState<Record<string, number>>({});
-  const [page, setPage] = useState(1);
 
-  const [addForm, setAddForm] = useState({
-    name: '', email: '', phone: '', role: 'Teacher', department_id: '', employee_id: '', password: 'password123',
-  });
-  const [editForm, setEditForm] = useState({ name: '', phone: '', role: '', department_id: '', employee_id: '', is_active: true });
-  const [resetPassword, setResetPassword] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { fetchUsers(); fetchDepartments(); fetchStats(); }, [roleFilter, activeFilter, page]);
+  useEffect(() => { fetchUsers(); fetchStats(); }, [roleFilter, activeFilter, page]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -83,17 +89,6 @@ export default function AdminUsersPage() {
     finally { setLoading(false); }
   };
 
-  const fetchDepartments = async () => {
-    try {
-      const res = await apiGet('campusCore/users/departments', { 
-        institution_id: JSON.parse(localStorage.getItem('iris_user_profile') || '{}').institution_id 
-      });
-      setDepartments(res.departments || []);
-    } catch {
-      setDepartments([]);
-    }
-  };
-
   const fetchStats = async () => {
     try {
       const res = await apiGet('campusCore/users/stats');
@@ -106,11 +101,14 @@ export default function AdminUsersPage() {
   const handleAddUser = async () => {
     setSaving(true);
     try {
-      const res = await apiPost('campusCore/users', addForm);
+      const body: any = { name: addForm.name, email: addForm.email, role: addForm.role, password: addForm.password };
+      if (addForm.phone) body.phone = addForm.phone;
+      if (addForm.employee_id) body.employee_id = addForm.employee_id;
+      const res = await apiPost('campusCore/users', body);
       if (res.success) {
         alert(res.message || 'User created!');
         setShowAddModal(false);
-        setAddForm({ name: '', email: '', phone: '', role: 'Teacher', department_id: '', employee_id: '', password: 'password123' });
+        setAddForm({ name: '', email: '', phone: '', role: 'Teacher', employee_id: '', password: 'password123' });
         fetchUsers();
         fetchStats();
       } else {
@@ -124,7 +122,10 @@ export default function AdminUsersPage() {
     if (!selectedUser) return;
     setSaving(true);
     try {
-      const res = await apiPut(`campusCore/users/${selectedUser.id}`, editForm);
+      const body: any = { name: editForm.name, role: editForm.role, is_active: editForm.is_active };
+      if (editForm.phone) body.phone = editForm.phone;
+      if (editForm.employee_id) body.employee_id = editForm.employee_id;
+      const res = await apiPut(`campusCore/users/${selectedUser.id}`, body);
       if (res.success) {
         alert('User updated!');
         setShowEditModal(false);
@@ -178,7 +179,6 @@ export default function AdminUsersPage() {
       name: user.name || '',
       phone: user.phone || '',
       role: user.role || '',
-      department_id: user.department_id || '',
       employee_id: user.employee_id || '',
       is_active: user.is_active !== false,
     });
@@ -195,7 +195,6 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
@@ -218,7 +217,6 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Role Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {ALL_ROLES.filter(r => stats[r.value]).map(r => (
           <div key={r.value} className="bg-white/5 rounded-xl border border-white/10 p-3 text-center">
@@ -228,7 +226,6 @@ export default function AdminUsersPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="flex-1 min-w-[200px] relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -240,7 +237,7 @@ export default function AdminUsersPage() {
         <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
           <option value="">All Roles</option>
-          {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
+          {getVisibleRoles(instituteType).map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
         </select>
         <select value={activeFilter} onChange={e => { setActiveFilter(e.target.value); setPage(1); }}
           className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
@@ -250,7 +247,6 @@ export default function AdminUsersPage() {
         </select>
       </div>
 
-      {/* Users Table */}
       {loading ? (
         <div className="text-center py-12 text-slate-400">Loading users...</div>
       ) : filteredUsers.length === 0 ? (
@@ -266,7 +262,6 @@ export default function AdminUsersPage() {
                 <tr className="border-b border-white/10">
                   <th className="text-left p-3 text-slate-400">User</th>
                   <th className="text-left p-3 text-slate-400">Role</th>
-                  <th className="text-left p-3 text-slate-400">Department</th>
                   <th className="text-center p-3 text-slate-400">Status</th>
                   <th className="text-left p-3 text-slate-400">Last Login</th>
                   <th className="text-right p-3 text-slate-400">Actions</th>
@@ -291,9 +286,6 @@ export default function AdminUsersPage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleStyle(user.role)}`}>
                         {getRoleLabel(user.role, instituteType)}
                       </span>
-                    </td>
-                    <td className="p-3 text-slate-300 text-xs">
-                      {user.departments?.name || '—'}
                     </td>
                     <td className="p-3 text-center">
                       {user.is_active !== false ? (
@@ -340,7 +332,6 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Add User Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#120F22] border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -354,13 +345,11 @@ export default function AdminUsersPage() {
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-400">Full Name *</label>
                 <input type="text" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder=""
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-400">Email *</label>
                 <input type="email" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
-                  placeholder=""
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50" />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -377,22 +366,12 @@ export default function AdminUsersPage() {
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-400">Role *</label>
-                  <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
-                    {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-400">Department</label>
-                  <select value={addForm.department_id} onChange={e => setAddForm(p => ({ ...p, department_id: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
-                    <option value="">None</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-400">Role *</label>
+                <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
+                  {getVisibleRoles(instituteType).map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-400">Initial Password *</label>
@@ -420,7 +399,6 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Edit User Modal */}
       {showEditModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#120F22] border border-white/10 rounded-2xl w-full max-w-lg">
@@ -439,22 +417,12 @@ export default function AdminUsersPage() {
                 <input type="text" value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-400">Role</label>
-                  <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
-                    {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-400">Department</label>
-                  <select value={editForm.department_id} onChange={e => setEditForm(p => ({ ...p, department_id: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
-                    <option value="">None</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-400">Role</label>
+                <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500/50">
+                  {getVisibleRoles(instituteType).map(r => <option key={r.value} value={r.value}>{getRoleLabel(r.value, instituteType)}</option>)}
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-400">Employee ID</label>
@@ -479,7 +447,6 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Reset Password Modal */}
       {showPasswordModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#120F22] border border-white/10 rounded-2xl w-full max-w-sm">

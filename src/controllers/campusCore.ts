@@ -65,6 +65,76 @@ async function getMethodConfig(institutionId: string, method: string): Promise<R
   }
 }
 
+// =========================================================================
+// PARENT NOTIFICATION HELPERS
+// =========================================================================
+import { sendPushNotification } from '../services/fcm';
+
+async function notifyParent(studentId: string, type: string, title: string, message: string, metadata: Record<string, any> = {}) {
+  try {
+    const { data: parentLinks } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('parent_user_id')
+      .eq('student_id', studentId)
+      .eq('verified', true);
+
+    if (!parentLinks || parentLinks.length === 0) return;
+
+    for (const link of parentLinks) {
+      await supabaseAdmin.from('parent_notifications').insert({
+        parent_user_id: link.parent_user_id,
+        student_id: studentId,
+        notification_type: type,
+        title,
+        message,
+        metadata,
+      });
+      await sendPushNotification(link.parent_user_id, title, message, { type, student_id: studentId, ...metadata });
+    }
+  } catch (err) {
+    console.error('[NOTIFY PARENT] Failed:', err);
+  }
+}
+
+async function checkAndNotifyLowAttendance(studentId: string, institutionId: string) {
+  try {
+    const { data: student } = await supabaseAdmin.from('students').select('id, users(full_name)').eq('id', studentId).single();
+    if (!student) return;
+
+    const studentName = (student as any).users?.full_name || 'Your child';
+    const currentYear = new Date().getFullYear();
+    const academicYear = `${currentYear}-${currentYear + 1}`;
+
+    const { data: logs } = await supabaseAdmin
+      .from('school_attendance')
+      .select('status')
+      .eq('student_id', studentId)
+      .eq('academic_year', academicYear);
+
+    if (!logs || logs.length === 0) return;
+
+    let presentCount = 0;
+    logs.forEach(l => {
+      if (l.status === 'Present' || l.status === 'Leave') presentCount += 1;
+      else if (l.status === 'Half-Day') presentCount += 0.5;
+    });
+
+    const percentage = Math.round((presentCount / logs.length) * 100);
+
+    if (percentage < 75) {
+      await notifyParent(
+        studentId,
+        'low_attendance',
+        'Low Attendance Alert',
+        `${studentName}'s attendance has dropped to ${percentage}%. The required minimum is 75%. Please take action.`,
+        { percentage, threshold: 75, student_name: studentName }
+      );
+    }
+  } catch (err) {
+    console.error('[CHECK LOW ATTENDANCE] Failed:', err);
+  }
+}
+
 // Generate a rotating QR token and store in qr_tokens table
 export async function generateRotatingQrToken(sessionId: string, institutionId: string, rotateIntervalMinutes: number): Promise<string> {
   const expiresAt = new Date(Date.now() + rotateIntervalMinutes * 60 * 1000).toISOString();
@@ -575,6 +645,26 @@ export async function markAttendanceBulk(req: Request, res: Response) {
 
     if (error) return res.status(500).json({ success: false, error: error.message });
 
+    // Fire-and-forget: notify parents of absent students
+    (async () => {
+      try {
+        const absentStudents = records.filter((r: any) => r.status === 'Absent');
+        for (const r of absentStudents) {
+          const { data: stu } = await supabaseAdmin.from('students').select('users(full_name)').eq('id', r.student_id).single();
+          const studentName = (stu as any)?.users?.full_name || 'Your child';
+          await notifyParent(
+            r.student_id,
+            'student_absent',
+            'Student Absent Today',
+            `${studentName} was marked absent today. - IRIS 365`,
+            { student_name: studentName, date, status: 'Absent' }
+          );
+        }
+      } catch (err) {
+        console.error('[ATTENDANCE NOTIFICATIONS] Background error:', err);
+      }
+    })();
+
     return res.status(200).json({ success: true, count: data.length });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Internal bulk write failure.' });
@@ -606,6 +696,31 @@ export async function markSchoolAttendanceBulk(req: Request, res: Response) {
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
+
+    // Fire-and-forget: notify parents of absent students + low attendance alerts
+    (async () => {
+      try {
+        const absentStudents = records.filter((r: any) => r.status === 'Absent');
+        for (const r of absentStudents) {
+          const { data: stu } = await supabaseAdmin.from('students').select('users(full_name)').eq('id', r.student_id).single();
+          const studentName = (stu as any)?.users?.full_name || 'Your child';
+          await notifyParent(
+            r.student_id,
+            'student_absent',
+            'Student Absent Today',
+            `${studentName} was marked absent on ${date}. - IRIS 365`,
+            { student_name: studentName, date, status: 'Absent' }
+          );
+        }
+        // Check low attendance threshold for all marked students
+        const uniqueStudentIds = [...new Set(records.map((r: any) => r.student_id))];
+        for (const sid of uniqueStudentIds) {
+          await checkAndNotifyLowAttendance(sid, institutionId);
+        }
+      } catch (err) {
+        console.error('[ATTENDANCE NOTIFICATIONS] Background error:', err);
+      }
+    })();
 
     return res.status(200).json({ success: true, count: dbRecords.length, message: 'Daily school attendance register updated successfully.' });
   } catch (err: any) {
@@ -1394,6 +1509,46 @@ export async function getStudents(req: Request, res: Response) {
     return res.status(200).json({ success: true, students: data });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Failed to fetch students list.' });
+  }
+}
+
+export async function getFacultyStudents(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    const instId = req.user?.institution_id;
+    if (!userId || !instId) {
+      return res.status(400).json({ success: false, error: 'User context not found.' });
+    }
+
+    // Look up staff details to find department_id
+    const { data: staff, error: staffErr } = await supabaseAdmin
+      .from('staff')
+      .select('department_id')
+      .eq('user_id', userId)
+      .eq('institution_id', instId)
+      .maybeSingle();
+
+    if (staffErr) {
+      return res.status(500).json({ success: false, error: staffErr.message });
+    }
+
+    let query = supabaseAdmin
+      .from('students')
+      .select('*, users(*)');
+
+    if (instId) {
+      query = query.eq('institution_id', instId);
+    }
+
+    if (staff && staff.department_id) {
+      query = query.eq('department_id', staff.department_id);
+    }
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    return res.status(200).json({ success: true, students: data });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch department students list.' });
   }
 }
 
@@ -3851,16 +4006,176 @@ export async function getParentDailySummary(req: Request, res: Response) {
 export async function parentTopupWallet(req: Request, res: Response) {
   try {
     const { student_id, amount, description } = req.body;
-    if (!student_id || !amount) {
-      return res.status(400).json({ success: false, error: 'student_id and amount required.' });
+    if (!student_id || !amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'student_id and valid amount required.' });
     }
-    const { data, error } = await supabaseAdmin.rpc('parent_topup_child_wallet', {
-      p_student_id: student_id,
-      p_amount: amount,
-      p_description: description || 'Parent wallet top-up',
+
+    const { data: student, error: fetchErr } = await supabaseAdmin
+      .from('students')
+      .select('id, wallet_balance, institution_id')
+      .eq('id', student_id)
+      .maybeSingle();
+
+    if (fetchErr || !student) {
+      return res.status(404).json({ success: false, error: 'Student not found.' });
+    }
+
+    const newBalance = (student.wallet_balance || 0) + amount;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('students')
+      .update({ wallet_balance: newBalance })
+      .eq('id', student_id);
+
+    if (updateErr) throw updateErr;
+
+    await supabaseAdmin.from('wallet_transactions').insert({
+      institution_id: student.institution_id,
+      student_id,
+      type: 'parent_topup',
+      amount,
+      payment_method: 'parent_topup',
+      status: 'completed',
+      balance_after: newBalance,
+      description: description || `Parent top-up of ₹${amount}`,
     });
-    if (error) throw error;
-    return res.status(200).json(data?.[0] || { success: false, error: 'Top-up failed' });
+
+    return res.status(200).json({ success: true, new_balance: newBalance });
+  } catch (err: any) {
+    logger.error('parentTopupWallet error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Top-up failed.' });
+  }
+}
+
+export async function getParentWallet(req: Request, res: Response) {
+  try {
+    // Get linked child
+    const { data: childData, error: childError } = await supabaseAdmin.rpc('get_parent_child_info');
+    if (childError) throw childError;
+    if (!childData || childData.length === 0) {
+      return res.status(200).json({ success: true, balance: 0, transactions: [], child: null });
+    }
+    const child = childData[0];
+    const studentId = child.student_id;
+
+    // Get wallet balance from students table
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('wallet_balance')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    // Get wallet transactions
+    const { data: transactions } = await supabaseAdmin
+      .from('wallet_transactions')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    return res.status(200).json({
+      success: true,
+      balance: student?.wallet_balance || 0,
+      transactions: transactions || [],
+      child: { name: child.student_name, roll: child.student_roll }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getParentFeeSummary(req: Request, res: Response) {
+  try {
+    const { data: childData, error: childError } = await supabaseAdmin.rpc('get_parent_child_info');
+    if (childError) throw childError;
+    if (!childData || childData.length === 0) {
+      return res.status(200).json({ success: true, summary: { total_fees: 0, total_paid: 0, pending_amount: 0, fines: 0, wallet_balance: 0, breakdown: [], installments: [], recent_payments: [] } });
+    }
+    const studentId = childData[0].student_id;
+
+    const { data: structures } = await supabaseAdmin
+      .from('fee_structures')
+      .select('*');
+
+    const { data: payments } = await supabaseAdmin
+      .from('fee_payments')
+      .select('*')
+      .eq('student_id', studentId);
+
+    const { data: concessions } = await supabaseAdmin
+      .from('fee_concessions')
+      .select('*')
+      .eq('student_id', studentId);
+
+    const { data: installments } = await supabaseAdmin
+      .from('installment_plans')
+      .select('*')
+      .eq('student_id', studentId);
+
+    const { data: student } = await supabaseAdmin
+      .from('students')
+      .select('wallet_balance')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    const { data: libraryFines } = await supabaseAdmin
+      .from('library_fines')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('status', 'unpaid');
+
+    const totalFees = (structures || []).reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+    const totalPaid = (payments || []).filter((p: any) => p.status === 'Completed').reduce((sum: number, p: any) => sum + Number(p.amount_paid), 0);
+    const totalConcessions = (concessions || []).reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+    const totalLibraryFines = (libraryFines || []).reduce((sum: number, f: any) => sum + Number(f.amount), 0);
+    const pendingAmount = Math.max(0, totalFees - totalPaid - totalConcessions);
+
+    const feeByName: Record<string, { total: number; paid: number; waiver: number }> = {};
+    for (const s of structures || []) {
+      const name = s.name || 'Other';
+      if (!feeByName[name]) feeByName[name] = { total: 0, paid: 0, waiver: 0 };
+      feeByName[name].total += Number(s.amount);
+    }
+    for (const p of payments || []) {
+      if (p.status !== 'Completed') continue;
+      const struct = (structures || []).find((s: any) => s.id === p.fee_structure_id);
+      const name = struct?.name || 'Other';
+      if (!feeByName[name]) feeByName[name] = { total: 0, paid: 0, waiver: 0 };
+      feeByName[name].paid += Number(p.amount_paid);
+    }
+    for (const c of concessions || []) {
+      const struct = (structures || []).find((s: any) => s.id === c.fee_structure_id);
+      const name = struct?.name || 'Other';
+      if (!feeByName[name]) feeByName[name] = { total: 0, paid: 0, waiver: 0 };
+      feeByName[name].waiver += Number(c.amount);
+    }
+
+    const breakdown = Object.entries(feeByName).map(([name, data]) => ({
+      category: name,
+      total: data.total,
+      paid: data.paid,
+      waiver: data.waiver,
+      pending: Math.max(0, data.total - data.paid - data.waiver),
+    }));
+
+    if (totalLibraryFines > 0) {
+      breakdown.push({ category: 'Library Fines', total: totalLibraryFines, paid: 0, waiver: 0, pending: totalLibraryFines });
+    }
+
+    return res.status(200).json({
+      success: true,
+      summary: {
+        total_fees: totalFees,
+        total_paid: totalPaid,
+        total_concessions: totalConcessions,
+        pending_amount: pendingAmount,
+        fines: totalLibraryFines,
+        wallet_balance: student?.wallet_balance || 0,
+        breakdown,
+        installments: installments || [],
+        recent_payments: (payments || []).sort((a: any, b: any) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()).slice(0, 10),
+      },
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -3943,16 +4258,103 @@ export async function getParentVisitorPreauths(req: Request, res: Response) {
       .from('hostel_visitor_preauth')
       .select('*, students(roll_number, users(full_name))')
       .eq('parent_user_id', req.user?.id)
-      .order('visit_date', { ascending: false });
+      .order('created_at', { ascending: false });
     if (error) throw error;
-    const preauths = (data || []).map((p: any) => ({
-      ...p,
-      student_name: p.students?.users?.full_name,
-    }));
-    return res.status(200).json({ success: true, preauths });
+    return res.status(200).json({ success: true, preauths: data || [] });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
+}
+
+// =========================================================================
+// PARENT LEAVE APPLICATION CONTROLLERS
+// =========================================================================
+export async function parentApplyLeave(req: Request, res: Response) {
+  try {
+    const { start_date, end_date, reason, leave_type } = req.body;
+    if (!start_date || !end_date || !reason) {
+      return res.status(400).json({ success: false, error: 'start_date, end_date, and reason are required.' });
+    }
+
+    // Get linked child
+    const { data: link } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('student_id')
+      .eq('parent_user_id', req.user?.id)
+      .eq('verified', true)
+      .maybeSingle();
+
+    if (!link) return res.status(404).json({ success: false, error: 'No linked child found.' });
+
+    const { data, error } = await supabaseAdmin
+      .from('student_leave_applications')
+      .insert({
+        student_id: link.student_id,
+        start_date,
+        end_date,
+        reason,
+        leave_type: leave_type || 'personal',
+        applied_by: 'parent',
+        parent_user_id: req.user?.id,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Notify admin about new leave application
+    try {
+      const { data: stu } = await supabaseAdmin.from('students').select('users(full_name), institutions(name)').eq('id', link.student_id).single();
+      const studentName = (stu as any)?.users?.full_name || 'Student';
+      // Find admin users for the institution
+      const instId = (stu as any)?.institutions?.id;
+      if (instId) {
+        const { data: admins } = await supabaseAdmin.from('users').select('id').eq('institution_id', instId).eq('role', 'Admin');
+        if (admins) {
+          for (const admin of admins) {
+            await supabaseAdmin.from('parent_notifications').insert({
+              parent_user_id: admin.id,
+              student_id: link.student_id,
+              notification_type: 'leave_applied',
+              title: 'New Leave Application',
+              message: `Leave application submitted for ${studentName} from ${start_date} to ${end_date}.`,
+              metadata: { student_name: studentName, start_date, end_date, leave_type: leave_type || 'personal' },
+            });
+          }
+        }
+      }
+    } catch { /* ignore notification errors */ }
+
+    return res.status(201).json({ success: true, leave: data });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getParentLeaveList(req: Request, res: Response) {
+  try {
+    const { data: link } = await supabaseAdmin
+      .from('parent_student_links')
+      .select('student_id')
+      .eq('parent_user_id', req.user?.id)
+      .eq('verified', true)
+      .maybeSingle();
+
+    if (!link) return res.status(404).json({ success: false, error: 'No linked child found.' });
+
+    const { data, error } = await supabaseAdmin
+      .from('student_leave_applications')
+      .select('*')
+      .eq('student_id', link.student_id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return res.status(200).json({ success: true, leaves: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
 }
 
 // =========================================================================
@@ -4358,16 +4760,82 @@ export async function detectTimetableConflicts(req: Request, res: Response) {
 export async function autoGenerateTimetable(req: Request, res: Response) {
   try {
     const { department_id, semester, batch_year, subjects } = req.body;
-    if (!department_id || !subjects || !Array.isArray(subjects)) {
-      return res.status(400).json({ success: false, error: 'department_id and subjects array required.' });
+    
+    let targetDeptId = department_id;
+    if (!targetDeptId && req.user?.id) {
+      const { data: staff } = await supabaseAdmin
+        .from('staff')
+        .select('department_id')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (staff) {
+        targetDeptId = staff.department_id;
+      }
     }
+
+    if (!targetDeptId) {
+      return res.status(400).json({ success: false, error: 'department_id is required or could not be resolved.' });
+    }
+
+    if (!subjects || !Array.isArray(subjects)) {
+      return res.status(400).json({ success: false, error: 'subjects array is required.' });
+    }
+
+    // Process and sanitize subjects array
+    const processedSubjects = [];
+    for (const sub of subjects) {
+      const name = sub.name || sub.subject_name || sub.subject || 'Unknown Subject';
+      
+      const classesVal = Number(sub.classes_per_week || 3);
+      const periodsVal = Number(sub.periods_per_class || 1);
+      const hours_per_week = Number(sub.hours_per_week || (classesVal * periodsVal) || 3);
+      
+      let teacherId = sub.teacher_id;
+      if (!teacherId && sub.teacher_name) {
+        const { data: teacherUser } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('role', 'Teacher')
+          .ilike('name', `%${sub.teacher_name}%`)
+          .limit(1)
+          .maybeSingle();
+        
+        if (teacherUser) {
+          teacherId = teacherUser.id;
+        } else {
+          // Search in employee_profiles
+          const { data: emp } = await supabaseAdmin
+            .from('employee_profiles')
+            .select('user_id')
+            .or(`first_name.ilike.%${sub.teacher_name}%,last_name.ilike.%${sub.teacher_name}%`)
+            .limit(1)
+            .maybeSingle();
+          if (emp && emp.user_id) {
+            teacherId = emp.user_id;
+          }
+        }
+      }
+
+      if (!teacherId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teacherId)) {
+        teacherId = 'b0000000-0000-0000-0000-000000000005'; // Default mock teacher
+      }
+
+      processedSubjects.push({
+        name,
+        hours_per_week,
+        teacher_id: teacherId,
+        room: sub.room || 'Room 101'
+      });
+    }
+
     const { data, error } = await supabaseAdmin.rpc('auto_generate_timetable', {
       p_institution_id: req.user?.institution_id,
-      p_department_id: department_id,
-      p_semester: semester || 1,
-      p_batch_year: batch_year || '',
-      p_subjects: JSON.stringify(subjects),
+      p_department_id: targetDeptId,
+      p_semester: Number(semester) || 1,
+      p_batch_year: batch_year || '2026',
+      p_subjects: JSON.stringify(processedSubjects),
     });
+
     if (error) throw error;
     return res.status(200).json(data?.[0] || { success: false, error: 'Auto-generation failed' });
   } catch (err: any) {

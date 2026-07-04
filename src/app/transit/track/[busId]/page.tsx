@@ -40,8 +40,8 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
       if (data && (data.busId === params.busId || !data.busId)) {
         setTelemetry(prev => ({
           ...prev,
-          latitude: data.lat,
-          longitude: data.lng,
+          latitude: data.lat ?? data.latitude ?? prev.latitude,
+          longitude: data.lng ?? data.longitude ?? prev.longitude,
           speed: data.speed_kmh ?? data.speed ?? prev.speed,
           heading: data.heading ?? prev.heading,
         }));
@@ -54,13 +54,14 @@ export default function TrackBusPage({ params }: { params: { busId: string } }) 
     // Legacy event from existing updateBusLocation controller
     socket.on('bus:location_updated', (data: any) => {
       if (data && data.bus_id === params.busId) {
-        setTelemetry({
-          latitude: data.latitude,
-          longitude: data.longitude,
-          speed: data.speed,
-          heading: data.heading,
-          vehicle_number: data.vehicle_number || telemetry.vehicle_number
-        });
+        setTelemetry(prev => ({
+          ...prev,
+          latitude: data.latitude ?? prev.latitude,
+          longitude: data.longitude ?? prev.longitude,
+          speed: data.speed ?? prev.speed,
+          heading: data.heading ?? prev.heading,
+          vehicle_number: data.vehicle_number || prev.vehicle_number
+        }));
         if (data.etas) {
           setEtas(data.etas);
         }

@@ -5,13 +5,13 @@ import dynamic from 'next/dynamic';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
 import {
   LayoutDashboard, Users, CalendarDays, CreditCard, ShoppingBag, BookOpen,
-  Shield, Dumbbell, Bus, BrainCircuit, ClipboardList, GraduationCap,
-  Home, Bell, Award, FileText, UserCheck, Briefcase, HeartPulse, Settings,
-  Armchair, Package, Link2, AlertTriangle, Calendar, BarChart3, Wand2, UserCircle, MessageSquare,
-  Sliders, UserPlus
+  Shield, Bus, BrainCircuit, ClipboardList, GraduationCap,
+  Home, Bell, Award, FileText, UserCheck, Settings,
+  Package, AlertTriangle, Calendar, BarChart3, UserCircle, MessageSquare,
+  Sliders, UserPlus, BedDouble, School, BookMarked, UtensilsCrossed
 } from 'lucide-react';
 
-const adminLinks: SidebarLink[] = [
+const collegeAdminLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Admissions', href: '/admin/admissions', icon: UserCheck },
   { label: 'New Admission', href: '/admin/admissions/new', icon: Users },
@@ -20,11 +20,11 @@ const adminLinks: SidebarLink[] = [
   { label: 'Permissions', href: '/admin/permissions', icon: Sliders },
   { label: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/admin/timetable', icon: ClipboardList },
-  { label: 'Timetable Auto', href: '/admin/timetable/auto', icon: Wand2 },
+  { label: 'Timetable Auto', href: '/admin/timetable/auto', icon: ClipboardList },
   { label: 'Fees & Finance', href: '/admin/fees', icon: CreditCard },
   { label: 'Fee Escalation', href: '/admin/fees/escalation', icon: AlertTriangle },
   { label: 'Exams & Results', href: '/admin/exams', icon: FileText },
-  { label: 'Exam Seating', href: '/admin/exam/seating', icon: Armchair },
+  { label: 'Exam Seating', href: '/admin/exam/seating', icon: ClipboardList },
   { label: 'Exam Enrollment', href: '/admin/exam/enrollment', icon: ClipboardList },
   { label: 'Academic Calendar', href: '/admin/calendar', icon: Calendar },
   { label: 'Defaulter Report', href: '/admin/reports/defaulters', icon: BarChart3 },
@@ -32,10 +32,10 @@ const adminLinks: SidebarLink[] = [
   { label: 'Hostel', href: '/admin/hostel', icon: Home },
   { label: 'Pending Complaints', href: '/admin/complaints', icon: AlertTriangle },
   { label: 'Library', href: '/admin/library/bookclubs', icon: BookOpen },
-  { label: 'Placements', href: '/admin/placements', icon: Briefcase },
-  { label: 'HR Management', href: '/admin/hr', icon: HeartPulse },
+  { label: 'Placements', href: '/admin/placements', icon: ClipboardList },
+  { label: 'HR Management', href: '/admin/hr', icon: ClipboardList },
   { label: 'Smart Gate', href: '/admin/gate', icon: Shield },
-  { label: 'FitZone Gym', href: '/admin/gym', icon: Dumbbell },
+  { label: 'FitZone Gym', href: '/admin/gym', icon: ClipboardList },
   { label: 'Transit', href: '/admin/transit', icon: Bus },
   { label: 'Events', href: '/admin/events', icon: Award },
   { label: 'Lost & Found', href: '/admin/lost-found', icon: Package },
@@ -53,6 +53,36 @@ const adminLinks: SidebarLink[] = [
   { label: 'WhatsApp API', href: '/admin/whatsapp', icon: MessageSquare },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
   { label: 'Payment Settings', href: '/admin/payment-settings', icon: CreditCard },
+  { label: 'Settings', href: '/admin/settings', icon: Settings },
+  { label: 'Profile', href: '/profile', icon: UserCircle },
+];
+
+const schoolAdminLinks: SidebarLink[] = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+  { label: 'Students', href: '/admin/students', icon: GraduationCap },
+  { label: 'Teachers & Staff', href: '/admin/users', icon: Users },
+  { label: 'Classes & Sections', href: '/admin/classes', icon: School },
+  { label: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
+  { label: 'Timetable', href: '/admin/timetable', icon: ClipboardList },
+  { label: 'Fees & Finance', href: '/admin/fees', icon: CreditCard },
+  { label: 'Scholarships', href: '/admin/fees/scholarships', icon: Award },
+  { label: 'Exams & Results', href: '/admin/exams', icon: FileText },
+  { label: 'Academic Calendar', href: '/admin/calendar', icon: Calendar },
+  { label: 'Admissions', href: '/admin/admissions', icon: UserCheck },
+  { label: 'Canteen & Meals', href: '/admin/canteen', icon: UtensilsCrossed },
+  { label: 'Library', href: '/admin/library/bookclubs', icon: BookMarked },
+  { label: 'Transit & Buses', href: '/admin/transit', icon: Bus },
+  { label: 'Gate & Security', href: '/admin/gate', icon: Shield },
+  { label: 'Hostel', href: '/admin/hostel', icon: BedDouble },
+  { label: 'Events', href: '/admin/events', icon: Award },
+  { label: 'Notices', href: '/admin/notices', icon: Bell },
+  { label: 'Complaints', href: '/admin/complaints', icon: AlertTriangle },
+  { label: 'Lost & Found', href: '/admin/lost-found', icon: Package },
+  { label: 'ID Cards', href: '/admin/idcards', icon: Users },
+  { label: 'AI Concierge', href: '/admin/ai', icon: BrainCircuit, badge: 'AI' },
+  { label: 'WhatsApp API', href: '/admin/whatsapp', icon: MessageSquare },
+  { label: 'Notifications', href: '/admin/notifications', icon: Bell },
+  { label: 'Permissions', href: '/admin/permissions', icon: Sliders },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
   { label: 'Profile', href: '/profile', icon: UserCircle },
 ];
@@ -78,7 +108,7 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
 const ALLOWED_ADMIN_ROLES = new Set(['SuperAdmin', 'Admin']);
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
-  const [links, setLinks] = useState<SidebarLink[]>(adminLinks);
+  const [links, setLinks] = useState<SidebarLink[]>(collegeAdminLinks);
   const [userRole, setUserRole] = useState<string>('');
   const [instituteType, setInstituteType] = useState<string>('college');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -95,22 +125,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         { label: 'Global Console', href: '/admin/global', icon: Shield },
         { label: 'Profile', href: '/profile', icon: UserCircle },
       ]);
+    } else if (instType === 'school') {
+      setLinks(schoolAdminLinks);
     } else {
-      let filteredLinks = adminLinks.filter(l => l.href !== '/admin/settings');
-      if (instType === 'school') {
-        filteredLinks = filteredLinks.filter(l => 
-          l.label !== 'OBE Maps' && 
-          l.label !== 'NAAC Scorecard' && 
-          l.label !== 'Placements' && 
-          l.label !== 'Faculty Dev'
-        );
-      }
-      setLinks(filteredLinks);
+      setLinks(collegeAdminLinks.filter(l => l.href !== '/admin/settings'));
     }
   };
 
   useEffect(() => {
-    // Instant redirect if no token — avoids stuck "Checking access..." after sign out
     const token = localStorage.getItem('iris_jwt_token');
     if (!token) {
       window.location.href = '/login';
@@ -165,7 +187,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 3-second safety timeout — redirect to login if auth never resolves
     redirectTimeout = setTimeout(() => {
       if (authorizedRef.current !== true) {
         window.location.href = '/login';

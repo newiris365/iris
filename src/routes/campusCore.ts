@@ -84,8 +84,6 @@ import {
   getLostFoundItems,
   createLostFoundItem,
   claimLostFoundItem,
-  generateParentOtp,
-  verifyParentOtp,
   linkParentToChild,
   getNoticeReadStats,
   getAssignments,
@@ -102,6 +100,8 @@ import {
   getMyBusETA,
   getParentChildInfo,
   getParentDailySummary,
+  getParentFeeSummary,
+  getParentWallet,
   parentTopupWallet,
   getParentNotifications,
   markParentNotificationRead,
@@ -109,6 +109,8 @@ import {
   getChildBusStatus,
   preauthorizeVisitor,
   getParentVisitorPreauths,
+  parentApplyLeave,
+  getParentLeaveList,
   getCiaAssessments,
   createCiaAssessment,
   getCiaMarks,
@@ -118,6 +120,7 @@ import {
   approveLeaveFaculty,
   rejectLeaveFaculty,
   getTeacherTimetable,
+  getFacultyStudents,
   getAdmissions,
   createAdmission,
   updateAdmissionStatus,
@@ -226,8 +229,6 @@ router.use('/leaves', requireFeature('students'));
 router.use('/wallet', requireFeature('fees'));
 router.use('/transit', requireFeature('transit'));
 router.use('/parent', requireFeature('parent_portal'));
-router.use('/parent-otp', requireFeature('parent_portal'));
-router.use('/parent-verify-otp', requireFeature('parent_portal'));
 router.use('/parent-link-child', requireFeature('parent_portal'));
 router.use('/admissions', requireFeature('admissions'));
 router.use('/calendar', requireFeature('timetable'));
@@ -396,10 +397,8 @@ router.post('/lost-found', requireRole(['Admin', 'SuperAdmin', 'Security']), cre
 router.post('/lost-found/:id/claim', requireRole(['Student']), claimLostFoundItem);
 
 // =========================================================================
-// 14. PARENT LINK ROUTERS
+// 14. PARENT LINK ROUTER
 // =========================================================================
-router.post('/parent-otp', generateParentOtp);
-router.post('/parent-verify-otp', verifyParentOtp);
 router.post('/parent-link-child', requireRole(['Parent']), linkParentToChild);
 
 // =========================================================================
@@ -443,6 +442,8 @@ router.get('/transit/eta', requireRole(['Student']), getMyBusETA);
 // =========================================================================
 router.get('/parent/child-info', requireRole(['Parent']), getParentChildInfo);
 router.get('/parent/daily-summary', requireRole(['Parent']), getParentDailySummary);
+router.get('/parent/fee-summary', requireRole(['Parent']), getParentFeeSummary);
+router.get('/parent/wallet', requireRole(['Parent']), getParentWallet);
 router.post('/parent/wallet/topup', requireRole(['Parent']), parentTopupWallet);
 router.get('/parent/notifications', requireRole(['Parent']), getParentNotifications);
 router.put('/parent/notifications/:id/read', requireRole(['Parent']), markParentNotificationRead);
@@ -450,6 +451,8 @@ router.get('/parent/notifications/unread-count', requireRole(['Parent']), getPar
 router.get('/parent/child/bus-status', requireRole(['Parent']), getChildBusStatus);
 router.post('/parent/visitor/preauthorize', requireRole(['Parent']), preauthorizeVisitor);
 router.get('/parent/visitor/preauths', requireRole(['Parent']), getParentVisitorPreauths);
+router.post('/parent/leave/apply', requireRole(['Parent']), parentApplyLeave);
+router.get('/parent/leave/list', requireRole(['Parent']), getParentLeaveList);
 
 // =========================================================================
 // 22. FACULTY MODULE ROUTERS
@@ -464,6 +467,7 @@ router.get('/faculty/leaves/pending', requireRole(['Teacher', 'Staff', 'Admin', 
 router.put('/faculty/leaves/:id/approve', requireRole(['Teacher', 'Staff', 'Admin', 'SuperAdmin']), approveLeaveFaculty);
 router.put('/faculty/leaves/:id/reject', requireRole(['Teacher', 'Staff', 'Admin', 'SuperAdmin']), rejectLeaveFaculty);
 router.get('/faculty/timetable', requireRole(['Teacher', 'Staff']), getTeacherTimetable);
+router.get('/faculty/students', requireRole(['Teacher', 'Staff', 'HOD', 'Admin', 'SuperAdmin']), getFacultyStudents);
 
 // =========================================================================
 // 23. ADMISSION WORKFLOW ROUTERS
@@ -477,10 +481,10 @@ router.post('/admissions/bulk', requireRole(['Admin', 'SuperAdmin']), bulkAdmitS
 // =========================================================================
 // 24. TIMETABLE AUTO-GENERATION ROUTERS
 // =========================================================================
-router.post('/timetable/detect-conflicts', requireRole(['Admin', 'SuperAdmin']), detectTimetableConflicts);
-router.post('/timetable/auto-generate', requireRole(['Admin', 'SuperAdmin']), autoGenerateTimetable);
-router.get('/timetable/constraints', requireRole(['Admin', 'SuperAdmin']), getTimetableConstraints);
-router.post('/timetable/constraints', requireRole(['Admin', 'SuperAdmin']), createTimetableConstraint);
+router.post('/timetable/detect-conflicts', requireRole(['Admin', 'SuperAdmin', 'HOD']), detectTimetableConflicts);
+router.post('/timetable/auto-generate', requireRole(['Admin', 'SuperAdmin', 'HOD']), autoGenerateTimetable);
+router.get('/timetable/constraints', requireRole(['Admin', 'SuperAdmin', 'HOD']), getTimetableConstraints);
+router.post('/timetable/constraints', requireRole(['Admin', 'SuperAdmin', 'HOD']), createTimetableConstraint);
 
 // =========================================================================
 // 25. CONSOLIDATED DEFAULTER REPORT

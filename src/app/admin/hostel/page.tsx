@@ -252,7 +252,7 @@ export default function AdminHostelOverview() {
       {/* Hero Header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#6C2BD9]/20 via-[#0D0A1A] to-[#0D0A1A]" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         
         <div className="relative max-w-7xl mx-auto px-6 pt-10 pb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

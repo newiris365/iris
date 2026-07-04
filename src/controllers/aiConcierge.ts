@@ -124,10 +124,8 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
       const { count: studentCount } = await supabaseAdmin
         .from('students')
         .select('*', { count: 'exact', head: true });
-      ctx.total_students = studentCount || 2450;
-    } catch {
-      ctx.total_students = 2450;
-    }
+      ctx.total_students = studentCount;
+    } catch {}
 
     try {
       const { data: payments } = await supabaseAdmin
@@ -135,33 +133,27 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
         .select('amount_paid')
         .eq('status', 'Completed');
       const total = payments?.reduce((sum, p) => sum + Number(p.amount_paid), 0) || 0;
-      ctx.total_revenue = total || 12450000;
-    } catch {
-      ctx.total_revenue = 12450000;
-    }
+      ctx.total_revenue = total || null;
+    } catch {}
 
     try {
       const { count: campusCount } = await supabaseAdmin
         .from('institutions')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true);
-      ctx.total_campuses = campusCount ?? 0;
-    } catch {
-      ctx.total_campuses = 0;
-    }
+      ctx.total_campuses = campusCount;
+    } catch {}
   }
 
   // ── ADMIN ────────────────────────────────────────────────────────────────
-  else if (roleLower === 'admin') {
+  else if (roleLower === 'admin' || roleLower === 'principal') {
     try {
       const { count: studentCount } = await supabaseAdmin
         .from('students')
         .select('*', { count: 'exact', head: true })
         .eq('institution_id', institutionId);
-      ctx.campus_students = studentCount || 1280;
-    } catch {
-      ctx.campus_students = 1280;
-    }
+      ctx.campus_students = studentCount;
+    } catch {}
 
     try {
       const { count: staffCount } = await supabaseAdmin
@@ -169,25 +161,20 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
         .select('*', { count: 'exact', head: true })
         .eq('institution_id', institutionId)
         .not('role', 'in', '("Student","Parent")');
-      ctx.campus_staff = staffCount || 124;
-    } catch {
-      ctx.campus_staff = 124;
-    }
+      ctx.campus_staff = staffCount;
+    } catch {}
 
     try {
       const { data: logs } = await supabaseAdmin
         .from('attendance')
         .select('status')
+        .eq('institution_id', institutionId)
         .limit(1000);
       if (logs && logs.length > 0) {
         const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
         ctx.campus_attendance_rate = Math.round((present / logs.length) * 100);
-      } else {
-        ctx.campus_attendance_rate = 88;
       }
-    } catch {
-      ctx.campus_attendance_rate = 88;
-    }
+    } catch {}
 
     try {
       const { data: payments } = await supabaseAdmin
@@ -196,10 +183,17 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
         .eq('institution_id', institutionId)
         .eq('status', 'Completed');
       const total = payments?.reduce((sum, p) => sum + Number(p.amount_paid), 0) || 0;
-      ctx.campus_fee_collection = total || 4850000;
-    } catch {
-      ctx.campus_fee_collection = 4850000;
-    }
+      ctx.campus_fee_collection = total || null;
+    } catch {}
+
+    try {
+      const { count: pendingLeaves } = await supabaseAdmin
+        .from('leave_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('institution_id', institutionId)
+        .eq('status', 'Pending');
+      ctx.pending_leaves = pendingLeaves;
+    } catch {}
   }
 
   // ── STUDENT ──────────────────────────────────────────────────────────────
@@ -211,7 +205,6 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
       .maybeSingle();
 
     const studentId = student?.id;
-    let attendanceRate = 85;
     if (studentId) {
       try {
         const { data: logs } = await supabaseAdmin
@@ -220,14 +213,10 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
           .eq('student_id', studentId);
         if (logs && logs.length > 0) {
           const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
-          attendanceRate = Math.round((present / logs.length) * 100);
+          ctx.attendance = Math.round((present / logs.length) * 100);
         }
       } catch {}
-    }
-    ctx.attendance = attendanceRate;
 
-    let pendingFees = 0;
-    if (studentId) {
       try {
         const { data: payments } = await supabaseAdmin
           .from('fee_payments')
@@ -241,42 +230,31 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
           .eq('institution_id', institutionId)
           .maybeSingle();
         
-        const target = structure?.amount ? Number(structure.amount) : 15000;
-        pendingFees = Math.max(0, target - totalPaid);
+        const target = structure?.amount ? Number(structure.amount) : 0;
+        ctx.pending_fees = Math.max(0, target - totalPaid);
       } catch {}
-    }
-    ctx.pending_fees = pendingFees;
 
-    let classes: string[] = [];
-    if (student?.department_id) {
       try {
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const today = dayNames[new Date().getDay()];
         const { data: sessions } = await supabaseAdmin
           .from('timetable')
           .select('subject, time_slot')
-          .eq('department_id', student.department_id)
+          .eq('department_id', student?.department_id)
           .eq('day_of_week', today);
         
-        classes = (sessions || []).map((s: any) => `${s.subject} (${s.time_slot})`);
+        ctx.timetable = (sessions || []).map((s: any) => `${s.subject} (${s.time_slot})`);
       } catch {}
-    }
-    ctx.timetable = classes.length > 0 ? classes : ['CS402 Systems Engineering (09:00 AM)', 'CS405 Lab (11:00 AM)'];
 
-    let walletBalance = 350;
-    if (studentId) {
       try {
         const { data: wallet } = await supabaseAdmin
           .from('canteen_wallets')
           .select('balance')
           .eq('student_id', studentId)
           .maybeSingle();
-        if (wallet) walletBalance = wallet.balance;
+        if (wallet) ctx.canteen_wallet = wallet.balance;
       } catch {}
-    }
 
-    let hostelRoom = 'None';
-    if (studentId) {
       try {
         const { data: alloc } = await supabaseAdmin
           .from('hostel_allocations')
@@ -285,57 +263,43 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
           .eq('is_current', true)
           .maybeSingle();
         if (alloc && alloc.hostel_rooms) {
-          hostelRoom = (alloc.hostel_rooms as any).room_number;
+          ctx.hostel_room = (alloc.hostel_rooms as any).room_number;
         }
       } catch {}
     }
-    ctx.hostel_room = hostelRoom;
-    ctx.subscription_status = {
-      transit: 'Active (Route 4)',
-      gym: 'None',
-      library: '2 books issued',
-      canteen_wallet: walletBalance,
-      courses: 'CS402, CS405, CS409'
-    };
   }
 
   // ── HOD ─────────────────────────────────────────────────────────────────
   else if (roleLower === 'hod') {
-    const deptId = user?.department_id || 'd0000000-0000-0000-0000-000000000001';
-    try {
-      const { count } = await supabaseAdmin
-        .from('students')
-        .select('*', { count: 'exact', head: true })
-        .eq('department_id', deptId);
-      ctx.dept_students = count || 120;
-    } catch {
-      ctx.dept_students = 120;
-    }
+    const deptId = user?.department_id;
+    if (deptId) {
+      try {
+        const { count } = await supabaseAdmin
+          .from('students')
+          .select('*', { count: 'exact', head: true })
+          .eq('department_id', deptId);
+        ctx.dept_students = count;
+      } catch {}
 
-    try {
-      const { data: logs } = await supabaseAdmin
-        .from('attendance')
-        .select('status, students!inner(department_id)')
-        .eq('students.department_id', deptId);
-      if (logs && logs.length > 0) {
-        const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
-        ctx.dept_attendance = Math.round((present / logs.length) * 100);
-      } else {
-        ctx.dept_attendance = 86;
-      }
-    } catch {
-      ctx.dept_attendance = 86;
-    }
+      try {
+        const { data: logs } = await supabaseAdmin
+          .from('attendance')
+          .select('status, students!inner(department_id)')
+          .eq('students.department_id', deptId);
+        if (logs && logs.length > 0) {
+          const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
+          ctx.dept_attendance = Math.round((present / logs.length) * 100);
+        }
+      } catch {}
 
-    try {
-      const { count } = await supabaseAdmin
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .eq('department_id', deptId)
-        .eq('role', 'Teacher');
-      ctx.dept_faculty = count || 12;
-    } catch {
-      ctx.dept_faculty = 12;
+      try {
+        const { count } = await supabaseAdmin
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('department_id', deptId)
+          .eq('role', 'Teacher');
+        ctx.dept_faculty = count;
+      } catch {}
     }
   }
 
@@ -350,10 +314,14 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
         .limit(3);
       ctx.my_classes = (sched || []).map((s: any) => `${s.subject} (${s.time_slot})`);
     } catch {}
-    if (!ctx.my_classes || ctx.my_classes.length === 0) {
-      ctx.my_classes = ['CS301 Algorithms (10:00 AM)', 'CS302 Labs (02:00 PM)'];
-    }
-    ctx.my_students_count = 65;
+
+    try {
+      const { count } = await supabaseAdmin
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('institution_id', institutionId);
+      ctx.my_students_count = count;
+    } catch {}
   }
 
   // ── WARDEN ───────────────────────────────────────────────────────────────
@@ -362,45 +330,41 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
       const { data: rooms } = await supabaseAdmin
         .from('hostel_rooms')
         .select('is_active');
-      const total = rooms?.length || 150;
-      const occupied = rooms?.filter((r: any) => !r.is_active).length || 128;
-      ctx.room_occupancy = `${occupied}/${total} Rooms (85% occupied)`;
-    } catch {
-      ctx.room_occupancy = '128/150 Rooms (85% occupied)';
-    }
-
-    ctx.mess_notices = ['Dinner timing: 7:30 PM - 9:30 PM', 'Special Sunday Lunch: Paneer Butter Masala'];
+      if (rooms && rooms.length > 0) {
+        const total = rooms.length;
+        const occupied = rooms.filter((r: any) => !r.is_active).length;
+        ctx.room_occupancy = `${occupied}/${total} Rooms (${Math.round((occupied/total)*100)}% occupied)`;
+      }
+    } catch {}
 
     try {
       const { count } = await supabaseAdmin
         .from('hostel_complaints')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'Pending');
-      ctx.pending_complaints = count || 4;
-    } catch {
-      ctx.pending_complaints = 4;
-    }
+      ctx.pending_complaints = count;
+    } catch {}
   }
 
   // ── SECURITY ─────────────────────────────────────────────────────────────
   else if (roleLower === 'security' || roleLower === 'gatesecurity') {
     try {
+      const today = new Date().toISOString().split('T')[0];
       const { count } = await supabaseAdmin
         .from('visitor_logs')
-        .select('*', { count: 'exact', head: true });
-      ctx.visitor_logs_today = count || 8;
-    } catch {
-      ctx.visitor_logs_today = 8;
-    }
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today);
+      ctx.visitor_logs_today = count;
+    } catch {}
 
     try {
+      const today = new Date().toISOString().split('T')[0];
       const { count } = await supabaseAdmin
         .from('gate_logs')
-        .select('*', { count: 'exact', head: true });
-      ctx.rfid_scans_today = count || 342;
-    } catch {
-      ctx.rfid_scans_today = 342;
-    }
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today);
+      ctx.rfid_scans_today = count;
+    } catch {}
   }
 
   // ── LIBRARIAN ────────────────────────────────────────────────────────────
@@ -409,22 +373,16 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
       const { count } = await supabaseAdmin
         .from('books')
         .select('*', { count: 'exact', head: true });
-      ctx.book_inventory = count || 12450;
-    } catch {
-      ctx.book_inventory = 12450;
-    }
+      ctx.book_inventory = count;
+    } catch {}
 
     try {
       const { count } = await supabaseAdmin
         .from('book_issues')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'Issued');
-      ctx.pending_returns = count || 23;
-    } catch {
-      ctx.pending_returns = 23;
-    }
-
-    ctx.library_hours = '9 AM - 8 PM (Monday - Saturday)';
+      ctx.pending_returns = count;
+    } catch {}
   }
 
   // ── PARENT ───────────────────────────────────────────────────────────────
@@ -439,6 +397,7 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
       const { data: child } = await studentQuery.limit(1).maybeSingle();
       if (child) {
         ctx.child_name = child.users?.name || child.roll_number;
+
         const { data: logs } = await supabaseAdmin
           .from('attendance')
           .select('status')
@@ -446,8 +405,6 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
         if (logs && logs.length > 0) {
           const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
           ctx.child_attendance = Math.round((present / logs.length) * 100);
-        } else {
-          ctx.child_attendance = 84;
         }
 
         const { data: payments } = await supabaseAdmin
@@ -460,43 +417,39 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
           .select('amount')
           .eq('institution_id', institutionId)
           .maybeSingle();
-        const target = structure?.amount ? Number(structure.amount) : 15000;
+        const target = structure?.amount ? Number(structure.amount) : 0;
         ctx.child_fees = Math.max(0, target - totalPaid);
       }
     } catch {}
-    if (!ctx.child_name) ctx.child_name = 'Aarav Sharma';
-    if (!ctx.child_attendance) ctx.child_attendance = 84;
-    if (!ctx.child_fees) ctx.child_fees = 3200;
-    ctx.transport_status = 'On Route - Passing Sector 5 (ETA 12 mins)';
   }
 
   // ── DRIVER ───────────────────────────────────────────────────────────────
   else if (roleLower === 'driver') {
-    ctx.today_route = 'Route 4 (Vardan Nagar to Campus)';
-    ctx.bus_schedule = 'First Trip: 08:00 AM, Return Trip: 04:30 PM';
-    ctx.passenger_count = 38;
+    ctx.today_route = 'No route assigned today';
+    ctx.bus_schedule = 'Check with transport admin';
   }
 
   // ── VENDOR / CANTEEN ─────────────────────────────────────────────────────
   else if (roleLower === 'vendor' || roleLower === 'canteenvendor') {
     try {
+      const today = new Date().toISOString().split('T')[0];
       const { count } = await supabaseAdmin
         .from('canteen_orders')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', new Date().toISOString().split('T')[0]);
-      ctx.orders_today = count || 42;
-    } catch {
-      ctx.orders_today = 42;
-    }
-    ctx.menu_items = ['Aloo Samosa', 'Masala Dosa', 'Paneer Roll', 'Cold Coffee'];
-    ctx.queue_status = 'Moderate (Est. wait time: 8-10 mins)';
+        .gte('created_at', today);
+      ctx.orders_today = count;
+    } catch {}
   }
 
   // ── STAFF ──────────────────────────────────────────────────────────────
   else if (roleLower === 'staff') {
-    ctx.announcements = ['Monthly Staff Review Meeting tomorrow at 3 PM', 'Submit AQAR data by Friday'];
-    ctx.my_tasks = ['Verify Admission Logs', 'Approve 3 Student Leave Requests'];
-    ctx.office_hours = '9:00 AM - 5:30 PM';
+    try {
+      const { count } = await supabaseAdmin
+        .from('leave_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Pending');
+      ctx.pending_leaves = count;
+    } catch {}
   }
 
   return ctx;

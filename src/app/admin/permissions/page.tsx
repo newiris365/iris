@@ -12,8 +12,18 @@ import {
 const ALL_ROLES = [
   'SuperAdmin', 'Admin', 'Director', 'Principal', 'HOD', 'Teacher', 'Staff',
   'Student', 'Parent', 'Warden', 'Security', 'Vendor', 'Driver',
-  'TPO', 'Librarian', 'Gym Trainer', 'IQAC Coordinator', 'Admissions Officer'
+  'TPO', 'Librarian', 'Gym Trainer', 'IQAC Coordinator', 'Admissions Officer',
+  'HR Admin', 'Company HR', 'Vice Principal', 'Applicant'
 ];
+
+const COLLEGE_ONLY_ROLES = new Set(['HOD', 'TPO', 'IQAC Coordinator']);
+
+function getVisibleRoles(instituteType: string) {
+  if (instituteType === 'school') {
+    return ALL_ROLES.filter(r => !COLLEGE_ONLY_ROLES.has(r));
+  }
+  return ALL_ROLES;
+}
 
 const ALL_MODULES = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -72,6 +82,7 @@ export default function AdminPermissionsPage() {
   const [hasExisting, setHasExisting] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [institutionId, setInstitutionId] = useState('');
+  const [instituteType, setInstituteType] = useState('college');
 
   useEffect(() => {
     const saved = localStorage.getItem('iris_user_profile');
@@ -79,6 +90,7 @@ export default function AdminPermissionsPage() {
       try {
         const p = JSON.parse(saved);
         setInstitutionId(p.institution_id || '');
+        setInstituteType(p.institute_type || 'college');
       } catch {}
     }
   }, []);
@@ -219,7 +231,7 @@ export default function AdminPermissionsPage() {
 
       {/* Role selector */}
       <div className="flex flex-wrap gap-2">
-        {ALL_ROLES.map(role => (
+        {getVisibleRoles(instituteType).map(role => (
           <button key={role} onClick={() => setSelectedRole(role)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               selectedRole === role

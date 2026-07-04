@@ -148,6 +148,25 @@ function generateDummyVector(): number[] {
   return Array.from({ length: 1536 }, () => parseFloat((Math.random() * 2 - 1).toFixed(4)));
 }
 
+// Helper to check if vector extension is available
+let vectorExtAvailable: boolean | null = null;
+async function checkVectorExtension(): Promise<boolean> {
+  if (vectorExtAvailable !== null) return vectorExtAvailable;
+  try {
+    const { error } = await supabaseAdmin.rpc('match_books', {
+      query_embedding: generateDummyVector(),
+      match_threshold: 0,
+      match_count: 1,
+      inst_id: '00000000-0000-0000-0000-000000000000'
+    });
+    // If error mentions "function match_books does not exist", vector isn't set up
+    vectorExtAvailable = !error || !error.message?.includes('does not exist');
+  } catch {
+    vectorExtAvailable = false;
+  }
+  return vectorExtAvailable;
+}
+
 // Helper to generate embedding using OpenAI (skips if key is dummy, returns dummy vector)
 async function getBookDescriptionEmbedding(description: string): Promise<number[]> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -188,8 +207,11 @@ export async function listBooks(req: Request, res: Response) {
     let query = supabaseAdmin
       .from('books')
       .select('*')
-      .eq('institution_id', institution_id)
       .order('title', { ascending: true });
+
+    if (institution_id) {
+      query = query.eq('institution_id', institution_id);
+    }
 
     if (category) {
       query = query.eq('category', category as string);
@@ -204,7 +226,7 @@ export async function listBooks(req: Request, res: Response) {
     let filtered = books || [];
     if (search) {
       const searchLower = (search as string).toLowerCase();
-      filtered = filtered.filter(b => 
+      filtered = filtered.filter(b =>
         b.title.toLowerCase().includes(searchLower) ||
         b.author.toLowerCase().includes(searchLower) ||
         (b.isbn && b.isbn.toLowerCase().includes(searchLower)) ||
@@ -213,8 +235,9 @@ export async function listBooks(req: Request, res: Response) {
     }
 
     return res.status(200).json({ success: true, books: filtered });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  } catch (err: any) {
+    console.error('[listBooks] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 
@@ -245,24 +268,63 @@ export async function getBook(req: Request, res: Response) {
 export async function createBook(req: Request, res: Response) {
   try {
     const parse = createBookSchema.safeParse(req.body);
-    if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
+    if (!parse.success) {
+      console.error('[createBook] Validation failed:', parse.error.errors);
+      return res.status(400).json({ success: false, error: parse.error.errors.map(e => e.message).join(', ') });
+    }
 
-    const embedding = await getBookDescriptionEmbedding(parse.data.description || parse.data.title);
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) {
+      return res.status(400).json({ success: false, error: 'No institution context. Please log in again.' });
+    }
 
-    const { data: book, error } = await supabaseAdmin
+    // Try to generate embedding, but don't fail if vector extension is missing
+    let embedding: number[] | undefined;
+    try {
+      const hasVector = await checkVectorExtension();
+      if (hasVector) {
+        embedding = await getBookDescriptionEmbedding(parse.data.description || parse.data.title);
+      }
+    } catch (e: any) {
+      console.warn('[createBook] Embedding generation skipped:', e.message);
+    }
+
+    const insertData: any = {
+      ...parse.data,
+      institution_id: institutionId,
+    };
+    if (embedding) insertData.embedding = embedding;
+
+    console.log('[createBook] Inserting book:', { title: parse.data.title, author: parse.data.author, institution_id: institutionId });
+
+    // First try with embedding, if it fails retry without
+    let { data: book, error } = await supabaseAdmin
       .from('books')
-      .insert({
-        ...parse.data,
-        institution_id: req.user?.institution_id,
-        embedding
-      })
+      .insert(insertData)
       .select()
       .single();
 
-    if (error) return res.status(500).json({ success: false, error: error.message });
+    // If embedding column doesn't exist, retry without it
+    if (error && error.message?.includes('embedding')) {
+      console.warn('[createBook] Embedding column issue, retrying without embedding');
+      delete insertData.embedding;
+      ({ data: book, error } = await supabaseAdmin
+        .from('books')
+        .insert(insertData)
+        .select()
+        .single());
+    }
+
+    if (error) {
+      console.error('[createBook] Supabase insert error:', error.message, error.details, error.hint);
+      return res.status(500).json({ success: false, error: `Database error: ${error.message}` });
+    }
+
+    console.log('[createBook] Book created successfully:', book.id);
     return res.status(201).json({ success: true, book });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  } catch (err: any) {
+    console.error('[createBook] Unhandled error:', err.message, err.stack);
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 
@@ -272,10 +334,15 @@ export async function updateBook(req: Request, res: Response) {
     const parse = createBookSchema.partial().safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
 
-    let updateData = { ...parse.data };
+    let updateData: any = { ...parse.data };
     if (parse.data.description) {
-      const embedding = await getBookDescriptionEmbedding(parse.data.description);
-      updateData = { ...updateData, ...({ embedding } as any) };
+      try {
+        const hasVector = await checkVectorExtension();
+        if (hasVector) {
+          const embedding = await getBookDescriptionEmbedding(parse.data.description);
+          updateData.embedding = embedding;
+        }
+      } catch {}
     }
 
     const { data: book, error } = await supabaseAdmin
@@ -287,8 +354,9 @@ export async function updateBook(req: Request, res: Response) {
 
     if (error) return res.status(500).json({ success: false, error: error.message });
     return res.status(200).json({ success: true, book });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  } catch (err: any) {
+    console.error('[updateBook] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 
@@ -342,27 +410,76 @@ export async function lookupIsbn(req: Request, res: Response) {
 
 export async function importBooks(req: Request, res: Response) {
   try {
-    const { books } = req.body; // array of books
-    if (!Array.isArray(books)) return res.status(400).json({ success: false, error: 'Books list array is required.' });
-
-    const insertedBooks = [];
-    for (const b of books) {
-      const embedding = generateDummyVector();
-      const { data } = await supabaseAdmin
-        .from('books')
-        .insert({
-          ...b,
-          institution_id: req.user?.institution_id,
-          embedding
-        })
-        .select()
-        .single();
-      if (data) insertedBooks.push(data);
+    const { books } = req.body;
+    if (!Array.isArray(books) || books.length === 0) {
+      return res.status(400).json({ success: false, error: 'Books list array is required and must not be empty.' });
     }
 
-    return res.status(201).json({ success: true, count: insertedBooks.length, books: insertedBooks });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) {
+      return res.status(400).json({ success: false, error: 'No institution context.' });
+    }
+
+    console.log(`[importBooks] Importing ${books.length} books for institution ${institutionId}`);
+
+    const hasVector = await checkVectorExtension();
+    const insertedBooks = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < books.length; i++) {
+      const b = books[i];
+      if (!b.title || !b.author) {
+        errors.push(`Book ${i + 1}: title and author are required`);
+        continue;
+      }
+
+      const insertData: any = {
+        title: b.title,
+        author: b.author,
+        isbn: b.isbn || null,
+        publisher: b.publisher || null,
+        category: b.category || null,
+        copies_total: b.copies_total || 1,
+        copies_available: b.copies_available || 1,
+        shelf_location: b.shelf_location || null,
+        institution_id: institutionId,
+      };
+
+      // First try with embedding, if it fails try without
+      let { data, error } = await supabaseAdmin
+        .from('books')
+        .insert(hasVector ? { ...insertData, embedding: generateDummyVector() } : insertData)
+        .select()
+        .single();
+
+      // If embedding column doesn't exist, retry without it
+      if (error && error.message?.includes('embedding')) {
+        console.warn(`[importBooks] Embedding column issue, retrying without embedding for "${b.title}"`);
+        ({ data, error } = await supabaseAdmin
+          .from('books')
+          .insert(insertData)
+          .select()
+          .single());
+      }
+
+      if (data) insertedBooks.push(data);
+      if (error) {
+        console.error(`[importBooks] Insert error for book ${i + 1} "${b.title}":`, error.message, error.details);
+        errors.push(`Book "${b.title}": ${error.message}`);
+      }
+    }
+
+    console.log(`[importBooks] Result: ${insertedBooks.length} inserted, ${errors.length} errors`);
+
+    return res.status(201).json({
+      success: insertedBooks.length > 0,
+      count: insertedBooks.length,
+      books: insertedBooks,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (err: any) {
+    console.error('[importBooks] Unhandled error:', err.message, err.stack);
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 
@@ -1231,15 +1348,16 @@ export async function getOverviewStats(req: Request, res: Response) {
     const institution_id = req.user?.institution_id;
     const today = new Date().toISOString().split('T')[0];
 
-    // Counts check
+    let booksQuery = supabaseAdmin.from('books').select('id', { count: 'exact', head: true });
+    if (institution_id) booksQuery = booksQuery.eq('institution_id', institution_id);
+
     const [booksRes, activeRes, overdueRes, finesRes] = await Promise.all([
-      supabaseAdmin.from('books').select('*', { count: 'exact', head: true }).eq('institution_id', institution_id),
+      booksQuery,
       supabaseAdmin.from('book_issues').select('id', { count: 'exact', head: true }).eq('status', 'issued'),
       supabaseAdmin.from('book_issues').select('id', { count: 'exact', head: true }).eq('status', 'issued').lt('due_date', today),
       supabaseAdmin.from('library_fines').select('amount').eq('status', 'unpaid')
     ]);
 
-    // Aggregate values
     const pendingFinesTotal = (finesRes.data || []).reduce((acc, f) => acc + (parseFloat(f.amount as any) || 0), 0);
 
     return res.status(200).json({
@@ -1251,8 +1369,9 @@ export async function getOverviewStats(req: Request, res: Response) {
         pending_fines: pendingFinesTotal
       }
     });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Internal server error.' });
+  } catch (err: any) {
+    console.error('[getOverviewStats] Error:', err.message);
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error.' });
   }
 }
 

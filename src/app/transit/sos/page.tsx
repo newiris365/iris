@@ -108,7 +108,7 @@ GENERATED: ${new Date().toLocaleString()}
     );
   }
 
-  if (role && role !== 'Parent') {
+  if (!role || role !== 'Parent') {
     return (
       <main className="min-h-screen bg-[#0D0A1A] text-white p-6 flex items-center justify-center">
         <div className="max-w-md w-full rounded-3xl border border-white/5 bg-[#13102A]/85 backdrop-blur-md p-8 text-center flex flex-col items-center gap-4">

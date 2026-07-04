@@ -68,7 +68,7 @@ export default function EmployeeSelfAppraisal() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Self-appraisal submitted successfully to HOD review queue.');
+        alert('Self-appraisal submitted successfully to Vice Principal review queue.');
         setComments('');
       }
     } catch (err) {
@@ -171,7 +171,7 @@ export default function EmployeeSelfAppraisal() {
           <div className="glass-panel border border-[#6C2BD9]/25 rounded-2xl p-5 bg-[#13102A]/20 flex flex-col gap-4 text-xs">
             <h3 className="font-extrabold text-sm text-white">Appraisal Policy Rules</h3>
             <p className="text-[#C4B5FD]/75 leading-normal">
-              Appraisals are scored on parameters matching Teaching Quality, Publications, and Campus Supports. Ratings will be reviewed by your Head of Department (HOD) and finalized by the Principal.
+              Appraisals are scored on parameters matching Teaching Quality, Publications, and Campus Supports. Ratings will be reviewed by your Vice Principal and finalized by the Principal.
             </p>
           </div>
         </div>

@@ -31,6 +31,8 @@ import permissionsRouter from './routes/permissions';
 import grievancesRouter from './routes/grievances';
 import attendanceEngineRouter from './services/attendanceEngine/routes';
 import notificationsRouter from './routes/notifications';
+import schoolRouter from './routes/school';
+import { ensureClassSectionsTable, ensureAllSchemaTables } from './controllers/school';
 import { initGateHardware } from './services/gateHardware';
 import { authMiddleware } from './middleware/auth';
 import { requireFeature } from './middleware/permissions';
@@ -175,10 +177,51 @@ eventsNs.on('connection', (socket) => {
 if (process.env.NODE_ENV !== 'test') {
   setInterval(async () => {
     try {
+      const today = new Date().toISOString().split('T')[0];
+      const institutionId = 'a0000000-0000-0000-0000-000000000001';
+
+      // Query real data from database
+      let attendanceRate = 0;
+      let feeCollectedToday = 0;
+      let studentsOnCampus = 0;
+
+      try {
+        const { data: attSummary } = await supabaseAdmin
+          .from('daily_attendance_summary')
+          .select('attendance_percent')
+          .eq('institution_id', institutionId)
+          .eq('date', today);
+        if (attSummary && attSummary.length > 0) {
+          const sum = attSummary.reduce((acc: number, curr: any) => acc + parseFloat(curr.attendance_percent), 0);
+          attendanceRate = Math.round(sum / attSummary.length);
+        }
+      } catch {}
+
+      try {
+        const { data: fees } = await supabaseAdmin
+          .from('daily_fee_summary')
+          .select('total_collected')
+          .eq('institution_id', institutionId)
+          .eq('date', today)
+          .maybeSingle();
+        if (fees) feeCollectedToday = parseFloat(fees.total_collected);
+      } catch {}
+
+      try {
+        const { data: occupancy } = await supabaseAdmin
+          .from('campus_occupancy')
+          .select('students_inside')
+          .eq('institution_id', institutionId)
+          .order('timestamp', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (occupancy) studentsOnCampus = occupancy.students_inside;
+      } catch {}
+
       directorNs.to('director:dashboard').emit('director:kpis_updated', {
-        attendance_rate: 80 + Math.floor(Math.random() * 12),
-        fee_collected_today: 185000 + Math.floor(Math.random() * 15000),
-        students_on_campus: 40 + Math.floor(Math.random() * 20),
+        attendance_rate: attendanceRate,
+        fee_collected_today: feeCollectedToday,
+        students_on_campus: studentsOnCampus,
         timestamp: new Date().toISOString()
       });
     } catch (err) {
@@ -297,6 +340,7 @@ app.use('/api/v1/transit', authMiddleware, requireFeature('transit'), transitRou
 app.use('/api/v1/director', authMiddleware, requireFeature('director'), directorRouter);
 app.use('/api/v1/ai', authMiddleware, requireFeature('ai_concierge'), aiConciergeRouter);
 app.use('/api/library', authMiddleware, requireFeature('library'), libraryRouter);
+app.use('/api/v1/library', authMiddleware, requireFeature('library'), libraryRouter);
 app.use('/api/gate', authMiddleware, requireFeature('gate'), gateRouter);
 app.use('/api/v1/gate', authMiddleware, requireFeature('gate'), gateRouter);
 app.use('/api/parent', authMiddleware, requireFeature('parent_portal'), parentRouter);
@@ -316,6 +360,8 @@ app.use('/api/grievances', grievancesRouter);
 app.use('/api/v1/grievances', grievancesRouter);
 app.use('/api/v1/attendance-engine', attendanceEngineRouter);
 app.use('/api/v1/notifications', requireSupabaseOnline, notificationsRouter);
+app.use('/api/v1/school', requireSupabaseOnline, schoolRouter);
+app.use('/api/school', requireSupabaseOnline, schoolRouter);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {
@@ -371,6 +417,15 @@ if (process.env.NODE_ENV !== 'test') {
         logger.error('Failed to initialize gate hardware integrations:', err);
       }
     }, 3000);
+
+    // Auto-create missing database tables (class_sections, ptm_slots, etc.)
+    setTimeout(async () => {
+      try {
+        await ensureAllSchemaTables();
+      } catch (err) {
+        logger.error('Schema auto-creation failed:', err);
+      }
+    }, 5000);
   });
 }
 

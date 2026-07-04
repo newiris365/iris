@@ -8,12 +8,13 @@ const ALL_ROLES = [
   'TPO', 'Librarian', 'Gym Trainer', 'IQAC Coordinator', 'Admissions Officer', 'Principal'
 ] as const;
 
+const COLLEGE_ONLY_ROLES = new Set(['HOD', 'TPO', 'IQAC Coordinator']);
+
 const createUserSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   email: z.string().email('Valid email required'),
   phone: z.string().optional(),
   role: z.enum(ALL_ROLES),
-  department_id: z.string().uuid().optional(),
   employee_id: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
@@ -22,7 +23,6 @@ const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
   phone: z.string().optional(),
   role: z.enum(ALL_ROLES).optional(),
-  department_id: z.string().uuid().optional().nullable(),
   employee_id: z.string().optional().nullable(),
   is_active: z.boolean().optional(),
 });
@@ -31,30 +31,32 @@ const updateUserSchema = z.object({
 
 export async function listUsers(req: Request, res: Response) {
   try {
-    const { role, department_id, search, is_active, page = '1', limit = '50' } = req.query;
+    const { role, search, is_active, page = '1', limit = '50' } = req.query;
     const institution_id = req.user?.institution_id;
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
+    const pageNum = Math.max(1, parseInt(page as string));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit as string)));
+
     let query = supabaseAdmin
       .from('users')
-      .select('id, name, email, phone, role, employee_id, is_active, department_id, last_login, created_at, departments(name)', { count: 'exact' })
-      .eq('institution_id', institution_id)
-      .order('created_at', { ascending: false });
+      .select('id, name, email, phone, role, employee_id, is_active, last_login, created_at')
+      .eq('institution_id', institution_id);
 
     if (role) query = query.eq('role', role);
-    if (department_id) query = query.eq('department_id', department_id);
-    if (is_active !== undefined) query = query.eq('is_active', is_active === 'true');
+    if (is_active !== undefined && is_active !== '') query = query.eq('is_active', is_active === 'true');
     if (search) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,employee_id.ilike.%${search}%`);
     }
 
-    const pageNum = Math.max(1, parseInt(page as string));
-    const limitNum = Math.min(200, Math.max(1, parseInt(limit as string)));
-    const from = (pageNum - 1) * limitNum;
-    const to = from + limitNum - 1;
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range((pageNum - 1) * limitNum, pageNum * limitNum - 1);
 
-    const { data, error, count } = await query.range(from, to);
-    if (error) throw error;
+    if (error) {
+      console.error('[listUsers] Query error:', error);
+      throw error;
+    }
 
     return res.json({
       success: true,
@@ -65,6 +67,7 @@ export async function listUsers(req: Request, res: Response) {
     });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[listUsers] Catch error:', errorMsg);
     return res.status(500).json({ success: false, error: errorMsg });
   }
 }
@@ -78,7 +81,7 @@ export async function getUserById(req: Request, res: Response) {
 
     const { data, error } = await supabaseAdmin
       .from('users')
-      .select('id, name, email, phone, role, employee_id, is_active, department_id, last_login, created_at, departments(name)')
+      .select('id, name, email, phone, role, employee_id, is_active, last_login, created_at')
       .eq('id', userId)
       .eq('institution_id', institution_id)
       .single();
@@ -98,11 +101,10 @@ export async function createUser(req: Request, res: Response) {
     const parse = createUserSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
 
-    const { name, email, phone, role, department_id, employee_id, password } = parse.data;
+    const { name, email, phone, role, employee_id, password } = parse.data;
     const institution_id = req.user?.institution_id;
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
-    // Check for duplicate email within institution
     const { data: existing } = await supabaseAdmin
       .from('users')
       .select('id')
@@ -114,7 +116,17 @@ export async function createUser(req: Request, res: Response) {
       return res.status(409).json({ success: false, error: 'A user with this email already exists in your institution.' });
     }
 
-    // Create Supabase auth user
+    if (COLLEGE_ONLY_ROLES.has(role as any)) {
+      const { data: inst } = await supabaseAdmin
+        .from('institutions')
+        .select('type')
+        .eq('id', institution_id)
+        .maybeSingle();
+      if (inst?.type === 'school') {
+        return res.status(400).json({ success: false, error: `Role "${role}" is not available for school-type institutions.` });
+      }
+    }
+
     const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -131,7 +143,6 @@ export async function createUser(req: Request, res: Response) {
       return res.status(500).json({ success: false, error: 'Auth user creation failed: No user ID returned.' });
     }
 
-    // Create user profile row
     const { data: user, error: uErr } = await supabaseAdmin
       .from('users')
       .insert({
@@ -141,7 +152,6 @@ export async function createUser(req: Request, res: Response) {
         email,
         phone: phone || null,
         role,
-        department_id: department_id || null,
         employee_id: employee_id || null,
         is_active: true,
       })
@@ -170,12 +180,21 @@ export async function updateUser(req: Request, res: Response) {
     const institution_id = req.user?.institution_id;
     const updates = parse.data;
 
-    // Remove undefined values
+    if (updates.role && COLLEGE_ONLY_ROLES.has(updates.role as any)) {
+      const { data: inst } = await supabaseAdmin
+        .from('institutions')
+        .select('type')
+        .eq('id', institution_id!)
+        .maybeSingle();
+      if (inst?.type === 'school') {
+        return res.status(400).json({ success: false, error: `Role "${updates.role}" is not available for school-type institutions.` });
+      }
+    }
+
     const cleanUpdates: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(updates)) {
       if (v !== undefined) cleanUpdates[k] = v;
     }
-    cleanUpdates.updated_at = new Date().toISOString();
 
     const { data, error } = await supabaseAdmin
       .from('users')
@@ -200,14 +219,13 @@ export async function deactivateUser(req: Request, res: Response) {
     const { userId } = req.params;
     const institution_id = req.user?.institution_id;
 
-    // Prevent self-deactivation
     if (userId === req.user?.id) {
       return res.status(400).json({ success: false, error: 'You cannot deactivate your own account.' });
     }
 
     const { data, error } = await supabaseAdmin
       .from('users')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({ is_active: false })
       .eq('id', userId)
       .eq('institution_id', institution_id)
       .select()
@@ -230,7 +248,7 @@ export async function reactivateUser(req: Request, res: Response) {
 
     const { data, error } = await supabaseAdmin
       .from('users')
-      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .update({ is_active: true })
       .eq('id', userId)
       .eq('institution_id', institution_id)
       .select()
@@ -256,7 +274,6 @@ export async function resetUserPassword(req: Request, res: Response) {
 
     const institution_id = req.user?.institution_id;
 
-    // Get user email
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('email')
@@ -266,7 +283,6 @@ export async function resetUserPassword(req: Request, res: Response) {
 
     if (!user) return res.status(404).json({ success: false, error: 'User not found.' });
 
-    // Update auth password
     const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
     if (authErr) {
       return res.status(500).json({ success: false, error: `Auth password update failed: ${authErr.message}` });

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, Clock, CreditCard, Coffee, LogIn, LogOut, Calendar, 
   CheckCircle, AlertTriangle, ShieldCheck, RefreshCw, MessageSquare,
-  Bus, Wallet, Bell, Link2, ChevronRight
+  Bus, Wallet, Bell, Link2, ChevronRight, TrendingUp, BookOpen, Award
 } from 'lucide-react';
 import Link from 'next/link';
 import { apiGet, apiPost } from '../../../lib/api';
@@ -21,6 +21,11 @@ export default function ParentDashboardPage() {
   const [topMethod, setTopMethod] = useState<'razorpay' | 'bank_transfer'>('razorpay');
   const [linkNeeded, setLinkNeeded] = useState(false);
 
+  // New state for exam data
+  const [exams, setExams] = useState<any[]>([]);
+  const [examResults, setExamResults] = useState<any[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+
   useEffect(() => { loadDashboard(); }, []);
 
   const loadDashboard = async () => {
@@ -36,6 +41,19 @@ export default function ParentDashboardPage() {
       if (childRes.success && childRes.child) {
         setChild(childRes.child);
         setLinkNeeded(false);
+
+        // Fetch exam data for this child's department
+        const examRes = await apiGet('/core/exams');
+        if (examRes.success && examRes.exams) {
+          setExams(examRes.exams);
+        }
+
+        // Fetch attendance history for progress graph
+        const attRes = await apiGet(`/core/attendance/student/${childRes.child.student_id}`);
+        if (attRes.success) {
+          setExamResults(attRes.results || []);
+          setAttendanceHistory(attRes.breakdown || []);
+        }
       } else {
         setLinkNeeded(true);
       }
@@ -117,6 +135,16 @@ export default function ParentDashboardPage() {
       setTopping(false);
     }
   };
+
+  // Calculate upcoming exams (future start_date)
+  const upcomingExams = exams.filter(e => new Date(e.start_date) >= new Date()).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()).slice(0, 5);
+
+  // Calculate last exam results for progress
+  const lastExam = examResults.length > 0 ? examResults[examResults.length - 1] : null;
+  const lastExamPct = lastExam ? Math.round((lastExam.marks_obtained / lastExam.max_marks) * 100) : null;
+
+  // Attendance trend data for sparkline
+  const attendanceTrend = attendanceHistory.map((m: any) => m.percentage || 0);
 
   if (loading) {
     return (
@@ -219,6 +247,104 @@ export default function ParentDashboardPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* Academic Progress & Exam Schedule Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Academic Progress Card */}
+        <div className="bg-[#13102A]/80 backdrop-blur-md rounded-2xl p-5 border border-[#6C2BD9]/30 flex flex-col gap-3">
+          <h4 className="font-bold text-xs uppercase text-[#A78BFA]/50 tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" /> Academic Progress
+          </h4>
+
+          {/* Last Exam Score */}
+          <div className="flex items-center gap-4 p-3 rounded-xl bg-[#0D0A1A]/60 border border-[#6C2BD9]/15">
+            <div className="w-14 h-14 rounded-full border-4 border-[#6C2BD9]/50 flex items-center justify-center bg-[#13102A] flex-shrink-0">
+              <div className="text-center">
+                <div className="text-lg font-bold text-white">{lastExamPct !== null ? `${lastExamPct}%` : '--'}</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">
+                {lastExam?.subject || 'Last Exam'}
+              </div>
+              <div className="text-[10px] text-[#C4B5FD]/50 mt-0.5">
+                {lastExam ? `${lastExam.marks_obtained}/${lastExam.max_marks} marks` : 'No exam results yet'}
+              </div>
+              {lastExamPct !== null && (
+                <div className={`text-[10px] font-bold mt-1 ${lastExamPct >= 75 ? 'text-emerald-400' : lastExamPct >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {lastExamPct >= 75 ? 'Above threshold' : lastExamPct >= 60 ? 'Needs improvement' : 'Critical - take action'}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Attendance Trend Mini Chart */}
+          {attendanceTrend.length > 0 && (
+            <div className="p-3 rounded-xl bg-[#0D0A1A]/60 border border-[#6C2BD9]/15">
+              <div className="text-[10px] text-[#A78BFA]/50 mb-2 font-semibold">Attendance Trend (Monthly %)</div>
+              <div className="flex items-end gap-1 h-12">
+                {attendanceTrend.slice(-8).map((val, idx) => (
+                  <div key={idx} className="flex-1 flex flex-col items-center gap-0.5">
+                    <div
+                      className={`w-full rounded-t ${val >= 75 ? 'bg-[#6C2BD9]' : 'bg-red-500'}`}
+                      style={{ height: `${Math.max((val / 100) * 40, 4)}px` }}
+                    />
+                    <span className="text-[7px] text-[#C4B5FD]/40">{val}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {examResults.length === 0 && attendanceHistory.length === 0 && (
+            <div className="text-center text-[10px] text-[#C4B5FD]/40 py-4">
+              No academic data available yet
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming Exams Card */}
+        <div className="bg-[#13102A]/80 backdrop-blur-md rounded-2xl p-5 border border-[#6C2BD9]/30 flex flex-col gap-3">
+          <h4 className="font-bold text-xs uppercase text-[#A78BFA]/50 tracking-wider flex items-center gap-2">
+            <BookOpen className="w-4 h-4" /> Upcoming Exams
+          </h4>
+
+          {upcomingExams.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+              <Award className="w-8 h-8 text-[#A78BFA]/20 mb-2" />
+              <div className="text-xs text-[#C4B5FD]/40">No upcoming exams scheduled</div>
+            </div>
+          ) : (
+            <div className="space-y-2 flex-1">
+              {upcomingExams.map((exam, idx) => {
+                const daysUntil = Math.ceil((new Date(exam.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                const isUrgent = daysUntil <= 7;
+                return (
+                  <div key={idx} className={`p-3 rounded-xl border flex justify-between items-center ${isUrgent ? 'bg-red-500/5 border-red-500/20' : 'bg-[#0D0A1A]/60 border-[#6C2BD9]/15'}`}>
+                    <div>
+                      <div className="text-xs font-bold text-white">{exam.name}</div>
+                      <div className="text-[10px] text-[#C4B5FD]/50 mt-0.5">
+                        {new Date(exam.start_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                        {exam.end_date && exam.end_date !== exam.start_date && 
+                          ` — ${new Date(exam.end_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`
+                        }
+                      </div>
+                      <div className="text-[9px] text-[#C4B5FD]/40 mt-0.5 capitalize">{exam.type || 'Exam'}</div>
+                    </div>
+                    <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${isUrgent ? 'bg-red-500/20 text-red-400' : 'bg-[#6C2BD9]/20 text-[#A78BFA]'}`}>
+                      {daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <Link href="/parent/timetable" className="text-[10px] text-[#A78BFA] flex items-center gap-1 hover:underline mt-auto pt-2 border-t border-white/5">
+            View full timetable <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
       </div>
 
       {/* Quick Actions */}

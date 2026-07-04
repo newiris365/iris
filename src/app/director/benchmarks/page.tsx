@@ -46,7 +46,7 @@ export default function CompetitorBenchmarksPage() {
     <main className="min-h-screen bg-[#0D0A1A] text-white pb-24 font-sans">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-white/5 bg-[#13102A]/40 backdrop-blur-md">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px]" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#8B5CF6]/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-7xl mx-auto px-6 py-6 flex items-center gap-2">
           <Link href="/director" className="text-[#C4B5FD]/70 hover:text-white transition-all">
             <ArrowLeft className="w-4.5 h-4.5" />

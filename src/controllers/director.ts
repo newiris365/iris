@@ -36,7 +36,7 @@ export async function getOverview(req: Request, res: Response) {
     const today = new Date().toISOString().split('T')[0];
 
     // Today's Attendance %
-    let attendanceRate = 82; // Sandbox default fallback
+    let attendanceRate = 0;
     try {
       const { data: attSummary } = await supabaseAdmin
         .from('daily_attendance_summary')
@@ -53,7 +53,7 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     // Fee Collected Today
-    let feeCollectedToday = 185000;
+    let feeCollectedToday = 0;
     try {
       const { data: fees } = await supabaseAdmin
         .from('daily_fee_summary')
@@ -69,7 +69,7 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     // Students on Campus Right Now
-    let studentsOnCampus = 48;
+    let studentsOnCampus = 0;
     try {
       const { data: occupancy } = await supabaseAdmin
         .from('campus_occupancy')
@@ -86,7 +86,7 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     // Open Complaints (Grievances across the whole institution)
-    let openComplaints = 6;
+    let openComplaints = 0;
     try {
       const { count } = await supabaseAdmin
         .from('grievances')
@@ -113,7 +113,7 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     // Active Bus Trips
-    let activeBusTrips = 3;
+    let activeBusTrips = 0;
     try {
       const { count } = await supabaseAdmin
         .from('bus_trips')
@@ -128,7 +128,7 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     // Events Today
-    let eventsToday = 2;
+    let eventsToday = 0;
     try {
       const { count } = await supabaseAdmin
         .from('events')
@@ -144,38 +144,63 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     // Fetch counts dynamically for full overview structure
-    let totalStudents = 1247;
-    let totalStaff = 89;
-    let totalDepartments = 12;
-    let hostelCapacity = 400;
-    let hostelOccupied = 312;
-    let gateEntriesToday = 342;
+    let totalStudents = 0;
+    let totalStaff = 0;
+    let totalDepartments = 0;
+    let hostelCapacity = 0;
+    let hostelOccupied = 0;
+    let gateEntriesToday = 0;
 
     try {
       const { count } = await supabaseAdmin
         .from('students')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('institution_id', institutionId);
       if (count !== null) totalStudents = count;
     } catch {}
 
     try {
       const { count } = await supabaseAdmin
         .from('staff')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('institution_id', institutionId);
       if (count !== null) totalStaff = count;
     } catch {}
 
     try {
       const { count } = await supabaseAdmin
         .from('departments')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('institution_id', institutionId);
       if (count !== null) totalDepartments = count;
     } catch {}
+
+    // Hostel occupancy - query real tables
+    try {
+      const { data: blocks } = await supabaseAdmin
+        .from('hostel_blocks')
+        .select('id')
+        .eq('institution_id', institutionId);
+      if (blocks && blocks.length > 0) {
+        const blockIds = blocks.map((b: any) => b.id);
+        const { data: rooms } = await supabaseAdmin
+          .from('hostel_rooms')
+          .select('capacity, occupied')
+          .in('block_id', blockIds);
+        if (rooms && rooms.length > 0) {
+          hostelCapacity = rooms.reduce((acc: number, r: any) => acc + (r.capacity || 0), 0);
+          hostelOccupied = rooms.reduce((acc: number, r: any) => acc + (r.occupied || 0), 0);
+        }
+      }
+    } catch (e) {
+      logger.error('Error fetching hostel occupancy:', e);
+    }
 
     try {
       const { count } = await supabaseAdmin
         .from('gate_logs')
         .select('*', { count: 'exact', head: true })
+        .eq('institution_id', institutionId)
         .gte('timestamp', `${today}T00:00:00Z`);
       if (count !== null) gateEntriesToday = count;
     } catch {}
@@ -254,32 +279,23 @@ export async function getAnalytics(req: Request, res: Response) {
     }
 
     if (attendanceTrend.length === 0) {
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000);
-        const total = 1200 + Math.floor(Math.random() * 80);
-        const present = Math.floor(total * (0.78 + Math.random() * 0.15));
-        attendanceTrend.push({
-          date: d.toISOString().split('T')[0],
-          present,
-          absent: total - present,
-          total,
-        });
-      }
+      // No mock data - return empty array so frontend shows "no data" state
+      attendanceTrend = [];
     }
 
     // 2. Fee collection by month
     let feeCollectionByMonth = [
-      { month: 'Jan', amount: 3200000 },
-      { month: 'Feb', amount: 2800000 },
-      { month: 'Mar', amount: 4100000 },
-      { month: 'Apr', amount: 1900000 },
-      { month: 'May', amount: 3500000 },
-      { month: 'Jun', amount: 4200000 },
-      { month: 'Jul', amount: 2100000 },
-      { month: 'Aug', amount: 3800000 },
-      { month: 'Sep', amount: 4500000 },
-      { month: 'Oct', amount: 3100000 },
-      { month: 'Nov', amount: 2600000 },
+      { month: 'Jan', amount: 0 },
+      { month: 'Feb', amount: 0 },
+      { month: 'Mar', amount: 0 },
+      { month: 'Apr', amount: 0 },
+      { month: 'May', amount: 0 },
+      { month: 'Jun', amount: 0 },
+      { month: 'Jul', amount: 0 },
+      { month: 'Aug', amount: 0 },
+      { month: 'Sep', amount: 0 },
+      { month: 'Oct', amount: 0 },
+      { month: 'Nov', amount: 0 },
       { month: 'Dec', amount: 0 }
     ];
 
@@ -312,7 +328,7 @@ export async function getAnalytics(req: Request, res: Response) {
     }
 
     // 3. Canteen Revenue this month
-    let canteenRevenueThisMonth = 485000;
+    let canteenRevenueThisMonth = 0;
     try {
       const today = new Date();
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -352,7 +368,7 @@ export async function getModules(req: Request, res: Response) {
     const todayStart = `${today}T00:00:00Z`;
 
     // Canteen orders today
-    let canteenOrdersToday = 312;
+    let canteenOrdersToday = 0;
     try {
       const { count } = await supabaseAdmin
         .from('canteen_orders')
@@ -363,7 +379,7 @@ export async function getModules(req: Request, res: Response) {
     } catch {}
 
     // Fitzone gym bookings this week
-    let gymBookingsThisWeek = 87;
+    let gymBookingsThisWeek = 0;
     try {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -376,7 +392,7 @@ export async function getModules(req: Request, res: Response) {
     } catch {}
 
     // Gate entries today
-    let gateEntriesToday = 342;
+    let gateEntriesToday = 0;
     try {
       const { count } = await supabaseAdmin
         .from('gate_logs')
@@ -387,7 +403,7 @@ export async function getModules(req: Request, res: Response) {
     } catch {}
 
     // Library issues this week
-    let libraryIssuesThisWeek = 156;
+    let libraryIssuesThisWeek = 0;
     try {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -400,7 +416,7 @@ export async function getModules(req: Request, res: Response) {
     } catch {}
 
     // Event registrations this week
-    let eventRegistrationsThisWeek = 43;
+    let eventRegistrationsThisWeek = 0;
     try {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -413,7 +429,7 @@ export async function getModules(req: Request, res: Response) {
     } catch {}
 
     // Transit active subscriptions
-    let transitActiveSubscriptions = 234;
+    let transitActiveSubscriptions = 0;
     try {
       const { count } = await supabaseAdmin
         .from('transport_subscriptions')

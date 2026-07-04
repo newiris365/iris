@@ -847,13 +847,7 @@ export async function getMySubscription(req: Request, res: Response) {
 
     const { data, error } = await supabaseAdmin
       .from('transport_subscriptions')
-      .select('*, bus_routes(*, buses(*, users(name, phone))))')
-      .eq('student_id', studentId)
-      .eq('status', 'active')
-      .gte('end_date', new Date().toISOString().split('T')[0])
-      .order('end_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .select('*, bus_routes(*, buses(*, users(name, phone)))')
       .eq('student_id', studentId)
       .eq('status', 'active')
       .gte('end_date', new Date().toISOString().split('T')[0])
