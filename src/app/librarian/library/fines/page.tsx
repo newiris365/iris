@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { IndianRupee, Search, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 export default function LibraryFinesPage() {
   const [fines, setFines] = useState<any[]>([]);

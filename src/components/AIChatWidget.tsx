@@ -174,7 +174,7 @@ export default function AIChatWidget() {
       });
       console.log('[AIChatWidget] Received response from /ai/chat:', res);
 
-      if (res.success) {
+      if (res.success && res.response) {
         const assistantMsg: Message = {
           id: res.message_id,
           role: 'assistant',
@@ -182,22 +182,28 @@ export default function AIChatWidget() {
           timestamp: new Date().toISOString()
         };
         setMessages(prev => [...prev, assistantMsg]);
-      }
-    } catch {
-      // Fallback when API is unreachable
-      setTimeout(() => {
-        const responseText = "I'm unable to connect to the IRIS server right now. Please try again in a moment, or ask your administrator to check the AI configuration in Admin > AI Settings.";
-        
+      } else {
+        // Show error feedback when API returns failure
+        const errorText = res.error || "I'm unable to process your request right now. Please try again.";
         const assistantMsg: Message = {
-          id: `msg_mock_${Date.now()}`,
+          id: `msg_err_${Date.now()}`,
           role: 'assistant',
-          content: responseText,
+          content: `⚠️ ${errorText}`,
           timestamp: new Date().toISOString()
         };
         setMessages(prev => [...prev, assistantMsg]);
-        setLoading(false);
-      }, 1000);
-      return;
+      }
+    } catch {
+      // Fallback when API is unreachable
+      const responseText = "I'm unable to connect to the IRIS server right now. Please try again in a moment, or ask your administrator to check the AI configuration in Admin > AI Settings.";
+      
+      const assistantMsg: Message = {
+        id: `msg_mock_${Date.now()}`,
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, assistantMsg]);
     }
     setLoading(false);
   };

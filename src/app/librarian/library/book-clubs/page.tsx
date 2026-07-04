@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Users, Search } from 'lucide-react';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 export default function LibraryBookClubsPage() {
   const [clubs, setClubs] = useState<any[]>([]);

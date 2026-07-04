@@ -106,7 +106,7 @@ export default function StudentWalletPage() {
                 razorpay_signature: response.razorpay_signature,
               });
               if (verifyRes && verifyRes.success) {
-                fetchWallet();
+                loadWallet();
                 setShowTopup(false);
                 setCustomAmount('');
               } else {
@@ -130,7 +130,7 @@ export default function StudentWalletPage() {
             amount
           });
           if (res && res.success) {
-            fetchWallet();
+            loadWallet();
             setShowTopup(false);
             setCustomAmount('');
           } else {

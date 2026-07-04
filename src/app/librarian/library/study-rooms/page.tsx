@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DoorOpen, Plus, Search, Clock, Users } from 'lucide-react';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 export default function LibraryStudyRoomsPage() {
   const [rooms, setRooms] = useState<any[]>([]);

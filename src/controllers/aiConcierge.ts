@@ -388,37 +388,73 @@ async function fetchUserContext(userId: string, institutionId: string, customRol
   // ── PARENT ───────────────────────────────────────────────────────────────
   else if (roleLower === 'parent') {
     try {
-      let studentQuery = supabaseAdmin.from('students').select('*, users(*)');
-      if (user?.phone) {
-        studentQuery = studentQuery.eq('guardian_phone', user.phone);
-      } else {
-        studentQuery = studentQuery.eq('guardian_name', username);
-      }
-      const { data: child } = await studentQuery.limit(1).maybeSingle();
-      if (child) {
-        ctx.child_name = child.users?.name || child.roll_number;
+      // Use parent_student_links (the canonical relationship table) to find the child
+      const { data: link } = await supabaseAdmin
+        .from('parent_student_links')
+        .select('student_id, students(*, users(*))')
+        .eq('parent_user_id', userId)
+        .eq('verified', true)
+        .maybeSingle();
 
-        const { data: logs } = await supabaseAdmin
-          .from('attendance')
-          .select('status')
-          .eq('student_id', child.id);
-        if (logs && logs.length > 0) {
-          const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
-          ctx.child_attendance = Math.round((present / logs.length) * 100);
+      const child = (link as any)?.students;
+      if (child) {
+        ctx.child_name = child.users?.full_name || child.users?.name || child.roll_number;
+
+        // Try school_attendance first (for school-type institutions), fall back to attendance (college)
+        let attendanceFound = false;
+        try {
+          const currentYear = new Date().getFullYear();
+          const academicYear = `${currentYear}-${currentYear + 1}`;
+          const { data: schoolLogs } = await supabaseAdmin
+            .from('school_attendance')
+            .select('status')
+            .eq('student_id', child.id)
+            .eq('academic_year', academicYear);
+          if (schoolLogs && schoolLogs.length > 0) {
+            let presentCount = 0;
+            schoolLogs.forEach((l: any) => {
+              if (l.status === 'Present' || l.status === 'Leave') presentCount += 1;
+              else if (l.status === 'Half-Day') presentCount += 0.5;
+            });
+            ctx.child_attendance = Math.round((presentCount / schoolLogs.length) * 100);
+            attendanceFound = true;
+          }
+        } catch {}
+
+        if (!attendanceFound) {
+          try {
+            const { data: logs } = await supabaseAdmin
+              .from('attendance')
+              .select('status')
+              .eq('student_id', child.id);
+            if (logs && logs.length > 0) {
+              const present = logs.filter((l: any) => l.status?.toLowerCase() === 'present').length;
+              ctx.child_attendance = Math.round((present / logs.length) * 100);
+            }
+          } catch {}
         }
 
-        const { data: payments } = await supabaseAdmin
-          .from('fee_payments')
-          .select('amount_paid, status')
-          .eq('student_id', child.id);
-        const totalPaid = payments?.filter((p: any) => p.status === 'Completed').reduce((sum, p) => sum + Number(p.amount_paid), 0) || 0;
-        const { data: structure } = await supabaseAdmin
-          .from('fee_structures')
-          .select('amount')
-          .eq('institution_id', institutionId)
-          .maybeSingle();
-        const target = structure?.amount ? Number(structure.amount) : 0;
-        ctx.child_fees = Math.max(0, target - totalPaid);
+        try {
+          const { data: payments } = await supabaseAdmin
+            .from('fee_payments')
+            .select('amount_paid, status')
+            .eq('student_id', child.id);
+          const totalPaid = payments?.filter((p: any) => p.status === 'Completed').reduce((sum, p) => sum + Number(p.amount_paid), 0) || 0;
+          const { data: structure } = await supabaseAdmin
+            .from('fee_structures')
+            .select('amount')
+            .eq('institution_id', institutionId)
+            .maybeSingle();
+          const target = structure?.amount ? Number(structure.amount) : 0;
+          ctx.child_fees = Math.max(0, target - totalPaid);
+        } catch {}
+
+        try {
+          const { data: busData } = await supabaseAdmin.rpc('get_child_bus_status');
+          if (busData?.[0]) {
+            ctx.transport_status = busData[0].is_on_bus ? `On bus (${busData[0].bus_name})` : 'Not on bus today';
+          }
+        } catch {}
       }
     } catch {}
   }
@@ -479,21 +515,24 @@ export async function chatQuery(req: Request, res: Response) {
     let queryEmbedding: number[] = [];
     try {
       queryEmbedding = await getEmbeddings(message);
-      const { data: faqMatch, error: matchErr } = await supabaseAdmin.rpc('match_faq', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.85,
-        match_count: 1,
-        inst_id: institutionId
-      });
+      // Only attempt FAQ matching if we have a valid embedding vector
+      if (queryEmbedding && queryEmbedding.length > 0) {
+        const { data: faqMatch, error: matchErr } = await supabaseAdmin.rpc('match_faq', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.85,
+          match_count: 1,
+          inst_id: institutionId
+        });
 
-      if (!matchErr && faqMatch && faqMatch.length > 0) {
-        matchedAnswer = faqMatch[0].answer;
-        // Increment usage count of the matching FAQ
-        await supabaseAdmin
-          .from('faq_knowledge_base')
-          .update({ usage_count: faqMatch[0].usage_count + 1 })
-          .eq('id', faqMatch[0].id);
-        logger.info(`FAQ Match hit for query: "${message}" (score: ${faqMatch[0].similarity})`);
+        if (!matchErr && faqMatch && faqMatch.length > 0) {
+          matchedAnswer = faqMatch[0].answer;
+          // Increment usage count of the matching FAQ
+          await supabaseAdmin
+            .from('faq_knowledge_base')
+            .update({ usage_count: faqMatch[0].usage_count + 1 })
+            .eq('id', faqMatch[0].id);
+          logger.info(`FAQ Match hit for query: "${message}" (score: ${faqMatch[0].similarity})`);
+        }
       }
     } catch (err) {
       logger.error('Error conducting FAQ match: ' + err);
@@ -517,6 +556,11 @@ export async function chatQuery(req: Request, res: Response) {
 
       const history = existingConv?.messages || [];
       finalResponse = await askClaude(message, ctx, history, keys);
+    }
+
+    // Safety net: ensure we never return an empty response
+    if (!finalResponse || finalResponse.trim() === '') {
+      finalResponse = "I'm having trouble processing your request right now. Please try again, or check the parent portal for the information you need.";
     }
 
     // Auto Handoff escalation trigger checking

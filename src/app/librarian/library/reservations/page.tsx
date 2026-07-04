@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CalendarClock, Plus, Search, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost } from '../../../../lib/api';
 
 export default function LibraryReservationsPage() {
   const [reservations, setReservations] = useState<any[]>([]);

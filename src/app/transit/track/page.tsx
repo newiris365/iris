@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Bus, Clock, Signal, SignalOff, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { MapPin, Navigation, Bus, Clock, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { apiGet } from '../../../lib/api';
 import dynamic from 'next/dynamic';

@@ -627,9 +627,11 @@ export function generateSmartMockResponse(message: string, context: MessageConte
       return `I don't have class-level attendance data available. Please check your class roster in the Teacher portal.`;
     }
     if (role === 'parent') {
-      return context.child_attendance
-        ? `Your child **${context.child_name || 'your child'}** has an attendance rate of **${context.child_attendance}%**.`
-        : `I don't have attendance data for your child yet. Please check the parent portal for updates.`;
+      if (context.child_attendance !== undefined && context.child_attendance !== null) {
+        const status = context.child_attendance >= 75 ? '✅ Above the 75% threshold.' : '⚠️ Below the 75% threshold — action needed.';
+        return `Your child **${context.child_name || 'your child'}** has an attendance rate of **${context.child_attendance}%**.\n${status}\nYou can view detailed daily records in the Attendance section.`;
+      }
+      return `I don't have attendance data for your child yet. Please ensure your child is linked to your account, or check the parent portal for updates.`;
     }
     return context.attendance
       ? `Your current overall attendance is **${context.attendance}%**. You need to maintain at least 75% to be eligible for final examinations.`
@@ -651,9 +653,13 @@ export function generateSmartMockResponse(message: string, context: MessageConte
       return `Fee collection tracking is managed at the campus level. Please contact the accounts section for department-wise recovery.`;
     }
     if (role === 'parent') {
-      return context.child_fees
-        ? `Your child **${context.child_name || 'your child'}** has an outstanding fee balance of **₹${context.child_fees.toLocaleString('en-IN')}**.`
-        : `I don't have fee information for your child yet. Please check the parent portal.`;
+      if (context.child_fees !== undefined && context.child_fees !== null) {
+        if (context.child_fees > 0) {
+          return `Your child **${context.child_name || 'your child'}** has an outstanding fee balance of **₹${context.child_fees.toLocaleString('en-IN')}**. Please clear it via the Fee Status section.`;
+        }
+        return `Great news! Your child **${context.child_name || 'your child'}** has no outstanding fees. All dues are cleared.`;
+      }
+      return `I don't have fee information for your child yet. Please check the parent portal Fee Status section.`;
     }
     if (context.pending_fees !== undefined && context.pending_fees !== null) {
       if (context.pending_fees > 0) {
@@ -674,6 +680,9 @@ export function generateSmartMockResponse(message: string, context: MessageConte
       return context.timetable?.length
         ? `Your timetable for today:\n${context.timetable.map((t: string) => `- ${t}`).join('\n')}`
         : `I don't have your timetable data yet. Please check the student portal.`;
+    }
+    if (role === 'parent') {
+      return `You can view your child's class timetable in the **Timetable** section of the parent portal. It shows daily schedules with subjects, rooms, and instructors.`;
     }
     if (role === 'superadmin' || role === 'admin' || role === 'principal' || role === 'hod') {
       return `Please view the academic timetable dashboard to see schedules.`;
@@ -722,7 +731,7 @@ export function generateSmartMockResponse(message: string, context: MessageConte
     }
   }
 
-  if (msg.includes('bus') || msg.includes('transport') || msg.includes('transit')) {
+  if (msg.includes('bus') || msg.includes('transport') || msg.includes('transit') || msg.includes('location')) {
     if (role === 'student') {
       return `Please check the transport dashboard for bus routes and schedules.`;
     }
@@ -730,6 +739,48 @@ export function generateSmartMockResponse(message: string, context: MessageConte
       return context.today_route
         ? `Your route today: **${context.today_route}**.`
         : `I don't have route data for you. Please check with the transport admin.`;
+    }
+    if (role === 'parent') {
+      if (context.transport_status) {
+        return `**Bus Status:** ${context.transport_status}\n\nYou can track your child's bus in real-time from the **Transit GPS** section.`;
+      }
+      return `You can track your child's school bus in real-time from the **Transit GPS** section in the parent portal.`;
+    }
+    return `Please check the transport dashboard for bus routes and schedules.`;
+  }
+
+  if (msg.includes('ptm') || msg.includes('parent teacher') || msg.includes('meeting')) {
+    if (role === 'parent') {
+      return `You can view and book Parent-Teacher Meeting slots from the **PTM Schedule** section in the parent portal.`;
+    }
+    return `PTM scheduling is available in the parent portal under PTM Schedule.`;
+  }
+
+  if (msg.includes('exam') || msg.includes('result') || msg.includes('marks')) {
+    if (role === 'parent') {
+      return `You can check your child's exam results and academic performance in the **Exam Results** section of the parent portal.`;
+    }
+    if (role === 'student') {
+      return `You can view your exam results in the Student Results section.`;
+    }
+    return `Please check the exam section for results and schedules.`;
+  }
+
+  if (msg.includes('leave') || msg.includes('absence') || msg.includes('sick')) {
+    if (role === 'parent') {
+      return `You can apply for leave on behalf of your child from the **Leave Application** section. Select dates, choose a reason, and submit — the school will review it.`;
+    }
+    return `Please check the leave application section in your portal.`;
+  }
+
+  if (msg.includes('wallet') || msg.includes('canteen') || msg.includes('food') || msg.includes('mess')) {
+    if (role === 'student') {
+      return context.canteen_wallet !== undefined
+        ? `Your canteen wallet balance is **₹${context.canteen_wallet}**.`
+        : `I don't have your canteen wallet data. Please check the student portal.`;
+    }
+    if (role === 'warden' || role === 'hostelwarden') {
+      return `Please check the mess dashboard for today's menu and meal timings.`;
     }
   }
 

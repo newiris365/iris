@@ -958,9 +958,8 @@ export default function SuperAdminConsole() {
                 </div>
               </div>
             </div>
-              </>
-              );
-            })()}
+          </>
+        )}
 
         {/* TAB: FEATURE TOGGLES */}
         {activeTab === 'features' && (
