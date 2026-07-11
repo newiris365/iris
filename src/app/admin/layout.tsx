@@ -139,61 +139,92 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    let redirectTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    const savedProfile = localStorage.getItem('iris_user_profile');
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        const role = parsed.role || '';
-        const instType = parsed.institute_type || 'college';
-        setUserRole(role);
-        setInstituteType(instType);
-
-        if (!ALLOWED_ADMIN_ROLES.has(role)) {
-          const redirect = ROLE_DASHBOARD_MAP[role] || '/dashboard';
-          window.location.href = redirect;
-          return;
-        }
-
-        setAuthorized(true);
-        authorizedRef.current = true;
-        applySidebar(role, instType);
-
-        const t = localStorage.getItem('iris_jwt_token');
-        if (t) {
-          fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${t}` } })
-            .then(r => r.json())
-            .then(data => {
-              if (data.success && data.profile) {
-                const freshType = data.profile.institute_type || 'college';
-                if (freshType !== instType) {
-                  parsed.institute_type = freshType;
-                  localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
-                  setInstituteType(freshType);
-                  applySidebar(role, freshType);
-                }
-              }
-            })
-            .catch(() => {});
-        }
-      } catch (e) {
-        console.error('Failed parsing profile for admin auth check:', e);
-        setAuthorized(false);
-        authorizedRef.current = false;
-      }
-    } else {
+    // Block mock sandbox tokens in production
+    const isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
+    if (token.startsWith('mock-sandbox') && isProduction) {
+      localStorage.removeItem('iris_jwt_token');
+      localStorage.removeItem('iris_user_profile');
+      localStorage.removeItem('iris_refresh_token');
       window.location.href = '/login';
       return;
     }
 
+    let redirectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const savedProfile = localStorage.getItem('iris_user_profile');
+    if (!savedProfile) {
+      window.location.href = '/login';
+      return;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(savedProfile);
+    } catch (e) {
+      localStorage.removeItem('iris_jwt_token');
+      localStorage.removeItem('iris_user_profile');
+      localStorage.removeItem('iris_refresh_token');
+      window.location.href = '/login';
+      return;
+    }
+
+    const role = parsed.role || '';
+    const instType = parsed.institute_type || 'college';
+    setUserRole(role);
+    setInstituteType(instType);
+
+    if (!ALLOWED_ADMIN_ROLES.has(role)) {
+      const redirect = ROLE_DASHBOARD_MAP[role] || '/dashboard';
+      window.location.href = redirect;
+      return;
+    }
+
+    // Optimistically allow rendering while we validate with backend
+    setAuthorized(true);
+    authorizedRef.current = true;
+    applySidebar(role, instType);
+
+    // Validate token with backend
+    fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(async r => {
+        if (cancelled) return;
+        if (r.status === 401 || r.status === 403) {
+          localStorage.removeItem('iris_jwt_token');
+          localStorage.removeItem('iris_user_profile');
+          localStorage.removeItem('iris_refresh_token');
+          window.location.href = '/login';
+          return;
+        }
+        const data = await r.json();
+        if (data.success && data.profile) {
+          const backendRole = data.profile.role || '';
+          if (!ALLOWED_ADMIN_ROLES.has(backendRole)) {
+            localStorage.removeItem('iris_jwt_token');
+            localStorage.removeItem('iris_user_profile');
+            localStorage.removeItem('iris_refresh_token');
+            window.location.href = '/login';
+            return;
+          }
+          const freshType = data.profile.institute_type || 'college';
+          if (freshType !== instType) {
+            parsed.institute_type = freshType;
+            localStorage.setItem('iris_user_profile', JSON.stringify(parsed));
+            setInstituteType(freshType);
+            applySidebar(role, freshType);
+          }
+        }
+      })
+      .catch(() => {});
+
     redirectTimeout = setTimeout(() => {
-      if (authorizedRef.current !== true) {
+      if (authorizedRef.current !== true && !cancelled) {
         window.location.href = '/login';
       }
     }, 3000);
 
     return () => {
+      cancelled = true;
       if (redirectTimeout) clearTimeout(redirectTimeout);
     };
   }, []);

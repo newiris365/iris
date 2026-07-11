@@ -403,10 +403,6 @@ export default function LoginPage() {
 
       if (oauthToken && oauthProfile && oauthPath) {
         try {
-          console.log('[Login] OAuth token received from callback — storing in localStorage');
-          console.log('[Login] Token type:', oauthToken.startsWith('eyJ') ? 'REAL JWT ✓' : 'UNEXPECTED FORMAT ✗');
-          console.log('[Login] Token prefix:', oauthToken.substring(0, 30));
-
           localStorage.setItem('iris_jwt_token', oauthToken);
           if (oauthRefresh) {
             localStorage.setItem('iris_refresh_token', oauthRefresh);
@@ -418,14 +414,11 @@ export default function LoginPage() {
             throw new Error('Failed to persist JWT in localStorage after OAuth callback.');
           }
 
-          console.log('[Login] Token stored successfully. Redirecting to:', oauthPath);
-
           // Remove token from URL before navigating so it's not cached or bookmarked
           window.history.replaceState({}, '', '/login');
           window.location.href = oauthPath;
           return;
         } catch (e: any) {
-          console.error('[Login] Error storing OAuth token:', e.message);
           setSubmitError('Authentication succeeded but session could not be saved. Please try again.');
           if (active) setIsCheckingSession(false);
           clearTimeout(timeout);
@@ -440,18 +433,36 @@ export default function LoginPage() {
         setSubmitError(decodeURIComponent(err));
       }
 
-      // Check if a session already exists to auto-redirect
+      // ─── Explicit Login Navigation ────────────────────────────────────────────
+      // When user clicks "Launch Portal" or "Dashboard Sign In" from the landing
+      // page, we pass ?fresh=1 to indicate they explicitly want to log in.
+      // In this case, clear any stale session data and show the login form.
+      const isFreshLogin = params.get('fresh') === '1';
+      if (isFreshLogin) {
+        localStorage.removeItem('iris_jwt_token');
+        localStorage.removeItem('iris_user_profile');
+        localStorage.removeItem('iris_refresh_token');
+        // Clean the URL param
+        window.history.replaceState({}, '', '/login');
+        if (active) setIsCheckingSession(false);
+        clearTimeout(timeout);
+        return;
+      }
+
+      // ─── Stale Mock Token Cleanup ─────────────────────────────────────────────
+      const isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
       const token = localStorage.getItem('iris_jwt_token');
       const savedProfile = localStorage.getItem('iris_user_profile');
-      
-      var isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
 
       if (token && token.startsWith('mock-sandbox') && isProduction) {
-        console.warn('[Login] Stale mock sandbox token on production — clearing.');
         localStorage.removeItem('iris_jwt_token');
         localStorage.removeItem('iris_user_profile');
         localStorage.removeItem('iris_refresh_token');
       } else if (token && savedProfile) {
+        // ─── Auto-Redirect for Existing Session ────────────────────────────────
+        // Only auto-redirect if there is a valid, non-stale session already in
+        // localStorage. This handles the case where a user's JWT expired and they
+        // were redirected back to /login — we re-route them to their dashboard.
         try {
           const parsed = JSON.parse(savedProfile);
           if (parsed && parsed.role) {
@@ -459,7 +470,10 @@ export default function LoginPage() {
             return;
           }
         } catch (e) {
-          console.error('Error parsing session on mount:', e);
+          // Corrupted profile — clear and show login form
+          localStorage.removeItem('iris_jwt_token');
+          localStorage.removeItem('iris_user_profile');
+          localStorage.removeItem('iris_refresh_token');
         }
       }
     }

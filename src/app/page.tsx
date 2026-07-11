@@ -191,10 +191,10 @@ export default function LandingPage() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/login" className="px-5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold tracking-wide transition-all">
+          <Link href="/login?fresh=1" className="px-5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold tracking-wide transition-all">
             Dashboard Sign In
           </Link>
-          <Link href="/login" className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-xs font-bold tracking-wide transition-all shadow-md shadow-[#6C2BD9]/20">
+          <Link href="/login?fresh=1" className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-xs font-bold tracking-wide transition-all shadow-md shadow-[#6C2BD9]/20">
             Launch Portal →
           </Link>
         </div>
@@ -216,7 +216,7 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 mt-10">
-          <Link href="/login" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] text-white font-bold text-sm shadow-xl shadow-[#06B6D4]/10 hover:scale-[1.02] transition-all">
+          <Link href="/login?fresh=1" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] text-white font-bold text-sm shadow-xl shadow-[#06B6D4]/10 hover:scale-[1.02] transition-all">
             Enter Management Console
           </Link>
           <a href="#features" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-sm transition-all">
@@ -376,7 +376,7 @@ export default function LandingPage() {
               </span>
               <span className="text-[10px] text-[#C4B5FD]/40 mt-2">Billed annually. Dynamic discount scales apply for Jodhpur institutions.</span>
               
-              <Link href="/login" className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs transition-all tracking-wide">
+              <Link href="/login?fresh=1" className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs transition-all tracking-wide">
                 Get Institutional Proposal →
               </Link>
             </div>

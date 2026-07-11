@@ -13,9 +13,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const JWT_SECRET = process.env.JWT_SECRET || '';
 
-// DEBUG: Log JWT_SECRET presence at module load time (shows in Vercel function logs)
-console.log('[auth/callback] MODULE INIT — JWT_SECRET present:', !!JWT_SECRET, '| length:', JWT_SECRET.length, '| prefix:', JWT_SECRET.substring(0, 8));
-
 
 // Create a service-role supabase client to fetch profiles bypassed RLS
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -174,37 +171,17 @@ function renderClientHashBridge() {
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
 
-  // ─── STEP 1: Log the incoming request ─────────────────────────────────────
-  console.log('════════════════════════════════════════════════════════════');
-  console.log('[auth/callback] ▶ ROUTE HIT');
-  console.log('[auth/callback] Full URL:', request.url);
-  console.log('[auth/callback] Origin:', requestUrl.origin);
-  console.log('[auth/callback] Pathname:', requestUrl.pathname);
-  console.log('[auth/callback] All query params:', Object.fromEntries(requestUrl.searchParams.entries()));
-  console.log('[auth/callback] Cookies present:', request.cookies.getAll().map(c => c.name));
-  console.log('════════════════════════════════════════════════════════════');
-
   const code = requestUrl.searchParams.get('code');
   const accessToken = requestUrl.searchParams.get('access_token');
   const refreshToken = requestUrl.searchParams.get('refresh_token');
   const deviceId = requestUrl.searchParams.get('device_id') || 'unknown-device';
 
-  // ─── STEP 2: Check for auth params ────────────────────────────────────────
-  console.log('[auth/callback] STEP 2 — Auth params:');
-  console.log('  code:', code ? `PRESENT (${code.substring(0, 12)}...)` : 'MISSING');
-  console.log('  access_token:', accessToken ? 'PRESENT' : 'MISSING');
-  console.log('  device_id:', deviceId);
-
   // If no server-side query params exist, check client-side hash fragment (Implicit flow)
   if (!code && !accessToken) {
-    console.log('[auth/callback] STEP 2 — No code or access_token. Rendering hash bridge for implicit flow.');
     return renderClientHashBridge();
   }
 
-  // ─── STEP 3: JWT_SECRET check ──────────────────────────────────────────────
-  console.log('[auth/callback] STEP 3 — JWT_SECRET present:', !!JWT_SECRET, '| length:', JWT_SECRET.length);
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
-    console.error('[auth/callback] STEP 3 — JWT_SECRET MISSING or too short! Cannot sign token.');
     return renderErrorPage('JWT Secret key is missing or invalid on the server.');
   }
 
