@@ -4355,7 +4355,6 @@ export async function getParentLeaveList(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
-}
 
 // =========================================================================
 // FACULTY MODULE CONTROLLERS

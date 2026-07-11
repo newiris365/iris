@@ -166,6 +166,44 @@ export default function AIChatWidget() {
     setCharCount(0);
     setLoading(true);
 
+    // Client-side fallback response generator (used when backend is unreachable)
+    const getLocalFallbackResponse = (msg: string): string => {
+      const m = msg.toLowerCase();
+      const childName = 'your child';
+
+      if (m.includes('attendance') || m.includes('present') || m.includes('absent')) {
+        return `📊 **Attendance**\nYou can check ${childName}'s daily attendance in the **Attendance** section of the parent portal. It shows a calendar view with Present/Absent/Leave status for each day.\n\nTip: Maintain at least 75% attendance to stay above the criteria.`;
+      }
+      if (m.includes('fee') || m.includes('payment') || m.includes('dues')) {
+        return `💰 **Fees**\nYou can view ${childName}'s fee status and make payments in the **Fee Status** section. Outstanding dues and payment history are shown there.`;
+      }
+      if (m.includes('bus') || m.includes('transport') || m.includes('location')) {
+        return `🚌 **Transport**\nYou can track ${childName}'s school bus in real-time from the **Transit GPS** section. It shows live bus location and route status.`;
+      }
+      if (m.includes('ptm') || m.includes('meeting') || m.includes('parent teacher')) {
+        return `📅 **PTM**\nYou can view and book Parent-Teacher Meeting slots from the **PTM Schedule** section. Available time slots with teachers are shown there.`;
+      }
+      if (m.includes('exam') || m.includes('result') || m.includes('marks')) {
+        return `📝 **Exam Results**\nYou can check ${childName}'s exam results, SGPA, and grade transcripts in the **Exam Results** section.`;
+      }
+      if (m.includes('timetable') || m.includes('schedule') || m.includes('class')) {
+        return `🗓️ **Timetable**\nYou can view ${childName}'s daily class schedule with subjects, rooms, and instructors in the **Timetable** section.`;
+      }
+      if (m.includes('leave') || m.includes('absence') || m.includes('sick')) {
+        return `📋 **Leave Application**\nYou can apply for leave on behalf of ${childName} from the **Leave Application** section. Select dates, choose a reason, and submit.`;
+      }
+      if (m.includes('notice') || m.includes('announcement')) {
+        return `📢 **Notices**\nCheck the **Notices** section for the latest school announcements and updates.`;
+      }
+      if (m.includes('message') || m.includes('teacher')) {
+        return `💬 **Messages**\nYou can send messages to ${childName}'s teachers from the **Messages** section.`;
+      }
+      if (m.includes('complaint')) {
+        return `⚠️ **Complaints**\nYou can file a complaint or report an issue from the **Complaints** section.`;
+      }
+      return `Hello! I am IRIS, your AI concierge. The backend server is currently unavailable, but I can still guide you.\n\nHere are some things I can help with:\n- **Attendance** — check daily records\n- **Fees** — view dues and payments\n- **Bus** — track school transport\n- **PTM** — book parent-teacher meetings\n- **Exams** — view results\n- **Leave** — apply for leave\n\nPlease use the sidebar navigation or ask me about any of these topics.`;
+    };
+
     try {
       console.log('[AIChatWidget] Sending request to /ai/chat:', { message: text, session_id: sessionId });
       const res = await apiPost('/ai/chat', {
@@ -194,8 +232,8 @@ export default function AIChatWidget() {
         setMessages(prev => [...prev, assistantMsg]);
       }
     } catch {
-      // Fallback when API is unreachable
-      const responseText = "I'm unable to connect to the IRIS server right now. Please try again in a moment, or ask your administrator to check the AI configuration in Admin > AI Settings.";
+      // Client-side fallback when backend is unreachable
+      const responseText = getLocalFallbackResponse(text);
       
       const assistantMsg: Message = {
         id: `msg_mock_${Date.now()}`,

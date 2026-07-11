@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { ShieldAlert, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { apiGet } from '../../../lib/api';
 
 interface DayRecord {
@@ -21,7 +21,7 @@ const DAYS_IN_MONTH = (month: number, year: number) => new Date(year, month + 1,
 const FIRST_DAY_OF_MONTH = (month: number, year: number) => new Date(year, month, 1).getDay();
 
 export default function ParentAttendancePage() {
-  const [stats, setStats] = useState<any>({ overall: 72, total: 25, present: 18 });
+  const [stats, setStats] = useState<any>({ overall: null, total: 0, present: 0 });
   const [heatmap, setHeatmap] = useState<DayRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -35,7 +35,7 @@ export default function ParentAttendancePage() {
       return null;
     }).then(res => {
       if (res?.success) {
-        setStats(res.stats || { overall: 72, total: 25, present: 18 });
+        setStats(res.stats || { overall: null, total: 0, present: 0 });
         setHeatmap(res.heatmap || []);
       }
       setIsLoading(false);
@@ -85,8 +85,30 @@ export default function ParentAttendancePage() {
     }
     const total = present + absent + halfDay + leave + late;
     const attended = present + leave + halfDay * 0.5;
-    return { present, absent, halfDay, leave, late, noClass, total, percentage: total > 0 ? Math.round((attended / total) * 100) : 100 };
+    return { present, absent, halfDay, leave, late, noClass, total, percentage: total > 0 ? Math.round((attended / total) * 100) : null };
   })();
+
+  const yearlyStats = (() => {
+    let present = 0, absent = 0, halfDay = 0, leave = 0, late = 0;
+    const yearStr = String(currentYear);
+    heatmap.forEach(rec => {
+      if (!rec.date.startsWith(yearStr)) return;
+      switch (rec.status) {
+        case 'Present': present++; break;
+        case 'Absent': absent++; break;
+        case 'Half-Day': halfDay++; break;
+        case 'Leave': leave++; break;
+        case 'Late': late++; break;
+      }
+    });
+    const total = present + absent + halfDay + leave + late;
+    const attended = present + leave + halfDay * 0.5;
+    return { present, absent, halfDay, leave, late, total, percentage: total > 0 ? Math.round((attended / total) * 100) : null };
+  })();
+
+  const hasYearlyData = yearlyStats.total > 0;
+  const hasMonthlyData = monthlyStats.total > 0;
+  const gaugePercentage = hasYearlyData ? yearlyStats.percentage : 0;
 
   return (
     <div className="max-w-4xl mx-auto py-6 w-full flex flex-col gap-6">
@@ -98,35 +120,49 @@ export default function ParentAttendancePage() {
 
           {/* Circular Gauge */}
           <div className="p-6 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center justify-center text-center gap-4">
-            <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">Attendance Gauge</span>
+            <span className="text-[10px] text-[#C4B5FD] uppercase tracking-wider font-semibold">
+              {hasYearlyData ? `${currentYear} Yearly Attendance` : 'Attendance Gauge'}
+            </span>
             <div className="relative w-36 h-36 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="transparent" />
-                <circle
-                  cx="50" cy="50" r="40"
-                  stroke="#6C2BD9"
-                  strokeWidth="8"
-                  fill="transparent"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={251.2 - (251.2 * stats.overall) / 100}
-                  strokeLinecap="round"
-                />
+                {hasYearlyData && (
+                  <circle
+                    cx="50" cy="50" r="40"
+                    stroke={gaugePercentage >= 75 ? '#6C2BD9' : '#EF4444'}
+                    strokeWidth="8"
+                    fill="transparent"
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * gaugePercentage) / 100}
+                    strokeLinecap="round"
+                  />
+                )}
               </svg>
               <div className="absolute flex flex-col items-center">
-                <strong className="font-heading font-extrabold text-3xl text-white">{stats.overall}%</strong>
+                {hasYearlyData ? (
+                  <strong className="font-heading font-extrabold text-3xl text-white">{gaugePercentage}%</strong>
+                ) : (
+                  <strong className="font-heading font-extrabold text-3xl text-white/30">--</strong>
+                )}
                 <span className="text-[9px] text-[#C4B5FD]/70 mt-0.5">Threshold: 75%</span>
               </div>
             </div>
 
-            {stats.overall < 75 && (
+            {hasYearlyData && (
+              <div className="text-[10px] text-[#C4B5FD]/60">
+                {yearlyStats.total} days recorded in {currentYear}
+              </div>
+            )}
+
+            {hasYearlyData && gaugePercentage < 75 && (
               <div className="text-[10px] text-red-400 font-bold flex items-center gap-1">
                 <ShieldAlert className="w-3.5 h-3.5" /> Below criteria. Overdue alert sent.
               </div>
             )}
 
-            {stats.daysNeeded > 0 && (
+            {hasYearlyData && gaugePercentage < 75 && (
               <div className="text-[10px] text-yellow-400 font-semibold">
-                Need {stats.daysNeeded} more days to reach 75%
+                Need {Math.max(0, Math.ceil(3 * yearlyStats.total - 4 * (yearlyStats.present + yearlyStats.leave + yearlyStats.halfDay * 0.5)))} more days to reach 75%
               </div>
             )}
           </div>
@@ -199,6 +235,13 @@ export default function ParentAttendancePage() {
                     </div>
                   ))}
                 </div>
+
+                {/* No data message */}
+                {!hasMonthlyData && (
+                  <div className="text-center py-4">
+                    <div className="text-xs text-[#C4B5FD]/40">No attendance records for {monthName}</div>
+                  </div>
+                )}
 
                 {/* Monthly summary */}
                 <div className="grid grid-cols-3 gap-2 mt-2">

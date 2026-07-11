@@ -7,7 +7,7 @@ import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import logger from './config/logger';
 import { globalLimiter, authLimiter } from './middleware/rateLimit';
-import { requireSupabaseOnline } from './config/supabase';
+import { requireSupabaseOnline, supabaseAdmin } from './config/supabase';
 import authRouter from './routes/auth';
 import coreRouter from './routes/campusCore';
 import canteenRouter from './routes/canteen';
