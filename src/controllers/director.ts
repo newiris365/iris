@@ -153,9 +153,11 @@ export async function getOverview(req: Request, res: Response) {
 
     try {
       const { count } = await supabaseAdmin
-        .from('students')
+        .from('users')
         .select('*', { count: 'exact', head: true })
-        .eq('institution_id', institutionId);
+        .eq('institution_id', institutionId)
+        .eq('role', 'Student')
+        .eq('is_active', true);
       if (count !== null) totalStudents = count;
     } catch {}
 
@@ -1136,56 +1138,297 @@ export async function generateAndDownloadPDFReport(req: Request, res: Response) 
   try {
     const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
     const today = new Date().toISOString().split('T')[0];
+    const { report_type = 'monthly', start_date, end_date, sections = ['attendance', 'fees', 'complaints', 'hostel', 'events', 'modules'] } = req.body || {};
 
-    // Gather stats (simulated or real from DB)
-    const reportDataPayload = {
-      report_type: 'weekly',
-      report_date: today,
-      data: {
-        attendance_rate: 87,
-        fee_collected: 24500000,
-        students_on_campus: 1089,
-        open_complaints: 14,
-        active_bus_trips: 5,
-        events_count: 5
-      }
+    const effectiveStartDate = start_date || today;
+    const effectiveEndDate = end_date || today;
+
+    // Gather real stats from database
+    const reportData: any = {
+      report_type,
+      start_date: effectiveStartDate,
+      end_date: effectiveEndDate,
+      generated_at: new Date().toISOString(),
+      institution_name: 'SIET Campus'
     };
+
+    // Attendance stats
+    if (sections.includes('attendance')) {
+      try {
+        const { data: attData } = await supabaseAdmin
+          .from('attendance')
+          .select('status, date')
+          .eq('institution_id', institutionId)
+          .gte('date', effectiveStartDate)
+          .lte('date', effectiveEndDate);
+
+        const totalRecords = attData?.length || 0;
+        const presentCount = attData?.filter((a: any) => a.status?.toLowerCase() === 'present').length || 0;
+        reportData.attendance = {
+          total_records: totalRecords,
+          present: presentCount,
+          absent: totalRecords - presentCount,
+          rate: totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0,
+          date_range: `${effectiveStartDate} to ${effectiveEndDate}`
+        };
+      } catch { reportData.attendance = { rate: 0, total_records: 0, present: 0, absent: 0 }; }
+    }
+
+    // Fee stats
+    if (sections.includes('fees')) {
+      try {
+        const { data: feeData } = await supabaseAdmin
+          .from('fee_payments')
+          .select('amount, status, payment_date')
+          .eq('institution_id', institutionId)
+          .gte('payment_date', effectiveStartDate)
+          .lte('payment_date', effectiveEndDate);
+
+        const totalCollected = feeData?.filter((f: any) => f.status === 'Completed' || f.status === 'Paid')
+          .reduce((sum: number, f: any) => sum + (parseFloat(f.amount) || 0), 0) || 0;
+        const totalPending = feeData?.filter((f: any) => f.status === 'Pending' || f.status === 'Unpaid')
+          .reduce((sum: number, f: any) => sum + (parseFloat(f.amount) || 0), 0) || 0;
+        reportData.fees = {
+          total_collected: totalCollected,
+          total_pending: totalPending,
+          transactions: feeData?.length || 0,
+          date_range: `${effectiveStartDate} to ${effectiveEndDate}`
+        };
+      } catch { reportData.fees = { total_collected: 0, total_pending: 0, transactions: 0 }; }
+    }
+
+    // Complaints stats
+    if (sections.includes('complaints')) {
+      try {
+        const { data: compData } = await supabaseAdmin
+          .from('hostel_complaints')
+          .select('status, created_at')
+          .eq('institution_id', institutionId)
+          .gte('created_at', effectiveStartDate)
+          .lte('created_at', effectiveEndDate + 'T23:59:59');
+
+        const total = compData?.length || 0;
+        const resolved = compData?.filter((c: any) => c.status === 'resolved' || c.status === 'closed').length || 0;
+        reportData.complaints = {
+          total,
+          resolved,
+          pending: total - resolved,
+          resolution_rate: total > 0 ? Math.round((resolved / total) * 100) : 0
+        };
+      } catch { reportData.complaints = { total: 0, resolved: 0, pending: 0, resolution_rate: 0 }; }
+    }
+
+    // Hostel stats
+    if (sections.includes('hostel')) {
+      try {
+        const { data: hostData } = await supabaseAdmin
+          .from('hostel_allocations')
+          .select('id, hostel_rooms(occupancy, capacity)')
+          .eq('institution_id', institutionId);
+
+        const totalBeds = hostData?.reduce((sum: number, h: any) => sum + (h.hostel_rooms?.capacity || 0), 0) || 0;
+        const occupied = hostData?.reduce((sum: number, h: any) => sum + (h.hostel_rooms?.occupancy || 0), 0) || 0;
+        reportData.hostel = {
+          total_beds: totalBeds,
+          occupied,
+          occupancy_rate: totalBeds > 0 ? Math.round((occupied / totalBeds) * 100) : 0,
+          total_allocations: hostData?.length || 0
+        };
+      } catch { reportData.hostel = { total_beds: 0, occupied: 0, occupancy_rate: 0, total_allocations: 0 }; }
+    }
+
+    // Events stats
+    if (sections.includes('events')) {
+      try {
+        const { data: evData } = await supabaseAdmin
+          .from('events')
+          .select('id, title, status')
+          .eq('institution_id', institutionId)
+          .gte('start_date', effectiveStartDate)
+          .lte('start_date', effectiveEndDate);
+
+        reportData.events = {
+          total: evData?.length || 0,
+          active: evData?.filter((e: any) => e.status === 'active' || e.status === 'upcoming').length || 0,
+          completed: evData?.filter((e: any) => e.status === 'completed').length || 0
+        };
+      } catch { reportData.events = { total: 0, active: 0, completed: 0 }; }
+    }
+
+    // Module usage stats
+    if (sections.includes('modules')) {
+      try {
+        const [canteenRes, gymRes, gateRes, libRes, transitRes] = await Promise.all([
+          supabaseAdmin.from('canteen_orders').select('id').eq('institution_id', institutionId).gte('created_at', effectiveStartDate).lte('created_at', effectiveEndDate + 'T23:59:59'),
+          supabaseAdmin.from('gym_bookings').select('id').eq('institution_id', institutionId).gte('booking_date', effectiveStartDate).lte('booking_date', effectiveEndDate),
+          supabaseAdmin.from('gate_logs').select('id').eq('institution_id', institutionId).gte('timestamp', effectiveStartDate).lte('timestamp', effectiveEndDate + 'T23:59:59'),
+          supabaseAdmin.from('book_issues').select('id').eq('institution_id', institutionId).gte('issue_date', effectiveStartDate).lte('issue_date', effectiveEndDate),
+          supabaseAdmin.from('transport_subscriptions').select('id').eq('institution_id', institutionId).eq('status', 'active')
+        ]);
+        reportData.modules = {
+          canteen_orders: canteenRes.data?.length || 0,
+          gym_bookings: gymRes.data?.length || 0,
+          gate_entries: gateRes.data?.length || 0,
+          library_issues: libRes.data?.length || 0,
+          active_transit_subs: transitRes.data?.length || 0
+        };
+      } catch { reportData.modules = { canteen_orders: 0, gym_bookings: 0, gate_entries: 0, library_issues: 0, active_transit_subs: 0 }; }
+    }
+
+    // Total students & staff
+    try {
+      const [studentsRes, staffRes] = await Promise.all([
+        supabaseAdmin.from('users').select('id', { count: 'exact', head: true }).eq('institution_id', institutionId).eq('role', 'Student').eq('is_active', true),
+        supabaseAdmin.from('users').select('id', { count: 'exact', head: true }).eq('institution_id', institutionId).in('role', ['Staff', 'Teacher', 'Admin', 'HOD', 'Warden'])
+      ]);
+      reportData.total_students = studentsRes.count || 0;
+      reportData.total_staff = staffRes.count || 0;
+    } catch { reportData.total_students = 0; reportData.total_staff = 0; }
+
+    // Generate PDF HTML
+    const reportTypeLabel = report_type === 'daily' ? 'Daily' : report_type === 'weekly' ? 'Weekly' : report_type === 'monthly' ? 'Monthly' : report_type === 'yearly' ? 'Annual' : 'Custom';
+    const dateRangeLabel = report_type === 'yearly' ? `January - December ${reportYear}` : `${effectiveStartDate} to ${effectiveEndDate}`;
+
+    const htmlSections = [];
+
+    if (reportData.attendance) {
+      htmlSections.push(`
+        <div class="section">
+          <h3>Attendance Overview</h3>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-value">${reportData.attendance.rate}%</span><span class="kpi-label">Attendance Rate</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.attendance.total_records}</span><span class="kpi-label">Total Records</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.attendance.present}</span><span class="kpi-label">Present</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.attendance.absent}</span><span class="kpi-label">Absent</span></div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (reportData.fees) {
+      htmlSections.push(`
+        <div class="section">
+          <h3>Fee Collection</h3>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-value">₹${reportData.fees.total_collected.toLocaleString('en-IN')}</span><span class="kpi-label">Collected</span></div>
+            <div class="kpi"><span class="kpi-value">₹${reportData.fees.total_pending.toLocaleString('en-IN')}</span><span class="kpi-label">Pending</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.fees.transactions}</span><span class="kpi-label">Transactions</span></div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (reportData.complaints) {
+      htmlSections.push(`
+        <div class="section">
+          <h3>Complaints Summary</h3>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-value">${reportData.complaints.total}</span><span class="kpi-label">Total</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.complaints.resolved}</span><span class="kpi-label">Resolved</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.complaints.pending}</span><span class="kpi-label">Pending</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.complaints.resolution_rate}%</span><span class="kpi-label">Resolution Rate</span></div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (reportData.hostel) {
+      htmlSections.push(`
+        <div class="section">
+          <h3>Hostel Occupancy</h3>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-value">${reportData.hostel.occupancy_rate}%</span><span class="kpi-label">Occupancy Rate</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.hostel.occupied} / ${reportData.hostel.total_beds}</span><span class="kpi-label">Beds (Occupied/Total)</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.hostel.total_allocations}</span><span class="kpi-label">Active Allocations</span></div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (reportData.events) {
+      htmlSections.push(`
+        <div class="section">
+          <h3>Events</h3>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-value">${reportData.events.total}</span><span class="kpi-label">Total Events</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.events.active}</span><span class="kpi-label">Active/Upcoming</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.events.completed}</span><span class="kpi-label">Completed</span></div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (reportData.modules) {
+      htmlSections.push(`
+        <div class="section">
+          <h3>Module Usage</h3>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-value">${reportData.modules.canteen_orders}</span><span class="kpi-label">Canteen Orders</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.modules.gym_bookings}</span><span class="kpi-label">Gym Bookings</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.modules.gate_entries}</span><span class="kpi-label">Gate Entries</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.modules.library_issues}</span><span class="kpi-label">Library Issues</span></div>
+            <div class="kpi"><span class="kpi-value">${reportData.modules.active_transit_subs}</span><span class="kpi-label">Transit Subscriptions</span></div>
+          </div>
+        </div>
+      `);
+    }
+
+    const sampleHtml = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1F2937; }
+            h1 { color: #6C2BD9; text-align: center; margin-bottom: 5px; }
+            .subtitle { text-align: center; color: #6B7280; font-size: 12px; margin-bottom: 30px; }
+            .meta { background: #F3F4F6; padding: 12px 16px; border-radius: 8px; margin-bottom: 24px; font-size: 11px; }
+            .meta strong { color: #6C2BD9; }
+            .section { border-top: 1px solid #E5E7EB; margin-top: 20px; padding-top: 20px; }
+            .section h3 { color: #6C2BD9; font-size: 14px; margin-bottom: 12px; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+            .kpi { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; text-align: center; }
+            .kpi-value { display: block; font-size: 18px; font-weight: 800; color: #111827; }
+            .kpi-label { display: block; font-size: 10px; color: #6B7280; margin-top: 4px; text-transform: uppercase; }
+            .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #6C2BD9; text-align: center; font-size: 10px; color: #9CA3AF; }
+            .summary { background: #EDE9FE; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+            .summary h2 { color: #6C2BD9; font-size: 16px; margin-bottom: 8px; }
+            .summary p { font-size: 12px; color: #4B5563; margin: 4px 0; }
+          </style>
+        </head>
+        <body>
+          <h1>IRIS 365 Campus Report</h1>
+          <p class="subtitle">${reportTypeLabel} Report • IRIS 365 Campus Management System</p>
+          
+          <div class="summary">
+            <h2>Report Summary</h2>
+            <p><strong>Report Type:</strong> ${reportTypeLabel}</p>
+            <p><strong>Date Range:</strong> ${dateRangeLabel}</p>
+            <p><strong>Total Students:</strong> ${reportData.total_students} | <strong>Total Staff:</strong> ${reportData.total_staff}</p>
+            <p><strong>Generated:</strong> ${new Date().toLocaleString('en-IN')}</p>
+          </div>
+          
+          <div class="meta">
+            <strong>Institution:</strong> ${reportData.institution_name} &nbsp;|&nbsp;
+            <strong>Sections Included:</strong> ${sections.map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')}
+          </div>
+          
+          ${htmlSections.join('\n')}
+          
+          <div class="footer">
+            <p>Generated by IRIS 365 Campus Management System • ${new Date().toLocaleString('en-IN')}</p>
+            <p>This is a system-generated report. No signature required.</p>
+          </div>
+        </body>
+      </html>
+    `;
 
     let pdfBuffer: Buffer;
     try {
-      // 1. Try Puppeteer HTML-to-PDF rendering compiler
-      const sampleHtml = `
-        <html>
-          <head>
-            <style>
-              body { font-family: sans-serif; padding: 40px; color: #1F2937; }
-              h1 { color: #6C2BD9; text-align: center; }
-              .section { border-top: 1px solid #E5E7EB; margin-top: 20px; padding-top: 20px; }
-            </style>
-          </head>
-          <body>
-            <h1>IRIS 365 Campus Report</h1>
-            <p><strong>Report Type:</strong> WEEKLY</p>
-            <p><strong>Date:</strong> ${today}</p>
-            <div class="section">
-              <h3>Operations Summary Statistics</h3>
-              <ul>
-                <li>Attendance Rate today: 87%</li>
-                <li>Fee Revenues today: ₹2,45,00,000</li>
-                <li>Students inside Campus: 1089</li>
-                <li>Pending Complaints: 14</li>
-              </ul>
-            </div>
-          </body>
-        </html>
-      `;
       pdfBuffer = await generatePuppeteerPDF(sampleHtml);
     } catch {
-      // 2. Dynamic fallback to robust local PDFKit compiler
       pdfBuffer = await generatePDFKitFallback(reportDataPayload);
     }
 
-    const fileName = `Report_weekly_${today}_${Date.now()}.pdf`;
+    const fileName = `Report_${reportTypeLabel.toLowerCase()}_${effectiveStartDate}_to_${effectiveEndDate}_${Date.now()}.pdf`;
     let publicUrl = '';
     try {
       publicUrl = await uploadReportToSupabase(pdfBuffer, fileName);
@@ -1193,43 +1436,43 @@ export async function generateAndDownloadPDFReport(req: Request, res: Response) 
       logger.warn('Failed uploading report to storage bucket: ' + (e as Error).message);
     }
 
-    // Save record in director_reports table
     let savedReport: any = null;
     try {
       const { data, error } = await supabaseAdmin
         .from('director_reports')
         .insert({
           institution_id: institutionId,
-          report_type: 'weekly',
+          report_type: reportTypeLabel.toLowerCase(),
           report_date: today,
-          data: reportDataPayload.data,
+          data: reportData,
           pdf_url: publicUrl
         })
         .select()
         .single();
-      if (!error) {
-        savedReport = data;
-      }
+      if (!error) savedReport = data;
     } catch (e) {
       logger.warn('Failed saving report record to database: ' + (e as Error).message);
     }
 
     const reportId = savedReport?.id || 'r0000000-0000-0000-0000-000000000001';
 
-    // Build the expected JSON structure
     const responsePayload = {
       success: true,
       report: {
         id: reportId,
-        title: 'IRIS 365 Operations Report',
-        institution: 'SIET Campus',
-        generated_at: new Date().toLocaleString(),
+        title: `IRIS 365 ${reportTypeLabel} Report`,
+        institution: reportData.institution_name,
+        generated_at: new Date().toLocaleString('en-IN'),
         pdf_url: `/api/v1/director/reports/${reportId}/download`,
+        date_range: { start: effectiveStartDate, end: effectiveEndDate },
+        sections: sections,
         summary: {
-          total_students: 1247,
-          total_staff: 89,
-          fee_collected: '₹2,45,00,000',
-          pending_complaints: 14
+          total_students: reportData.total_students,
+          total_staff: reportData.total_staff,
+          attendance_rate: reportData.attendance?.rate || 0,
+          fee_collected: reportData.fees?.total_collected || 0,
+          complaints_pending: reportData.complaints?.pending || 0,
+          hostel_occupancy: reportData.hostel?.occupancy_rate || 0
         }
       }
     };

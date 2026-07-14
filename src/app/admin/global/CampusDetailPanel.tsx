@@ -5,15 +5,24 @@ import { X, Users, GraduationCap, CheckCircle2, IndianRupee, Activity, CreditCar
 import { supabase } from '../../../lib/supabase';
 
 const FEATURE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', admissions: 'Admissions', students: 'Students',
-  attendance: 'Attendance', timetable: 'Timetable', fees: 'Fees & Finance',
-  exams: 'Exams & Results', canteen: 'Canteen', hostel: 'Hostel',
+  dashboard: 'Dashboard', admissions: 'Admissions', new_admission: 'New Admission',
+  students: 'Students', users_roles: 'Users & Roles', permissions: 'Permissions',
+  attendance: 'Attendance', timetable: 'Timetable', timetable_auto: 'Timetable Auto',
+  fees: 'Fees & Finance', fee_escalation: 'Fee Escalation',
+  exams: 'Exams & Results', exam_seating: 'Exam Seating', exam_enrollment: 'Exam Enrollment',
+  calendar: 'Academic Calendar', defaulter_report: 'Defaulter Report',
+  canteen: 'Canteen', hostel: 'Hostel', complaints: 'Complaints',
   library: 'Library', placements: 'Placements', hr: 'HR Management',
   gate: 'Smart Gate', gym: 'FitZone Gym', transit: 'Transit',
-  events: 'Events', notices: 'Notices', idcards: 'ID Cards',
-  ai_concierge: 'AI Concierge', obe: 'OBE Maps', naac: 'NAAC Scorecard',
-  faculty_development: 'Faculty Dev', achievements: 'Achievements',
-  director: 'Director Console', parent_portal: 'Parent Portal'
+  events: 'Events', lost_found: 'Lost & Found', notices: 'Notices',
+  idcards: 'ID Cards', ai_concierge: 'AI Concierge', obe: 'OBE Maps',
+  naac: 'NAAC Scorecard', faculty_development: 'Faculty Dev',
+  faculty_portal: 'Faculty Portal', security_portal: 'Security Portal',
+  driver_portal: 'Driver Portal', vendor_portal: 'Vendor Portal',
+  achievements: 'Achievements', whatsapp: 'WhatsApp API',
+  notifications: 'Notifications', payment_settings: 'Payment Settings',
+  settings: 'Settings', director: 'Director Console',
+  parent_portal: 'Parent Portal', profile: 'Profile'
 };
 
 interface CampusDetailPanelProps {

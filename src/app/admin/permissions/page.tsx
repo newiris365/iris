@@ -17,24 +17,39 @@ const ALL_ROLES = [
 ];
 
 const COLLEGE_ONLY_ROLES = new Set(['HOD', 'TPO', 'IQAC Coordinator']);
+const SCHOOL_ONLY_ROLES = new Set(['Principal', 'Vice Principal']);
 
 function getVisibleRoles(instituteType: string) {
+  let roles = ALL_ROLES.filter(r => r !== 'SuperAdmin');
   if (instituteType === 'school') {
-    return ALL_ROLES.filter(r => !COLLEGE_ONLY_ROLES.has(r));
+    roles = roles.filter(r => !COLLEGE_ONLY_ROLES.has(r));
+  } else {
+    roles = roles.filter(r => !SCHOOL_ONLY_ROLES.has(r));
   }
-  return ALL_ROLES;
+  return roles;
 }
 
 const ALL_MODULES = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'admissions', label: 'Admissions' },
+  { key: 'new_admission', label: 'New Admission' },
   { key: 'students', label: 'Students' },
+  { key: 'users_roles', label: 'Users & Roles' },
+  { key: 'departments', label: 'Departments' },
+  { key: 'permissions', label: 'Permissions' },
   { key: 'attendance', label: 'Attendance' },
   { key: 'timetable', label: 'Timetable' },
+  { key: 'timetable_auto', label: 'Timetable Auto' },
   { key: 'fees', label: 'Fees & Finance' },
+  { key: 'fee_escalation', label: 'Fee Escalation' },
   { key: 'exams', label: 'Exams & Results' },
+  { key: 'exam_seating', label: 'Exam Seating' },
+  { key: 'exam_enrollment', label: 'Exam Enrollment' },
+  { key: 'academic_calendar', label: 'Academic Calendar' },
+  { key: 'defaulter_report', label: 'Defaulter Report' },
   { key: 'canteen', label: 'Canteen' },
   { key: 'hostel', label: 'Hostel' },
+  { key: 'complaints', label: 'Complaints' },
   { key: 'library', label: 'Library' },
   { key: 'placements', label: 'Placements' },
   { key: 'hr', label: 'HR Management' },
@@ -42,36 +57,125 @@ const ALL_MODULES = [
   { key: 'gym', label: 'FitZone Gym' },
   { key: 'transit', label: 'Transit' },
   { key: 'events', label: 'Events' },
+  { key: 'lost_found', label: 'Lost & Found' },
   { key: 'notices', label: 'Notices' },
   { key: 'idcards', label: 'ID Cards' },
   { key: 'ai_concierge', label: 'AI Concierge' },
   { key: 'obe', label: 'OBE Maps' },
   { key: 'naac', label: 'NAAC Scorecard' },
   { key: 'faculty_development', label: 'Faculty Dev' },
+  { key: 'faculty_portal', label: 'Faculty Portal' },
+  { key: 'security_portal', label: 'Security Portal' },
+  { key: 'driver_portal', label: 'Driver Portal' },
+  { key: 'vendor_portal', label: 'Vendor Portal' },
   { key: 'achievements', label: 'Achievements' },
-  { key: 'director', label: 'Director Console' },
+  { key: 'whatsapp', label: 'WhatsApp API' },
+  { key: 'notifications', label: 'Notifications' },
+  { key: 'payment_settings', label: 'Payment Settings' },
+  { key: 'settings', label: 'Settings' },
+  { key: 'director', label: 'Director Portal' },
   { key: 'parent_portal', label: 'Parent Portal' },
+  { key: 'profile', label: 'Profile' },
 ];
 
 // Sensible default permissions per role
 const DEFAULT_PERMISSIONS: Record<string, Record<string, { read: boolean; write: boolean; delete: boolean }>> = {
   Admin: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: true, write: true, delete: true }])),
-  Director: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: true, write: false, delete: false }])),
-  Principal: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: true, write: false, delete: false }])),
-  HOD: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: true, write: ['attendance', 'obe', 'students'].includes(m.key), delete: false }])),
-  Teacher: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'attendance', 'timetable', 'exams', 'obe', 'students', 'notices'].includes(m.key), write: ['attendance', 'obe'].includes(m.key), delete: false }])),
-  Staff: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'attendance', 'timetable', 'hr', 'notices'].includes(m.key), write: ['attendance'].includes(m.key), delete: false }])),
-  Student: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'attendance', 'timetable', 'fees', 'exams', 'canteen', 'hostel', 'library', 'placements', 'events', 'gym', 'transit', 'notices', 'idcards', 'obe'].includes(m.key), write: false, delete: false }])),
-  Parent: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'attendance', 'fees', 'exams', 'notices', 'parent_portal'].includes(m.key), write: false, delete: false }])),
-  Warden: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'hostel', 'gate', 'notices'].includes(m.key), write: ['hostel', 'gate'].includes(m.key), delete: false }])),
-  Security: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'gate', 'notices'].includes(m.key), write: ['gate'].includes(m.key), delete: false }])),
-  Vendor: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'canteen'].includes(m.key), write: ['canteen'].includes(m.key), delete: false }])),
-  Driver: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'transit'].includes(m.key), write: false, delete: false }])),
-  TPO: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'placements', 'students'].includes(m.key), write: ['placements'].includes(m.key), delete: false }])),
-  Librarian: Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'library'].includes(m.key), write: ['library'].includes(m.key), delete: false }])),
-  'Gym Trainer': Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'gym'].includes(m.key), write: ['gym'].includes(m.key), delete: false }])),
-  'IQAC Coordinator': Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'obe', 'naac'].includes(m.key), write: ['obe', 'naac'].includes(m.key), delete: false }])),
-  'Admissions Officer': Object.fromEntries(ALL_MODULES.map(m => [m.key, { read: ['dashboard', 'admissions'].includes(m.key), write: ['admissions'].includes(m.key), delete: false }])),
+  Director: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: true,
+    write: ['dashboard', 'admissions', 'new_admission', 'students', 'attendance', 'timetable', 'fees', 'fee_escalation', 'exams', 'defaulter_report', 'placements', 'hr', 'hostel', 'gate', 'events', 'notices', 'obe', 'naac', 'director', 'faculty_development', 'achievements'].includes(m.key),
+    delete: false
+  }])),
+  HOD: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: true,
+    write: ['dashboard', 'students', 'attendance', 'obe', 'timetable', 'exams', 'faculty_development', 'achievements', 'placements', 'events', 'notices', 'canteen', 'complaints'].includes(m.key),
+    delete: false
+  }])),
+  Teacher: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'attendance', 'timetable', 'exams', 'obe', 'students', 'notices', 'events', 'library', 'gym', 'canteen', 'complaints'].includes(m.key),
+    write: ['attendance', 'obe', 'timetable', 'exams'].includes(m.key),
+    delete: false
+  }])),
+  Staff: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'attendance', 'timetable', 'hr', 'notices', 'events', 'canteen', 'complaints', 'gym'].includes(m.key),
+    write: ['attendance'].includes(m.key),
+    delete: false
+  }])),
+  Student: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'attendance', 'timetable', 'fees', 'exams', 'canteen', 'hostel', 'library', 'placements', 'events', 'gym', 'transit', 'notices', 'idcards', 'obe', 'complaints', 'lost_found', 'academic_calendar', 'exam_enrollment', 'parent_portal'].includes(m.key),
+    write: false,
+    delete: false
+  }])),
+  Parent: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'attendance', 'fees', 'exams', 'notices', 'parent_portal', 'complaints', 'hostel'].includes(m.key),
+    write: false,
+    delete: false
+  }])),
+  Warden: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'hostel', 'gate', 'notices', 'complaints', 'transit'].includes(m.key),
+    write: ['hostel', 'gate', 'complaints'].includes(m.key),
+    delete: false
+  }])),
+  Security: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'gate', 'notices', 'security_portal', 'transit'].includes(m.key),
+    write: ['gate', 'security_portal'].includes(m.key),
+    delete: false
+  }])),
+  Vendor: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'canteen', 'vendor_portal'].includes(m.key),
+    write: ['canteen', 'vendor_portal'].includes(m.key),
+    delete: false
+  }])),
+  Driver: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'transit', 'driver_portal'].includes(m.key),
+    write: ['driver_portal'].includes(m.key),
+    delete: false
+  }])),
+  TPO: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'placements', 'students', 'achievements'].includes(m.key),
+    write: ['placements'].includes(m.key),
+    delete: false
+  }])),
+  Librarian: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'library'].includes(m.key),
+    write: ['library'].includes(m.key),
+    delete: false
+  }])),
+  'Gym Trainer': Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'gym'].includes(m.key),
+    write: ['gym'].includes(m.key),
+    delete: false
+  }])),
+  'IQAC Coordinator': Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'obe', 'naac', 'faculty_development'].includes(m.key),
+    write: ['obe', 'naac'].includes(m.key),
+    delete: false
+  }])),
+  'Admissions Officer': Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'admissions', 'new_admission'].includes(m.key),
+    write: ['admissions', 'new_admission'].includes(m.key),
+    delete: false
+  }])),
+  'HR Admin': Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'hr', 'attendance', 'notifications'].includes(m.key),
+    write: ['hr'].includes(m.key),
+    delete: false
+  }])),
+  'Company HR': Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'placements'].includes(m.key),
+    write: false,
+    delete: false
+  }])),
+  'Vice Principal': Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: true,
+    write: ['dashboard', 'students', 'attendance', 'timetable', 'exams', 'notices', 'complaints'].includes(m.key),
+    delete: false
+  }])),
+  Applicant: Object.fromEntries(ALL_MODULES.map(m => [m.key, {
+    read: ['dashboard', 'admissions', 'new_admission', 'fees', 'profile'].includes(m.key),
+    write: false,
+    delete: false
+  }])),
 };
 
 export default function AdminPermissionsPage() {
@@ -105,10 +209,23 @@ export default function AdminPermissionsPage() {
     try {
       const res = await getRolePermissions(institutionId);
       if (res.success && res.permissions && res.permissions.length > 0) {
-        setPermissions(res.permissions);
+        // Merge database permissions with defaults for any missing role+module combos
+        const dbPerms = res.permissions as ModulePermission[];
+        const merged: ModulePermission[] = [];
+        for (const role of ALL_ROLES) {
+          for (const mod of ALL_MODULES) {
+            const existing = dbPerms.find(p => p.role === role && p.module === mod.key);
+            if (existing) {
+              merged.push(existing);
+            } else {
+              const def = DEFAULT_PERMISSIONS[role]?.[mod.key] || { read: false, write: false, delete: false };
+              merged.push({ role, module: mod.key, can_read: def.read, can_write: def.write, can_delete: def.delete });
+            }
+          }
+        }
+        setPermissions(merged);
         setHasExisting(true);
       } else {
-        // Load defaults
         loadDefaults();
       }
     } catch (err) {

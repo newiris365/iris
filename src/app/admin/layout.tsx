@@ -8,7 +8,8 @@ import {
   Shield, Bus, BrainCircuit, ClipboardList, GraduationCap,
   Home, Bell, Award, FileText, UserCheck, Settings,
   Package, AlertTriangle, Calendar, BarChart3, UserCircle, MessageSquare,
-  Sliders, UserPlus, BedDouble, School, BookMarked, UtensilsCrossed
+  Sliders, UserPlus, BedDouble, School, BookMarked, UtensilsCrossed, Tag,
+  Building2
 } from 'lucide-react';
 
 const collegeAdminLinks: SidebarLink[] = [
@@ -17,6 +18,7 @@ const collegeAdminLinks: SidebarLink[] = [
   { label: 'New Admission', href: '/admin/admissions/new', icon: Users },
   { label: 'Students', href: '/admin/students', icon: GraduationCap },
   { label: 'Users & Roles', href: '/admin/users', icon: UserPlus },
+  { label: 'Departments', href: '/admin/departments', icon: Building2 },
   { label: 'Permissions', href: '/admin/permissions', icon: Sliders },
   { label: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/admin/timetable', icon: ClipboardList },
@@ -52,6 +54,7 @@ const collegeAdminLinks: SidebarLink[] = [
   { label: 'Achievements', href: '/admin/achievements', icon: FileText },
   { label: 'WhatsApp API', href: '/admin/whatsapp', icon: MessageSquare },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
+  { label: 'Service Pricing', href: '/admin/pricing', icon: Tag },
   { label: 'Payment Settings', href: '/admin/payment-settings', icon: CreditCard },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
   { label: 'Profile', href: '/profile', icon: UserCircle },
@@ -61,6 +64,7 @@ const schoolAdminLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Students', href: '/admin/students', icon: GraduationCap },
   { label: 'Teachers & Staff', href: '/admin/users', icon: Users },
+  { label: 'Departments', href: '/admin/departments', icon: Building2 },
   { label: 'Classes & Sections', href: '/admin/classes', icon: School },
   { label: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/admin/timetable', icon: ClipboardList },
@@ -81,6 +85,7 @@ const schoolAdminLinks: SidebarLink[] = [
   { label: 'ID Cards', href: '/admin/idcards', icon: Users },
   { label: 'AI Concierge', href: '/admin/ai', icon: BrainCircuit, badge: 'AI' },
   { label: 'WhatsApp API', href: '/admin/whatsapp', icon: MessageSquare },
+  { label: 'Service Pricing', href: '/admin/pricing', icon: Tag },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },
   { label: 'Permissions', href: '/admin/permissions', icon: Sliders },
   { label: 'Settings', href: '/admin/settings', icon: Settings },

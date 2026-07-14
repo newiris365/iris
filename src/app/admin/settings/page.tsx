@@ -10,33 +10,53 @@ import {
 } from '../../../lib/api';
 
 const ALL_FEATURES = [
-  'dashboard', 'admissions', 'students', 'attendance', 'timetable',
-  'fees', 'exams', 'canteen', 'hostel', 'library', 'placements',
-  'hr', 'gate', 'gym', 'transit', 'events', 'notices', 'idcards',
-  'ai_concierge', 'obe', 'naac', 'faculty_development', 'achievements',
-  'director', 'parent_portal'
+  'dashboard', 'admissions', 'new_admission', 'students', 'users_roles',
+  'departments', 'permissions', 'attendance', 'timetable', 'timetable_auto',
+  'fees', 'fee_escalation', 'exams', 'exam_seating', 'exam_enrollment',
+  'academic_calendar', 'defaulter_report', 'canteen', 'hostel', 'complaints',
+  'library', 'placements', 'hr', 'gate', 'gym', 'transit', 'events',
+  'lost_found', 'notices', 'idcards', 'ai_concierge', 'obe', 'naac',
+  'faculty_development', 'faculty_portal', 'security_portal', 'driver_portal',
+  'vendor_portal', 'achievements', 'whatsapp', 'notifications',
+  'payment_settings', 'settings', 'director', 'parent_portal', 'profile'
 ];
 
 const FEATURE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', admissions: 'Admissions', students: 'Students',
-  attendance: 'Attendance', timetable: 'Timetable', fees: 'Fees & Finance',
-  exams: 'Exams & Results', canteen: 'Canteen', hostel: 'Hostel',
+  dashboard: 'Dashboard', admissions: 'Admissions', new_admission: 'New Admission',
+  students: 'Students', users_roles: 'Users & Roles', departments: 'Departments',
+  permissions: 'Permissions', attendance: 'Attendance', timetable: 'Timetable',
+  timetable_auto: 'Timetable Auto', fees: 'Fees & Finance',
+  fee_escalation: 'Fee Escalation', exams: 'Exams & Results',
+  exam_seating: 'Exam Seating', exam_enrollment: 'Exam Enrollment',
+  academic_calendar: 'Academic Calendar', defaulter_report: 'Defaulter Report',
+  canteen: 'Canteen', hostel: 'Hostel', complaints: 'Complaints',
   library: 'Library', placements: 'Placements', hr: 'HR Management',
   gate: 'Smart Gate', gym: 'FitZone Gym', transit: 'Transit',
-  events: 'Events', notices: 'Notices', idcards: 'ID Cards',
-  ai_concierge: 'AI Concierge', obe: 'OBE Maps', naac: 'NAAC Scorecard',
-  faculty_development: 'Faculty Dev', achievements: 'Achievements',
-  director: 'Director Console', parent_portal: 'Parent Portal'
+  events: 'Events', lost_found: 'Lost & Found', notices: 'Notices',
+  idcards: 'ID Cards', ai_concierge: 'AI Concierge', obe: 'OBE Maps',
+  naac: 'NAAC Scorecard', faculty_development: 'Faculty Dev',
+  faculty_portal: 'Faculty Portal', security_portal: 'Security Portal',
+  driver_portal: 'Driver Portal', vendor_portal: 'Vendor Portal',
+  achievements: 'Achievements', whatsapp: 'WhatsApp API',
+  notifications: 'Notifications', payment_settings: 'Payment Settings',
+  settings: 'Settings', director: 'Director Portal',
+  parent_portal: 'Parent Portal', profile: 'Profile'
 };
 
 const FEATURE_ICONS: Record<string, string> = {
-  dashboard: '📊', admissions: '🎓', students: '👤', attendance: '✅',
-  timetable: '📅', fees: '💰', exams: '📝', canteen: '🍽️',
-  hostel: '🏠', library: '📚', placements: '💼', hr: '👥',
-  gate: '🚪', gym: '💪', transit: '🚌', events: '🎉',
-  notices: '📢', idcards: '🪪', ai_concierge: '🤖', obe: '📋',
-  naac: '🏆', faculty_development: '👨‍🏫', achievements: '🏅',
-  director: '🎯', parent_portal: '👨‍👩‍👧'
+  dashboard: '📊', admissions: '🎓', new_admission: '📝', students: '👤',
+  users_roles: '👥', departments: '🏢', permissions: '🔐', attendance: '✅',
+  timetable: '📅', timetable_auto: '⚡', fees: '💰', fee_escalation: '📈',
+  exams: '📝', exam_seating: '🪑', exam_enrollment: '📋',
+  academic_calendar: '📆', defaulter_report: '📊', canteen: '🍽️',
+  hostel: '🏠', complaints: '⚠️', library: '📚', placements: '💼',
+  hr: '👥', gate: '🚪', gym: '💪', transit: '🚌', events: '🎉',
+  lost_found: '📦', notices: '📢', idcards: '🪪', ai_concierge: '🤖',
+  obe: '📋', naac: '🏆', faculty_development: '👨‍🏫',
+  faculty_portal: '👨‍🏫', security_portal: '🛡️', driver_portal: '🚌',
+  vendor_portal: '🛒', achievements: '🏅', whatsapp: '💬',
+  notifications: '🔔', payment_settings: '💳', settings: '⚙️',
+  director: '🎯', parent_portal: '👨‍👩‍👧', profile: '👤'
 };
 
 type Tab = 'features' | 'permissions';
@@ -47,22 +67,30 @@ const SEED_SQL = `-- Run this in Supabase SQL Editor to seed defaults
 INSERT INTO institution_features (institution_id, feature_key, enabled)
 SELECT 'YOUR_INSTITUTION_ID', f.feature_key, true
 FROM (VALUES
-  ('dashboard'), ('admissions'), ('students'), ('attendance'), ('timetable'),
-  ('fees'), ('exams'), ('canteen'), ('hostel'), ('library'), ('placements'),
-  ('hr'), ('gate'), ('gym'), ('transit'), ('events'), ('notices'), ('idcards'),
-  ('ai_concierge'), ('obe'), ('naac'), ('faculty_development'), ('achievements'),
-  ('director'), ('parent_portal')
+  ('dashboard'), ('admissions'), ('new_admission'), ('students'), ('users_roles'),
+  ('departments'), ('permissions'), ('attendance'), ('timetable'), ('timetable_auto'),
+  ('fees'), ('fee_escalation'), ('exams'), ('exam_seating'), ('exam_enrollment'),
+  ('academic_calendar'), ('defaulter_report'), ('canteen'), ('hostel'), ('complaints'),
+  ('library'), ('placements'), ('hr'), ('gate'), ('gym'), ('transit'), ('events'),
+  ('lost_found'), ('notices'), ('idcards'), ('ai_concierge'), ('obe'), ('naac'),
+  ('faculty_development'), ('faculty_portal'), ('security_portal'), ('driver_portal'),
+  ('vendor_portal'), ('achievements'), ('whatsapp'), ('notifications'),
+  ('payment_settings'), ('settings'), ('director'), ('parent_portal'), ('profile')
 ) AS f(feature_key)
 ON CONFLICT (institution_id, feature_key) DO NOTHING;
 
 INSERT INTO module_permissions (institution_id, role, module, can_read, can_write, can_delete)
 SELECT 'YOUR_INSTITUTION_ID', 'Admin', m.module, true, true, true
 FROM (VALUES
-  ('dashboard'), ('admissions'), ('students'), ('attendance'), ('timetable'),
-  ('fees'), ('exams'), ('canteen'), ('hostel'), ('library'), ('placements'),
-  ('hr'), ('gate'), ('gym'), ('transit'), ('events'), ('notices'), ('idcards'),
-  ('ai_concierge'), ('obe'), ('naac'), ('faculty_development'), ('achievements'),
-  ('director'), ('parent_portal')
+  ('dashboard'), ('admissions'), ('new_admission'), ('students'), ('users_roles'),
+  ('departments'), ('permissions'), ('attendance'), ('timetable'), ('timetable_auto'),
+  ('fees'), ('fee_escalation'), ('exams'), ('exam_seating'), ('exam_enrollment'),
+  ('academic_calendar'), ('defaulter_report'), ('canteen'), ('hostel'), ('complaints'),
+  ('library'), ('placements'), ('hr'), ('gate'), ('gym'), ('transit'), ('events'),
+  ('lost_found'), ('notices'), ('idcards'), ('ai_concierge'), ('obe'), ('naac'),
+  ('faculty_development'), ('faculty_portal'), ('security_portal'), ('driver_portal'),
+  ('vendor_portal'), ('achievements'), ('whatsapp'), ('notifications'),
+  ('payment_settings'), ('settings'), ('director'), ('parent_portal'), ('profile')
 ) AS m(module)
 ON CONFLICT (institution_id, role, module) DO NOTHING;`;
 

@@ -194,10 +194,8 @@ export async function GET(request: NextRequest) {
       console.log('[auth/callback] STEP 4 — Attempting PKCE code exchange...');
       const cookieStore = await cookies();
       const allCookies = cookieStore.getAll();
-      console.log('[auth/callback] STEP 4 — Available cookies:', allCookies.map(c => c.name));
       const verifierCookie = allCookies.find(c => c.name.includes('code-verifier') || c.name.includes('code_verifier') || c.name.includes('pkce'));
       const code_verifier = verifierCookie?.value;
-      console.log('[auth/callback] STEP 4 — PKCE verifier cookie found:', verifierCookie?.name || 'NONE');
 
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://api.iris365.in';
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -217,12 +215,10 @@ export async function GET(request: NextRequest) {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error('[auth/callback] STEP 4 — Direct PKCE token exchange failed:', response.status, errText);
         throw new Error(`Direct PKCE token exchange failed: ${errText}`);
       }
 
       const tokenData = await response.json();
-      console.log('[auth/callback] STEP 4 — Direct PKCE exchange SUCCESS');
 
       const authData = {
         user: tokenData.user,
@@ -234,13 +230,8 @@ export async function GET(request: NextRequest) {
       };
 
       if (!authData.session || !authData.user) {
-        console.error('[auth/callback] STEP 5 — Direct PKCE exchange returned no session or user. Data:', JSON.stringify({ hasSession: !!authData.session, hasUser: !!authData.user }));
         throw new Error('Failed to exchange auth session code');
       }
-      console.log('[auth/callback] STEP 5 — exchangeCodeForSession SUCCESS:');
-      console.log('  user.id:', authData.user.id);
-      console.log('  user.email:', authData.user.email);
-      console.log('  session.expires_at:', authData.session.expires_at);
 
       authUser = authData.user;
       authSession = {
@@ -249,13 +240,10 @@ export async function GET(request: NextRequest) {
       };
     } else if (accessToken) {
       // Implicit flow fallback
-      console.log('[auth/callback] STEP 4 — Using implicit flow (access_token directly)');
       const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
       if (userError || !userData.user) {
-        console.error('[auth/callback] STEP 4 — getUser failed:', userError?.message);
         throw new Error(userError?.message || 'Failed to retrieve user from access token');
       }
-      console.log('[auth/callback] STEP 4 — Implicit flow user:', userData.user.email);
       authUser = userData.user;
       authSession = {
         access_token: accessToken,
@@ -272,8 +260,6 @@ export async function GET(request: NextRequest) {
       throw new Error('No email returned from Google authentication provider');
     }
 
-    // ─── STEP 6: Fetch user profile from Supabase users table ────────────────
-    console.log('[auth/callback] STEP 6 — Looking up email in users table:', email);
     // Fetch user profile matching the authenticated email
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
@@ -282,13 +268,8 @@ export async function GET(request: NextRequest) {
       .eq('email', email)
       .single();
 
-    // ─── STEP 6 result ────────────────────────────────────────────────────────
     if (profileError) {
-      console.error('[auth/callback] STEP 6 — Supabase users table query error:', profileError.message, '| code:', profileError.code);
-    }
-    console.log('[auth/callback] STEP 6 — Profile found:', !!userProfile, '| email queried:', email);
-    if (userProfile) {
-      console.log('[auth/callback] STEP 6 — Profile details: id:', userProfile.id, '| role:', userProfile.role, '| is_active:', userProfile.is_active, '| institution_id:', userProfile.institution_id);
+      console.error('[auth/callback] Profile lookup error:', profileError.message);
     }
 
     let resolvedRole = 'Student';
@@ -311,7 +292,6 @@ export async function GET(request: NextRequest) {
       profileId = userProfile.id;
     } else {
       // Email not found in users table — reject OAuth login
-      console.warn(`[auth/callback] STEP 6 — Email NOT found in users table: ${email}. Redirecting to /login?error=user_not_found`);
       return NextResponse.redirect(new URL('/login?error=user_not_found', requestUrl.origin));
     }
 
@@ -320,11 +300,6 @@ export async function GET(request: NextRequest) {
     }
 
     const normalizedRole = normalizeRole(resolvedRole);
-
-    // ─── STEP 7: Sign JWT ─────────────────────────────────────────────────────
-    console.log('[auth/callback] STEP 7 — Signing JWT:');
-    console.log('  JWT_SECRET present:', !!JWT_SECRET, '| length:', JWT_SECRET.length, '| prefix:', JWT_SECRET.substring(0, 8));
-    console.log('  Claims: role:', normalizedRole, '| id:', profileId, '| institution_id:', resolvedInstitutionId);
 
     const tokenClaims = {
       id: profileId,
@@ -338,8 +313,6 @@ export async function GET(request: NextRequest) {
     };
 
     const token = jwt.sign(tokenClaims, JWT_SECRET, { expiresIn: '7d' });
-    const tokenParts = token.split('.');
-    console.log('[auth/callback] STEP 7 — Token signed ✓ | starts with eyJ:', token.startsWith('eyJ'), '| prefix:', token.substring(0, 25), '| payload:', Buffer.from(tokenParts[1], 'base64').toString().substring(0, 100));
 
     const profileData = {
       id: profileId,
@@ -368,16 +341,6 @@ export async function GET(request: NextRequest) {
     loginRedirectUrl.searchParams.set('refresh', authSession.refresh_token);
     loginRedirectUrl.searchParams.set('profile', JSON.stringify(profileData));
     loginRedirectUrl.searchParams.set('path', redirectPath);
-
-    // ─── STEP 8: Final redirect ───────────────────────────────────────────────
-    console.log('[auth/callback] STEP 8 — Final redirect URL (base, no token for security):');
-    console.log('  Origin:', requestUrl.origin);
-    console.log('  Path: /login');
-    console.log('  Params: path=' + redirectPath + ' | role=' + normalizedRole + ' | token present:', !!token);
-    console.log('  Full redirect URL length:', loginRedirectUrl.toString().length, 'chars');
-    console.log('════════════════════════════════════════════════════════════');
-    console.log('[auth/callback] ✅ COMPLETE — redirecting to login for localStorage ingestion');
-    console.log('════════════════════════════════════════════════════════════');
 
     return NextResponse.redirect(loginRedirectUrl);
 

@@ -7,8 +7,8 @@ export function getDbPool(): Pool | null {
   if (pool) return pool;
 
   const connStr = process.env.DATABASE_URL;
-  if (!connStr) {
-    logger.warn('[DB] DATABASE_URL not set. Direct SQL execution unavailable. Table auto-creation disabled.');
+  if (!connStr || connStr.includes('your-db-password')) {
+    logger.warn('[DB] DATABASE_URL not set or contains placeholder password. Direct SQL execution unavailable. Table auto-creation disabled.');
     return null;
   }
 

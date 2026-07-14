@@ -40,31 +40,32 @@ export default function AdminAdmissionsDashboard() {
       if (res.success && res.dashboard) {
         setStats(res.dashboard);
       } else {
-        throw new Error(res.error);
+        // No data from backend — show zeros
+        setStats({
+          applications_received: 0,
+          applications_submitted: 0,
+          documents_pending: 0,
+          merit_listed: 0,
+          offers_sent: 0,
+          offers_accepted: 0,
+          seats_filled: 0,
+          program_occupancies: [],
+          geographic_distribution: []
+        });
       }
     } catch {
-      // Mock data fallback
-      const mockStats: DashboardStats = {
-        applications_received: 1245,
-        applications_submitted: 980,
-        documents_pending: 145,
-        merit_listed: 320,
-        offers_sent: 240,
-        offers_accepted: 180,
-        seats_filled: 155,
-        program_occupancies: [
-          { name: 'Bachelor of Technology in Computer Science (B.Tech CSE)', seats: 120, filled: 94 },
-          { name: 'Bachelor of Technology in Artificial Intelligence (B.Tech AI-DS)', seats: 60, filled: 48 },
-          { name: 'Master of Business Administration (MBA)', seats: 60, filled: 13 }
-        ],
-        geographic_distribution: [
-          { state: 'Rajasthan', count: 680 },
-          { state: 'Delhi NCR', count: 180 },
-          { state: 'Gujarat', count: 120 },
-          { state: 'Madhya Pradesh', count: 65 }
-        ]
-      };
-      setStats(mockStats);
+      // Backend not reachable — show zeros
+      setStats({
+        applications_received: 0,
+        applications_submitted: 0,
+        documents_pending: 0,
+        merit_listed: 0,
+        offers_sent: 0,
+        offers_accepted: 0,
+        seats_filled: 0,
+        program_occupancies: [],
+        geographic_distribution: []
+      });
     } finally {
       setLoading(false);
     }

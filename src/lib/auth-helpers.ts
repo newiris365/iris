@@ -46,6 +46,7 @@ export const ROLE_CASING_MAP: Record<string, string> = {
   'iqac coordinator': 'IQAC Coordinator',
   'admissions officer': 'Admissions Officer',
   'principal': 'Principal',
+  'vice principal': 'Vice Principal',
   'hr admin': 'HR Admin',
   'applicant': 'Applicant',
   'company hr': 'Company HR',

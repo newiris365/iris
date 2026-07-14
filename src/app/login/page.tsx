@@ -43,108 +43,116 @@ const getRedirectPath = (role: string): string => {
   }
 };
 
+const COLLEGE_INST_ID = 'a0000000-0000-0000-0000-000000000001';
+const SCHOOL_INST_ID = 'a0000000-0000-0000-0000-000000000002';
+
 const getMockProfile = (email: string, role: string) => {
+  const isSchool = email.includes('school');
+  const instId = isSchool ? SCHOOL_INST_ID : COLLEGE_INST_ID;
+  const instName = isSchool ? 'SIET School' : 'SIN Institute of Engineering & Technology (SIET)';
+  const instType = isSchool ? 'school' : 'college';
+
   switch (role) {
     case 'Student':
       return {
-        id: 'b0000000-0000-0000-0000-000000000006',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000034' : 'b0000000-0000-0000-0000-000000000006',
         student_id: '',
         room_id: 'e4000000-0000-0000-0000-000000000001',
-        name: 'Priyansh Student',
+        name: isSchool ? 'School Student' : 'Priyansh Student',
         email: email,
         role: 'Student',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Admin':
       return {
-        id: 'b0000000-0000-0000-0000-000000000002',
-        name: 'Director SIET',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000031' : 'b0000000-0000-0000-0000-000000000002',
+        name: isSchool ? 'School Admin' : 'Director SIET',
         email: email,
         role: 'Admin',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Warden':
       return {
-        id: 'b0000000-0000-0000-0000-000000000012',
-        name: 'Jaswant Singh',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000037' : 'b0000000-0000-0000-0000-000000000012',
+        name: isSchool ? 'School Warden' : 'Jaswant Singh',
         email: email,
         role: 'Warden',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Security':
       return {
-        id: 'b0000000-0000-0000-0000-000000000015',
-        name: 'Guard Sher Singh',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000038' : 'b0000000-0000-0000-0000-000000000015',
+        name: isSchool ? 'School Security' : 'Guard Sher Singh',
         email: email,
         role: 'Security',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Driver':
       return {
-        id: '',
-        name: 'Priyansh Driver',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000040' : '',
+        name: isSchool ? 'School Driver' : 'Priyansh Driver',
         email: email,
         role: 'Driver',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Staff':
       return {
-        id: 'b0000000-0000-0000-0000-000000000003',
-        name: 'Faculty Staff Member',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000033' : 'b0000000-0000-0000-0000-000000000030',
+        name: isSchool ? 'School Staff' : 'Faculty Staff Member',
         email: email,
         role: 'Staff',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Parent':
       return {
-        id: 'b0000000-0000-0000-0000-000000000011',
-        name: 'Nakshtra Parihar (Parent)',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000035' : 'b0000000-0000-0000-0000-000000000011',
+        name: isSchool ? 'School Parent' : 'Nakshtra Parihar (Parent)',
         email: email,
         role: 'Parent',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Vendor':
       return {
-        id: '',
-        name: 'Canteen Vendor',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000039' : '',
+        name: isSchool ? 'School Vendor' : 'Canteen Vendor',
         email: email,
         role: 'Vendor',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Teacher':
       return {
-        id: 'b0000000-0000-0000-0000-000000000016',
-        name: 'Priyansh Rai (Teacher)',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000032' : 'b0000000-0000-0000-0000-000000000016',
+        name: isSchool ? 'School Teacher' : 'Priyansh Rai (Teacher)',
         email: email,
         role: 'Teacher',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'HOD':
       return {
@@ -152,21 +160,21 @@ const getMockProfile = (email: string, role: string) => {
         name: 'HOD Member',
         email: email,
         role: 'HOD',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
       };
     case 'Librarian':
       return {
-        id: 'b0000000-0000-0000-0000-000000000018',
-        name: 'Librarian Head',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000036' : 'b0000000-0000-0000-0000-000000000018',
+        name: isSchool ? 'School Librarian' : 'Librarian Head',
         email: email,
         role: 'Librarian',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Director':
       return {
@@ -174,7 +182,7 @@ const getMockProfile = (email: string, role: string) => {
         name: 'Director SIET',
         email: email,
         role: 'Director',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
@@ -185,33 +193,33 @@ const getMockProfile = (email: string, role: string) => {
         name: 'Siddharth (SuperAdmin)',
         email: email,
         role: 'SuperAdmin',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'Enterprise',
         institute_type: 'college'
       };
     case 'Principal':
       return {
-        id: 'b0000000-0000-0000-0000-000000000021',
-        name: 'Khushal Khatri (Principal)',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000021' : 'b0000000-0000-0000-0000-000000000021',
+        name: isSchool ? 'School Principal' : 'Khushal Khatri (Principal)',
         email: email,
         role: 'Principal',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Vice Principal':
     case 'VP':
       return {
         id: 'b0000000-0000-0000-0000-000000000022',
-        name: 'Vice Principal SIET',
+        name: isSchool ? 'Vice Principal' : 'Vice Principal SIET',
         email: email,
         role: 'Vice Principal',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'TPO':
       return {
@@ -219,7 +227,7 @@ const getMockProfile = (email: string, role: string) => {
         name: 'TPO Cell Head',
         email: email,
         role: 'TPO',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
@@ -230,21 +238,21 @@ const getMockProfile = (email: string, role: string) => {
         name: 'IQAC Coordinator',
         email: email,
         role: 'IQAC Coordinator',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
       };
     case 'Admissions Officer':
       return {
-        id: 'b0000000-0000-0000-0000-000000000025',
-        name: 'Admissions Officer',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000042' : 'b0000000-0000-0000-0000-000000000025',
+        name: isSchool ? 'School Admissions' : 'Admissions Officer',
         email: email,
         role: 'Admissions Officer',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
     case 'Gym Trainer':
       return {
@@ -252,7 +260,7 @@ const getMockProfile = (email: string, role: string) => {
         name: 'Gym Trainer',
         email: email,
         role: 'Gym Trainer',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
@@ -263,7 +271,7 @@ const getMockProfile = (email: string, role: string) => {
         name: 'HR Admin',
         email: email,
         role: 'HR Admin',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
@@ -274,21 +282,21 @@ const getMockProfile = (email: string, role: string) => {
         name: 'Company HR Partner',
         email: email,
         role: 'Company HR',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
+        institution_id: COLLEGE_INST_ID,
         institution_name: 'SIN Institute of Engineering & Technology (SIET)',
         plan_tier: 'University',
         institute_type: 'college'
       };
     case 'Applicant':
       return {
-        id: 'b0000000-0000-0000-0000-000000000029',
-        name: 'Applicant User',
+        id: isSchool ? 'b0000000-0000-0000-0000-000000000041' : 'b0000000-0000-0000-0000-000000000029',
+        name: isSchool ? 'School Applicant' : 'Applicant User',
         email: email,
         role: 'Applicant',
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: email.includes('school') ? 'school' : 'college'
+        institute_type: instType
       };
     default:
       return {
@@ -296,10 +304,10 @@ const getMockProfile = (email: string, role: string) => {
         name: 'External Guest',
         email: email,
         role: role,
-        institution_id: 'a0000000-0000-0000-0000-000000000001',
-        institution_name: 'SIN Institute of Engineering & Technology (SIET)',
+        institution_id: instId,
+        institution_name: instName,
         plan_tier: 'University',
-        institute_type: 'college'
+        institute_type: instType
       };
   }
 };
@@ -353,6 +361,9 @@ export default function LoginPage() {
     setIsLoading(true);
     setSubmitError(null);
     try {
+      // Sign out of any existing Supabase session to clear stale PKCE state
+      await supabase.auth.signOut();
+
       // Clear any stale local sessions before starting OAuth redirect
       localStorage.removeItem('iris_jwt_token');
       localStorage.removeItem('iris_user_profile');
@@ -538,7 +549,21 @@ export default function LoginPage() {
 
       if (!isProduction) {
         // Automatic client-side bypass for sandbox testing profiles on connection failure (local dev only)
-        const sandboxEmails = [];
+        const sandboxEmails = [
+          'siddharth@sin.education', 'director@siet.edu.in', 'director2@siet.edu.in',
+          'priyansh.24jics153@jietjodhpur.ac.in', 'raipriyansh45@gmail.com',
+          'pariharnakshtra21@gmail.com', 'hod@sin.education', 'warden@siet.edu.in',
+          'librarian@sin.education', 'canteen@siet.edu.in', 'security@siet.edu.in',
+          'raip32380@gmail.com', 'staff@sin.education', 'tpo@siet.edu.in',
+          'iqac@sin.education', 'admissions@siet.edu.in', 'gym@sin.education',
+          'hr@siet.edu.in', 'companyhr@siet.edu.in', 'applicant@sin.education',
+          'admin@school.edu.in', 'khushalkhatri0019@gmail.com',
+          'khushal.24jiaiml067@jietjodhpur.ac.in', 'teacher@school.edu.in',
+          'staff@school.edu.in', 'student@school.edu.in', 'parent@school.edu.in',
+          'librarian@school.edu.in', 'warden@school.edu.in', 'security@school.edu.in',
+          'canteen@school.edu.in', 'driver@school.edu.in', 'applicant@school.edu.in',
+          'admissions@school.edu.in'
+        ];
         if (sandboxEmails.includes(data.email)) {
           let role = 'Student';
           if (data.email === 'siddharth@sin.education') role = 'SuperAdmin';
@@ -567,7 +592,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = async (email: string, role: string) => {
+  const handleQuickLogin = async (email: string, role: string, instituteType?: 'college' | 'school') => {
     setIsLoading(true);
     setSubmitError(null);
 
@@ -575,72 +600,20 @@ export default function LoginPage() {
     setValue('email', email);
     setValue('password', 'password123');
 
-    if (useOfflineBypass) {
-      // Direct client bypass
-      setTimeout(() => {
-        const mockProfile = getMockProfile(email, role);
-        const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
-        const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
+    // Instant login buttons always use client-side mock bypass
+    // These are dev/testing accounts — they bypass the real backend entirely
+    setTimeout(() => {
+      const mockProfile = getMockProfile(email, role);
+      if (instituteType) mockProfile.institute_type = instituteType;
+      const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
+      const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
 
-        localStorage.setItem('iris_jwt_token', mockToken);
-        localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
+      localStorage.setItem('iris_jwt_token', mockToken);
+      localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
 
-        setIsLoading(false);
-        window.location.href = getRedirectPath(mockProfile.role);
-      }, 600);
-      return;
-    }
-
-    // Attempt backend login, with fallback
-    try {
-      const deviceId = typeof window !== 'undefined' ? localStorage.getItem('iris_client_device_id') : '';
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(deviceId ? { 'X-Client-Device-ID': deviceId } : {})
-        },
-        body: JSON.stringify({ email, password: 'password123' })
-      });
-
-      const result = await response.json();
-
-        if (response.ok && result.success) {
-          localStorage.setItem('iris_jwt_token', result.token);
-          localStorage.setItem('iris_user_profile', JSON.stringify(result.profile));
-          
-          // Verify token exists in localStorage
-          const verifyToken = localStorage.getItem('iris_jwt_token');
-          if (!verifyToken) {
-            throw new Error('Token verification failed: JWT was not correctly saved to localStorage.');
-          }
-
-          window.location.href = getRedirectPath(result.profile.role);
-        } else {
-        throw new Error(result.error || 'Quick login backend auth failed');
-      }
-    } catch (err: any) {
-      console.warn('Quick login backend failed:', err);
-
-      var isProduction = process.env.NEXT_PUBLIC_ENV === 'production' || window.location.hostname !== 'localhost';
-
-      if (!isProduction) {
-        console.log('Activating instant client fallback for quick login (local dev only)');
-        const mockProfile = getMockProfile(email, role);
-        const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
-        const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
-
-        localStorage.setItem('iris_jwt_token', mockToken);
-        localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
-
-        setIsLoading(false);
-        window.location.href = getRedirectPath(mockProfile.role);
-        return;
-      }
-
-      setSubmitError(err.message || 'Quick login backend authentication failed.');
       setIsLoading(false);
-    }
+      window.location.href = getRedirectPath(mockProfile.role);
+    }, 400);
   };
 
   return (
@@ -788,15 +761,7 @@ export default function LoginPage() {
               <button
                 key={`college-${item.role}`}
                 type="button"
-                onClick={() => {
-                  const mockProfile = getMockProfile(item.email, item.role);
-                  mockProfile.institute_type = 'college';
-                  const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
-                  const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
-                  localStorage.setItem('iris_jwt_token', mockToken);
-                  localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
-                  window.location.href = getRedirectPath(mockProfile.role);
-                }}
+                onClick={() => handleQuickLogin(item.email, item.role, 'college')}
                 className={`p-2 rounded-xl ${item.bg} border ${item.border} ${item.hoverBorder} ${item.hoverBg} transition-all text-left flex flex-col group`}
               >
                 <span className={`text-[10px] font-bold ${item.text} ${item.hoverText} transition-colors`}>
@@ -830,15 +795,7 @@ export default function LoginPage() {
               <button
                 key={`school-${item.role}`}
                 type="button"
-                onClick={() => {
-                  const mockProfile = getMockProfile(item.email, item.role);
-                  mockProfile.institute_type = 'school';
-                  const mockPayload = btoa(unescape(encodeURIComponent(JSON.stringify(mockProfile))));
-                  const mockToken = `mock-sandbox-jwt-token-value.${mockPayload}.signature`;
-                  localStorage.setItem('iris_jwt_token', mockToken);
-                  localStorage.setItem('iris_user_profile', JSON.stringify(mockProfile));
-                  window.location.href = getRedirectPath(mockProfile.role);
-                }}
+                onClick={() => handleQuickLogin(item.email, item.role, 'school')}
                 className={`p-2 rounded-xl ${item.bg} border ${item.border} ${item.hoverBorder} ${item.hoverBg} transition-all text-left flex flex-col group`}
               >
                 <span className={`text-[10px] font-bold ${item.text} ${item.hoverText} transition-colors`}>

@@ -36,18 +36,23 @@ function getScopedSupabase(req: NextRequest): any {
 }
 
 const ALL_FEATURES = [
-  'dashboard', 'admissions', 'students', 'attendance', 'timetable',
-  'fees', 'exams', 'canteen', 'hostel', 'library', 'placements',
-  'hr', 'gate', 'gym', 'transit', 'events', 'notices', 'idcards',
-  'ai_concierge', 'obe', 'naac', 'faculty_development', 'achievements',
-  'director', 'parent_portal'
+  'dashboard', 'admissions', 'new_admission', 'students', 'users_roles',
+  'departments', 'permissions', 'attendance', 'timetable', 'timetable_auto',
+  'fees', 'fee_escalation', 'exams', 'exam_seating', 'exam_enrollment',
+  'academic_calendar', 'defaulter_report', 'canteen', 'hostel', 'complaints',
+  'library', 'placements', 'hr', 'gate', 'gym', 'transit', 'events',
+  'lost_found', 'notices', 'idcards', 'ai_concierge', 'obe', 'naac',
+  'faculty_development', 'faculty_portal', 'security_portal', 'driver_portal',
+  'vendor_portal', 'achievements', 'whatsapp', 'notifications',
+  'payment_settings', 'settings', 'director', 'parent_portal', 'profile'
 ];
 
 const ALL_ROLES = [
   'Admin', 'Staff', 'Teacher', 'Student', 'Parent',
   'Warden', 'Security', 'Vendor', 'Driver', 'Director',
   'TPO', 'HOD', 'Librarian', 'Gym Trainer', 'IQAC Coordinator',
-  'Admissions Officer', 'Principal'
+  'Admissions Officer', 'Principal', 'HR Admin', 'Company HR',
+  'Vice Principal', 'Applicant'
 ];
 
 function decodeJWT(token: string): Record<string, any> | null {
@@ -332,8 +337,8 @@ async function handleSettings(req: NextRequest): Promise<NextResponse> {
 
       // ==================== SEED ====================
       case 'seed': {
-        if (role !== 'SuperAdmin') {
-          return NextResponse.json({ success: false, error: 'Only SuperAdmin can seed defaults.' }, { status: 403 });
+        if (!['SuperAdmin', 'Admin'].includes(role)) {
+          return NextResponse.json({ success: false, error: 'Only SuperAdmin or Admin can seed defaults.' }, { status: 403 });
         }
 
         try {
@@ -350,19 +355,66 @@ async function handleSettings(req: NextRequest): Promise<NextResponse> {
 
           if (featureErr) throw featureErr;
 
-          // Seed Admin full CRUD on all modules
-          const adminPerms = ALL_FEATURES.map(mod => ({
-            institution_id: targetInstitutionId,
-            role: 'Admin',
-            module: mod,
-            can_read: true,
-            can_write: true,
-            can_delete: true
-          }));
+          // Sensible default permissions per role
+          const ALL_MODULES = [
+            'dashboard', 'admissions', 'new_admission', 'students', 'users_roles',
+            'departments', 'permissions', 'attendance', 'timetable', 'timetable_auto',
+            'fees', 'fee_escalation', 'exams', 'exam_seating', 'exam_enrollment',
+            'academic_calendar', 'defaulter_report', 'canteen', 'hostel', 'complaints',
+            'library', 'placements', 'hr', 'gate', 'gym', 'transit', 'events',
+            'lost_found', 'notices', 'idcards', 'ai_concierge', 'obe', 'naac',
+            'faculty_development', 'faculty_portal', 'security_portal', 'driver_portal',
+            'vendor_portal', 'achievements', 'whatsapp', 'notifications',
+            'payment_settings', 'settings', 'director', 'parent_portal', 'profile'
+          ];
+
+          const WRITE_MODULES: Record<string, string[]> = {
+            Admin: [...ALL_MODULES],
+            Director: ['dashboard', 'admissions', 'new_admission', 'students', 'attendance', 'timetable', 'fees', 'fee_escalation', 'exams', 'defaulter_report', 'placements', 'hr', 'hostel', 'gate', 'events', 'notices', 'obe', 'naac', 'director', 'faculty_development', 'achievements'],
+            HOD: ['dashboard', 'students', 'attendance', 'obe', 'timetable', 'exams', 'faculty_development', 'achievements', 'placements', 'events', 'notices', 'canteen', 'complaints'],
+            Teacher: ['attendance', 'obe', 'timetable', 'exams'],
+            Staff: ['attendance'],
+            Student: [],
+            Parent: [],
+            Warden: ['hostel', 'gate', 'complaints', 'notices'],
+            Security: ['gate', 'security_portal', 'transit', 'notices'],
+            Vendor: ['canteen', 'vendor_portal'],
+            Driver: ['driver_portal'],
+            TPO: ['placements', 'students'],
+            Librarian: ['library'],
+            'Gym Trainer': ['gym'],
+            'IQAC Coordinator': ['obe', 'naac'],
+            'Admissions Officer': ['admissions', 'new_admission'],
+            'HR Admin': ['hr'],
+            'Company HR': [],
+            'Vice Principal': ['dashboard', 'students', 'attendance', 'timetable', 'exams', 'notices', 'complaints'],
+            Applicant: [],
+          };
+
+          const DELETE_MODULES: Record<string, string[]> = {
+            Admin: [...ALL_MODULES],
+          };
+
+          // Seed permissions for all roles
+          const permRows: any[] = [];
+          for (const r of ALL_ROLES) {
+            const writeSet = new Set(WRITE_MODULES[r] || []);
+            const deleteSet = new Set(DELETE_MODULES[r] || []);
+            for (const mod of ALL_MODULES) {
+              permRows.push({
+                institution_id: targetInstitutionId,
+                role: r,
+                module: mod,
+                can_read: true,
+                can_write: writeSet.has(mod),
+                can_delete: deleteSet.has(mod),
+              });
+            }
+          }
 
           const { error: permErr } = await supabase
             .from('module_permissions')
-            .upsert(adminPerms, { onConflict: 'institution_id,role,module' });
+            .upsert(permRows, { onConflict: 'institution_id,role,module' });
 
           if (permErr) throw permErr;
 

@@ -32,6 +32,7 @@ import grievancesRouter from './routes/grievances';
 import attendanceEngineRouter from './services/attendanceEngine/routes';
 import notificationsRouter from './routes/notifications';
 import schoolRouter from './routes/school';
+import serviceSubscriptionsRouter from './routes/serviceSubscriptions';
 import { ensureClassSectionsTable, ensureAllSchemaTables } from './controllers/school';
 import { initGateHardware } from './services/gateHardware';
 import { authMiddleware } from './middleware/auth';
@@ -362,6 +363,8 @@ app.use('/api/v1/attendance-engine', attendanceEngineRouter);
 app.use('/api/v1/notifications', requireSupabaseOnline, notificationsRouter);
 app.use('/api/v1/school', requireSupabaseOnline, schoolRouter);
 app.use('/api/school', requireSupabaseOnline, schoolRouter);
+app.use('/api/v1/service-subscriptions', requireSupabaseOnline, serviceSubscriptionsRouter);
+app.use('/api/service-subscriptions', requireSupabaseOnline, serviceSubscriptionsRouter);
 
 // Health Check endpoint
 app.get('/health', (req, res) => {

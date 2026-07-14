@@ -7,25 +7,23 @@ router.use(authMiddleware);
 
 // All defined feature modules
 const ALL_FEATURES = [
-  'dashboard', 'admissions', 'students', 'attendance', 'timetable',
-  'fees', 'exams', 'canteen', 'hostel', 'library', 'placements',
-  'hr', 'gate', 'gym', 'transit', 'events', 'notices', 'idcards',
-  'ai_concierge', 'obe', 'naac', 'faculty_development', 'achievements',
-  'director', 'parent_portal', 'lost_found', 'exam_seating',
-  'assignments', 'study_materials', 'leave_applications', 'campus_wallet',
-  'cia_marks', 'faculty_portal', 'admission_workflow', 'timetable_auto',
-  'defaulter_report', 'academic_calendar', 'curfew_checkin', 'room_transfers',
-  'visitor_approval', 'meal_block_view', 'gate_scanner', 'vehicle_logs',
-  'access_restrictions', 'event_attendees',   'driver_console', 'driver_trip',
-  'driver_headcount', 'driver_emergency',
-  'vendor_portal', 'vendor_orders', 'vendor_menu', 'vendor_sales', 'vendor_prep'
+  'dashboard', 'admissions', 'new_admission', 'students', 'users_roles',
+  'departments', 'permissions', 'attendance', 'timetable', 'timetable_auto',
+  'fees', 'fee_escalation', 'exams', 'exam_seating', 'exam_enrollment',
+  'academic_calendar', 'defaulter_report', 'canteen', 'hostel', 'complaints',
+  'library', 'placements', 'hr', 'gate', 'gym', 'transit', 'events',
+  'lost_found', 'notices', 'idcards', 'ai_concierge', 'obe', 'naac',
+  'faculty_development', 'faculty_portal', 'security_portal', 'driver_portal',
+  'vendor_portal', 'achievements', 'whatsapp', 'notifications',
+  'payment_settings', 'settings', 'director', 'parent_portal', 'profile'
 ];
 
 const ALL_ROLES = [
   'Admin', 'Staff', 'Teacher', 'Student', 'Parent',
   'Warden', 'Security', 'Vendor', 'Driver', 'Director',
   'TPO', 'HOD', 'Librarian', 'Gym Trainer', 'IQAC Coordinator',
-  'Admissions Officer', 'Principal'
+  'Admissions Officer', 'Principal', 'HR Admin', 'Company HR',
+  'Vice Principal', 'Applicant'
 ];
 
 // =========================================================================
@@ -242,19 +240,54 @@ router.post('/seed', requireRole(['SuperAdmin']), async (req: Request, res: Resp
 
     if (featureErr) throw featureErr;
 
-    // Seed default Admin permissions (full CRUD on all modules)
-    const adminPerms = ALL_FEATURES.map(mod => ({
-      institution_id,
-      role: 'Admin',
-      module: mod,
-      can_read: true,
-      can_write: true,
-      can_delete: true
-    }));
+    // Sensible default permissions per role
+    const WRITE_MODULES: Record<string, string[]> = {
+      Admin: [...ALL_FEATURES],
+      Director: ['dashboard', 'admissions', 'new_admission', 'students', 'attendance', 'timetable', 'fees', 'fee_escalation', 'exams', 'defaulter_report', 'placements', 'hr', 'hostel', 'gate', 'events', 'notices', 'obe', 'naac', 'director', 'faculty_development', 'achievements'],
+      HOD: ['dashboard', 'students', 'attendance', 'obe', 'timetable', 'exams', 'faculty_development', 'achievements', 'placements', 'events', 'notices', 'canteen', 'complaints'],
+      Teacher: ['attendance', 'obe', 'timetable', 'exams'],
+      Staff: ['attendance'],
+      Student: [],
+      Parent: [],
+      Warden: ['hostel', 'gate', 'complaints', 'notices'],
+      Security: ['gate', 'security_portal', 'transit', 'notices'],
+      Vendor: ['canteen', 'vendor_portal'],
+      Driver: ['driver_portal'],
+      TPO: ['placements', 'students'],
+      Librarian: ['library'],
+      'Gym Trainer': ['gym'],
+      'IQAC Coordinator': ['obe', 'naac'],
+      'Admissions Officer': ['admissions', 'new_admission'],
+      'HR Admin': ['hr'],
+      'Company HR': [],
+      'Vice Principal': ['dashboard', 'students', 'attendance', 'timetable', 'exams', 'notices', 'complaints'],
+      Applicant: [],
+    };
+
+    const DELETE_MODULES: Record<string, string[]> = {
+      Admin: [...ALL_FEATURES],
+    };
+
+    // Seed permissions for all roles
+    const permRows: any[] = [];
+    for (const r of ALL_ROLES) {
+      const writeSet = new Set(WRITE_MODULES[r] || []);
+      const deleteSet = new Set(DELETE_MODULES[r] || []);
+      for (const mod of ALL_FEATURES) {
+        permRows.push({
+          institution_id,
+          role: r,
+          module: mod,
+          can_read: true,
+          can_write: writeSet.has(mod),
+          can_delete: deleteSet.has(mod),
+        });
+      }
+    }
 
     const { error: permErr } = await supabaseServiceRole
       .from('module_permissions')
-      .upsert(adminPerms, { onConflict: 'institution_id,role,module' });
+      .upsert(permRows, { onConflict: 'institution_id,role,module' });
 
     if (permErr) throw permErr;
 

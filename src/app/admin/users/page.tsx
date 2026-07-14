@@ -9,12 +9,16 @@ import { apiGet, apiPost, apiPut } from '../../../lib/api';
 import { getRoleLabel } from '../../../lib/roleLabels';
 
 const ALL_ROLES = [
+  { value: 'SuperAdmin', label: 'SuperAdmin', color: 'text-rose-400 bg-rose-500/20', collegeOnly: true },
   { value: 'Admin', label: 'Admin', color: 'text-violet-400 bg-violet-500/20' },
-  { value: 'Director', label: 'Director', color: 'text-amber-400 bg-amber-500/20' },
-  { value: 'Principal', label: 'Principal', color: 'text-purple-400 bg-purple-500/20' },
+  { value: 'Director', label: 'Director', color: 'text-amber-400 bg-amber-500/20', collegeOnly: true },
+  { value: 'Principal', label: 'Principal', color: 'text-purple-400 bg-purple-500/20', schoolOnly: true },
+  { value: 'Vice Principal', label: 'Vice Principal', color: 'text-indigo-400 bg-indigo-500/20', schoolOnly: true },
   { value: 'HOD', label: 'HOD', color: 'text-cyan-400 bg-cyan-500/20', collegeOnly: true },
   { value: 'Teacher', label: 'Teacher', color: 'text-emerald-400 bg-emerald-500/20' },
   { value: 'Staff', label: 'Staff', color: 'text-blue-400 bg-blue-500/20' },
+  { value: 'Student', label: 'Student', color: 'text-green-400 bg-green-500/20' },
+  { value: 'Parent', label: 'Parent', color: 'text-pink-400 bg-pink-500/20' },
   { value: 'TPO', label: 'TPO', color: 'text-indigo-400 bg-indigo-500/20', collegeOnly: true },
   { value: 'Librarian', label: 'Librarian', color: 'text-teal-400 bg-teal-500/20' },
   { value: 'Gym Trainer', label: 'Gym Trainer', color: 'text-orange-400 bg-orange-500/20' },
@@ -24,13 +28,16 @@ const ALL_ROLES = [
   { value: 'Security', label: 'Security', color: 'text-red-400 bg-red-500/20' },
   { value: 'Vendor', label: 'Vendor', color: 'text-yellow-400 bg-yellow-500/20' },
   { value: 'Driver', label: 'Driver', color: 'text-orange-400 bg-orange-500/20' },
+  { value: 'HR Admin', label: 'HR Admin', color: 'text-violet-400 bg-violet-500/20', collegeOnly: true },
+  { value: 'Company HR', label: 'Company HR', color: 'text-sky-400 bg-sky-500/20', collegeOnly: true },
+  { value: 'Applicant', label: 'Applicant', color: 'text-gray-400 bg-gray-500/20' },
 ];
 
 function getVisibleRoles(instituteType: string) {
   if (instituteType === 'school') {
     return ALL_ROLES.filter(r => !r.collegeOnly);
   }
-  return ALL_ROLES;
+  return ALL_ROLES.filter(r => !r.schoolOnly);
 }
 
 export default function AdminUsersPage() {

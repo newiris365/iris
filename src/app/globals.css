@@ -18,6 +18,13 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+/* Fix native select dropdown options visibility on dark backgrounds */
+select option {
+  color: #1a1a2e;
+  background-color: #ffffff;
+  padding: 8px;
+}
+
 /* Glassmorphism custom panel */
 .glass-panel {
   background: rgba(19, 16, 42, 0.65);

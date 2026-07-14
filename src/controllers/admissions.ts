@@ -1471,28 +1471,98 @@ export async function convertToStudent(req: Request, res: Response) {
 
 export async function getAnalyticsDashboard(req: Request, res: Response) {
   try {
-    const cycleId = req.query.cycle_id || 'c1111111-1111-1111-1111-111111111111';
+    const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const cycleId = req.query.cycle_id as string | undefined;
 
-    // Simulated dashboard statistics
+    // Build base query for applicants
+    let applicantQuery = supabaseAdmin
+      .from('applicants')
+      .select('id, status, domicile_state, gender, category, created_at')
+      .eq('institution_id', institutionId);
+
+    if (cycleId) {
+      applicantQuery = applicantQuery.eq('cycle_id', cycleId);
+    }
+
+    const { data: applicants, error: appError } = await applicantQuery;
+
+    if (appError) {
+      logger.warn('Failed fetching applicants for analytics: ' + appError.message);
+    }
+
+    const allApplicants = applicants || [];
+
+    // Count by status
+    const applications_received = allApplicants.length;
+    const applications_submitted = allApplicants.filter(a => 
+      ['submitted', 'under_review', 'shortlisted', 'merit_listed', 'waitlisted', 'offered', 'admitted'].includes(a.status)
+    ).length;
+    const documents_pending = allApplicants.filter(a => a.status === 'under_review').length;
+    const merit_listed = allApplicants.filter(a => ['merit_listed', 'waitlisted', 'offered', 'admitted'].includes(a.status)).length;
+    const offers_sent = allApplicants.filter(a => ['offered', 'admitted'].includes(a.status)).length;
+    const offers_accepted = allApplicants.filter(a => a.status === 'admitted').length;
+    const seats_filled = allApplicants.filter(a => a.status === 'admitted').length;
+
+    // Program occupancies — join with programs table
+    let programOccupancies: { name: string; seats: number; filled: number }[] = [];
+    try {
+      const { data: programs } = await supabaseAdmin
+        .from('programs')
+        .select('id, name, total_seats')
+        .eq('institution_id', institutionId)
+        .eq('is_active', true);
+
+      if (programs && programs.length > 0) {
+        for (const prog of programs) {
+          // Count admitted applicants for this program via applicant_programs
+          const { count: filledCount } = await supabaseAdmin
+            .from('applicant_programs')
+            .select('id', { count: 'exact', head: true })
+            .eq('program_id', prog.id)
+            .eq('allocated', true);
+
+          // Also count applicants who selected this program and are admitted
+          const { data: linkedApplicants } = await supabaseAdmin
+            .from('applicant_programs')
+            .select('applicant_id, applicants!inner(status, institution_id)')
+            .eq('program_id', prog.id);
+
+          const admittedCount = linkedApplicants?.filter((la: any) => 
+            la.applicants?.status === 'admitted' && la.applicants?.institution_id === institutionId
+          ).length || 0;
+
+          programOccupancies.push({
+            name: prog.name,
+            seats: prog.total_seats || 0,
+            filled: admittedCount || filledCount || 0
+          });
+        }
+      }
+    } catch (e) {
+      logger.warn('Failed fetching program occupancies: ' + (e as Error).message);
+    }
+
+    // Geographic distribution from domicile_state
+    const geoMap: Record<string, number> = {};
+    allApplicants.forEach(a => {
+      const state = a.domicile_state || 'Unknown';
+      geoMap[state] = (geoMap[state] || 0) + 1;
+    });
+    const geographic_distribution = Object.entries(geoMap)
+      .map(([state, count]) => ({ state, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
     const stats = {
-      applications_received: 1245,
-      applications_submitted: 980,
-      documents_pending: 145,
-      merit_listed: 320,
-      offers_sent: 240,
-      offers_accepted: 180,
-      seats_filled: 155,
-      program_occupancies: [
-        { name: 'B.Tech CSE', seats: 120, filled: 94 },
-        { name: 'B.Tech AI-DS', seats: 60, filled: 48 },
-        { name: 'MBA Core', seats: 60, filled: 13 }
-      ],
-      geographic_distribution: [
-        { state: 'Rajasthan', count: 680 },
-        { state: 'Delhi NCR', count: 180 },
-        { state: 'Gujarat', count: 120 },
-        { state: 'Madhya Pradesh', count: 65 }
-      ]
+      applications_received,
+      applications_submitted,
+      documents_pending,
+      merit_listed,
+      offers_sent,
+      offers_accepted,
+      seats_filled,
+      program_occupancies: programOccupancies,
+      geographic_distribution
     };
 
     return res.status(200).json({ success: true, dashboard: stats });
@@ -1503,15 +1573,36 @@ export async function getAnalyticsDashboard(req: Request, res: Response) {
 
 export async function getAnalyticsFunnel(req: Request, res: Response) {
   try {
+    const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
+    const cycleId = req.query.cycle_id as string | undefined;
+
+    let query = supabaseAdmin
+      .from('applicants')
+      .select('id, status')
+      .eq('institution_id', institutionId);
+
+    if (cycleId) {
+      query = query.eq('cycle_id', cycleId);
+    }
+
+    const { data: applicants, error } = await query;
+
+    if (error) {
+      logger.warn('Failed fetching applicants for funnel: ' + error.message);
+    }
+
+    const all = applicants || [];
+
     const funnel = [
-      { stage: 'Total Enquiries', value: 3450 },
-      { stage: 'Registered', value: 1245 },
-      { stage: 'Form Submitted', value: 980 },
-      { stage: 'Shortlisted', value: 450 },
-      { stage: 'Merit Listed', value: 320 },
-      { stage: 'Offers Accepted', value: 180 },
-      { stage: 'Fully Enrolled', value: 155 }
+      { stage: 'Total Enquiries', value: all.length },
+      { stage: 'Registered', value: all.filter(a => a.status !== 'draft').length || all.length },
+      { stage: 'Form Submitted', value: all.filter(a => ['submitted', 'under_review', 'shortlisted', 'merit_listed', 'waitlisted', 'offered', 'admitted'].includes(a.status)).length },
+      { stage: 'Shortlisted', value: all.filter(a => ['shortlisted', 'merit_listed', 'waitlisted', 'offered', 'admitted'].includes(a.status)).length },
+      { stage: 'Merit Listed', value: all.filter(a => ['merit_listed', 'waitlisted', 'offered', 'admitted'].includes(a.status)).length },
+      { stage: 'Offers Accepted', value: all.filter(a => ['offered', 'admitted'].includes(a.status)).length },
+      { stage: 'Fully Enrolled', value: all.filter(a => a.status === 'admitted').length }
     ];
+
     return res.status(200).json({ success: true, funnel });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -1521,17 +1612,62 @@ export async function getAnalyticsFunnel(req: Request, res: Response) {
 export async function getReports(req: Request, res: Response) {
   try {
     const { type } = req.params;
+    const institutionId = req.user?.institution_id || 'a0000000-0000-0000-0000-000000000001';
     
     if (type === 'aishe') {
-      // Return UGC/AISHE survey compatibility table structure
+      // Fetch programs and applicants to build real AISHE data
+      const { data: programs } = await supabaseAdmin
+        .from('programs')
+        .select('id, name')
+        .eq('institution_id', institutionId)
+        .eq('is_active', true);
+
+      const { data: allApplicants } = await supabaseAdmin
+        .from('applicants')
+        .select('id, gender, category, status')
+        .eq('institution_id', institutionId)
+        .in('status', ['admitted', 'offered', 'merit_listed']);
+
+      const { data: linkedPrograms } = await supabaseAdmin
+        .from('applicant_programs')
+        .select('applicant_id, program_id');
+
+      const metrics: any[] = [];
+
+      if (programs && allApplicants && linkedPrograms) {
+        for (const prog of programs) {
+          // Get applicant IDs linked to this program
+          const linkedIds = linkedPrograms
+            .filter(lp => lp.program_id === prog.id)
+            .map(lp => lp.applicant_id);
+
+          // Filter to admitted/active applicants for this program
+          const progApplicants = allApplicants.filter(a => linkedIds.includes(a.id));
+
+          if (progApplicants.length === 0) {
+            metrics.push({
+              degree: prog.name,
+              male: 0, female: 0,
+              sc: 0, st: 0, obc: 0, general: 0
+            });
+            continue;
+          }
+
+          const male = progApplicants.filter(a => a.gender?.toLowerCase() === 'male').length;
+          const female = progApplicants.filter(a => a.gender?.toLowerCase() === 'female').length;
+          const sc = progApplicants.filter(a => a.category?.toUpperCase() === 'SC').length;
+          const st = progApplicants.filter(a => a.category?.toUpperCase() === 'ST').length;
+          const obc = progApplicants.filter(a => a.category?.toUpperCase() === 'OBC').length;
+          const general = progApplicants.filter(a => !a.category || a.category.toUpperCase() === 'GENERAL' || !['SC', 'ST', 'OBC'].includes(a.category?.toUpperCase())).length;
+
+          metrics.push({ degree: prog.name, male, female, sc, st, obc, general });
+        }
+      }
+
       const report = {
         title: 'AISHE Higher Education Admissions Audit Report',
-        academic_year: '2026-27',
-        metrics: [
-          { degree: 'B.Tech CSE', male: 74, female: 20, sc: 15, st: 8, obc: 25, general: 46 },
-          { degree: 'B.Tech AI-DS', male: 35, female: 13, sc: 7, st: 4, obc: 12, general: 25 },
-          { degree: 'MBA', male: 8, female: 5, sc: 2, st: 1, obc: 3, general: 7 }
-        ]
+        academic_year: `${new Date().getFullYear()}-${String(new Date().getFullYear() + 1).slice(2)}`,
+        metrics
       };
       return res.status(200).json({ success: true, report });
     }

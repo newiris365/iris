@@ -188,8 +188,8 @@ exports.handler = async (event) => {
 
       // ==================== SEED ====================
       case 'seed': {
-        if (role !== 'SuperAdmin') {
-          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin can seed defaults.' }) };
+        if (!['SuperAdmin', 'Admin'].includes(role)) {
+          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Only SuperAdmin or Admin can seed defaults.' }) };
         }
 
         // Seed all features as enabled

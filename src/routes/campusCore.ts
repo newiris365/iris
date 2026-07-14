@@ -567,7 +567,8 @@ router.get('/whatsapp/delivery-log', requireRole(['Admin', 'SuperAdmin']), getWh
 import {
   listUsers, getUserById, createUser, updateUser,
   deactivateUser, reactivateUser, resetUserPassword,
-  getUserRoleStats, getDepartments
+  getUserRoleStats, getDepartments, createDepartment,
+  updateDepartment, deleteDepartment
 } from '../controllers/userManagement';
 
 router.get('/users', requireRole(['Admin', 'SuperAdmin']), listUsers);
@@ -579,6 +580,11 @@ router.put('/users/:userId', requireRole(['Admin', 'SuperAdmin']), updateUser);
 router.post('/users/:userId/deactivate', requireRole(['Admin', 'SuperAdmin']), deactivateUser);
 router.post('/users/:userId/reactivate', requireRole(['Admin', 'SuperAdmin']), reactivateUser);
 router.post('/users/:userId/reset-password', requireRole(['Admin', 'SuperAdmin']), resetUserPassword);
+
+router.get('/departments', requireRole(['Admin', 'SuperAdmin']), getDepartments);
+router.post('/departments', requireRole(['Admin', 'SuperAdmin']), createDepartment);
+router.put('/departments', requireRole(['Admin', 'SuperAdmin']), updateDepartment);
+router.delete('/departments', requireRole(['Admin', 'SuperAdmin']), deleteDepartment);
 
 // =========================================================================
 // 27. GENERAL WALLET DEDUCTION

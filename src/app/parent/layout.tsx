@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import PortalShell, { SidebarLink } from '../../components/PortalShell';
-import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Calendar, Link2, Bell, Bus, Wallet, UserCircle, Upload, AlertCircle, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, CreditCard, FileText, MessageSquare, Calendar, Link2, Bell, Bus, Wallet, UserCircle, Upload, AlertCircle, ClipboardList, Home, Dumbbell } from 'lucide-react';
 
 const parentLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/parent/dashboard', icon: LayoutDashboard },
@@ -83,7 +83,9 @@ function ParentLayoutContent({ children }: { children: React.ReactNode }) {
             { label: 'Attendance', href: '/parent/attendance', icon: CalendarDays },
             { label: 'Assignments', href: '/parent/assignments', icon: Upload },
             { label: 'Timetable', href: '/parent/timetable', icon: CalendarDays },
-            { label: 'Transit GPS', href: '/parent/transit', icon: Bus },
+            { label: 'Hostel', href: '/hostel', icon: Home },
+            { label: 'Transit GPS', href: '/transit', icon: Bus },
+            { label: 'FitZone Gym', href: '/gym', icon: Dumbbell },
             { label: 'Fee Status', href: '/parent/fees', icon: CreditCard },
             { label: 'Exam Results', href: '/parent/results', icon: FileText },
             { label: 'Leave Application', href: '/parent/leave', icon: ClipboardList },

@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { Home, Users, Bell, AlertTriangle, Calendar, FileText, ArrowRight, ShieldCheck, CreditCard } from 'lucide-react';
 import { apiGet } from '../../lib/api';
 import Link from 'next/link';
+import SubscriptionGate from '../../components/SubscriptionGate';
 
-export default function StudentHostelDashboard() {
+function HostelContent() {
   const [allocation, setAllocation] = useState<any>(null);
   const [roommates, setRoommates] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
@@ -220,5 +221,33 @@ export default function StudentHostelDashboard() {
 
       </div>
     </main>
+  );
+}
+
+export default function StudentHostelDashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [instId, setInstId] = useState('');
+
+  useEffect(() => {
+    const profile = localStorage.getItem('iris_user_profile');
+    if (profile) {
+      const parsed = JSON.parse(profile);
+      setUser(parsed);
+      setInstId(parsed.institution_id || 'a0000000-0000-0000-0000-000000000001');
+    }
+  }, []);
+
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-[#0D0A1A] flex items-center justify-center text-white">
+        <div className="w-10 h-10 border-2 border-[#6C2BD9] border-t-transparent rounded-full animate-spin" />
+      </main>
+    );
+  }
+
+  return (
+    <SubscriptionGate serviceType="hostel" institutionId={instId} studentId={user.student_id || user.id}>
+      <HostelContent />
+    </SubscriptionGate>
   );
 }

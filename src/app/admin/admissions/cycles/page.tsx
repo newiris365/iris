@@ -37,29 +37,11 @@ export default function AdminCyclesPage() {
       if (res.success && res.institution) {
         setCycles(res.institution.open_cycles || []);
       } else {
-        throw new Error(res.error);
+        setCycles([]);
       }
     } catch {
-      // Mock cycles list
-      const mockCycles: CycleRecord[] = [
-        {
-          id: 'c1111111-1111-1111-1111-111111111111',
-          name: 'Fall Admissions 2026',
-          academic_year: '2026-27',
-          start_date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          status: 'open'
-        },
-        {
-          id: 'c1111111-1111-1111-1111-111111111112',
-          name: 'Spring Admissions 2027',
-          academic_year: '2026-27',
-          start_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          status: 'upcoming'
-        }
-      ];
-      setCycles(mockCycles);
+      // Backend not reachable — show empty
+      setCycles([]);
     } finally {
       setLoading(false);
     }

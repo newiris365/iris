@@ -1,12 +1,8 @@
 /**
- * Centrally maps role labels based on the institution configuration.
- * For school-type institutions, the 'Admin' display role is replaced with 'Principal'.
+ * Returns the display label for a role.
+ * Roles are displayed as-is without any mapping.
  */
-export function getRoleLabel(role: string, instituteType?: string): string {
+export function getRoleLabel(role: string, _instituteType?: string): string {
   if (!role) return '';
-  const trimmed = role.trim();
-  if (trimmed.toLowerCase() === 'admin' && instituteType?.toLowerCase() === 'school') {
-    return 'Principal';
-  }
-  return role;
+  return role.trim();
 }

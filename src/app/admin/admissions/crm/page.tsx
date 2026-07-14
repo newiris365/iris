@@ -56,12 +56,11 @@ export default function AdminCRMPage() {
       if (res.success && res.leads) {
         setLeads(res.leads);
       } else {
-        throw new Error(res.error);
+        setLeads([]);
       }
     } catch {
-      // Mock leads list
-      const mockLeads: LeadRecord[] = [];
-      setLeads(mockLeads);
+      // Backend not reachable — show empty
+      setLeads([]);
     } finally {
       setLoading(false);
     }

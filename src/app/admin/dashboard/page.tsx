@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Users, GraduationCap, Building2, CheckCircle, IndianRupee, AlertTriangle,
   CalendarDays, DoorOpen, Activity, TrendingUp, FileText, LogOut,
-  Dumbbell, Bus, ShoppingBag, BookOpen, Shield
+  Dumbbell, Bus, ShoppingBag, BookOpen, Shield, X, ChevronDown, Loader2
 } from 'lucide-react';
 
 // ========== TYPE DEFINITIONS ==========
@@ -67,6 +67,13 @@ export default function AdminDashboard() {
   const [modules, setModules] = useState<ModuleUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'>('monthly');
+  const [reportMonth, setReportMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [reportYear, setReportYear] = useState<string>(String(new Date().getFullYear()));
+  const [reportStartDate, setReportStartDate] = useState<string>('');
+  const [reportEndDate, setReportEndDate] = useState<string>('');
+  const [reportSections, setReportSections] = useState<string[]>(['attendance', 'fees', 'complaints', 'hostel', 'events', 'modules']);
   const isSchool = instituteType === 'school';
 
   useEffect(() => {
@@ -213,10 +220,46 @@ export default function AdminDashboard() {
 
   const handleDownloadReport = async () => {
     setDownloading(true);
+    setShowReportModal(false);
     try {
+      let startDate = '';
+      let endDate = '';
+
+      if (reportType === 'daily') {
+        startDate = endDate = new Date().toISOString().split('T')[0];
+      } else if (reportType === 'weekly') {
+        const now = new Date();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        startDate = weekStart.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+      } else if (reportType === 'monthly') {
+        startDate = `${reportYear}-${reportMonth}-01`;
+        const lastDay = new Date(parseInt(reportYear), parseInt(reportMonth), 0).getDate();
+        endDate = `${reportYear}-${reportMonth}-${String(lastDay).padStart(2, '0')}`;
+      } else if (reportType === 'yearly') {
+        startDate = `${reportYear}-01-01`;
+        endDate = `${reportYear}-12-31`;
+      } else if (reportType === 'custom') {
+        startDate = reportStartDate;
+        endDate = reportEndDate;
+      }
+
+      if (!startDate || !endDate) {
+        alert('Please select a valid date range.');
+        setDownloading(false);
+        return;
+      }
+
       const response = await fetch('/api/v1/director/report/pdf', {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          report_type: reportType,
+          start_date: startDate,
+          end_date: endDate,
+          sections: reportSections
+        })
       });
       const result = await response.json();
       if (result.success && result.report.pdf_url) {
@@ -266,11 +309,11 @@ export default function AdminDashboard() {
         ))}
 
         <button
-          onClick={handleDownloadReport}
+          onClick={() => setShowReportModal(true)}
           disabled={downloading}
           className="ml-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] text-white font-bold text-sm shadow-lg hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
         >
-          <FileText className="w-4 h-4" /> {downloading ? 'Downloading...' : 'Download Report'}
+          <FileText className="w-4 h-4" /> {downloading ? 'Generating...' : 'Download Report'}
         </button>
       </div>
 
@@ -458,7 +501,7 @@ export default function AdminDashboard() {
                     </div>
                     <p className="text-xs text-[#C4B5FD]/80">{alert.detail}</p>
                   </div>
-                  <span className="text-[10px] text-[#C4B5FD]/50 flex-shrink-0">{alert.type.replace('_', ' ')}</span>
+                  <span className="text-[10px] text-[#C4B5FD]/50 flex-shrink-0">{alert.type?.replace('_', ' ')}</span>
                 </div>
               ))}
             </div>
@@ -500,6 +543,193 @@ export default function AdminDashboard() {
                 <h3 className="font-extrabold text-3xl text-white">{mod.value}</h3>
               </Link>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════ REPORT MODAL ═══════════════════════ */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-white/5 bg-[#13102A] p-6 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#6C2BD9]/20 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-[#A78BFA]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Download Report</h3>
+                  <p className="text-[10px] text-[#C4B5FD]/50">Choose report type and date range</p>
+                </div>
+              </div>
+              <button onClick={() => setShowReportModal(false)} className="p-2 rounded-lg hover:bg-white/5 transition-all">
+                <X className="w-4 h-4 text-[#C4B5FD]" />
+              </button>
+            </div>
+
+            {/* Report Type Selector */}
+            <div className="mb-5">
+              <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Report Type</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { key: 'daily', label: 'Daily', desc: 'Today' },
+                  { key: 'weekly', label: 'Weekly', desc: 'This Week' },
+                  { key: 'monthly', label: 'Monthly', desc: 'Choose Month' },
+                  { key: 'yearly', label: 'Yearly', desc: 'Full Year' },
+                ].map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setReportType(t.key as any)}
+                    className={`p-3 rounded-xl text-center transition-all border ${
+                      reportType === t.key
+                        ? 'border-[#6C2BD9] bg-[#6C2BD9]/10 shadow-lg shadow-[#6C2BD9]/10'
+                        : 'border-white/5 bg-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    <span className={`text-xs font-bold block ${reportType === t.key ? 'text-white' : 'text-[#C4B5FD]'}`}>{t.label}</span>
+                    <span className="text-[9px] text-[#C4B5FD]/50 mt-0.5 block">{t.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date Pickers based on type */}
+            {reportType === 'monthly' && (
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div>
+                  <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1.5">Month</label>
+                  <select
+                    value={reportMonth}
+                    onChange={e => setReportMonth(e.target.value)}
+                    className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
+                  >
+                    {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                      <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1.5">Year</label>
+                  <select
+                    value={reportYear}
+                    onChange={e => setReportYear(e.target.value)}
+                    className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
+                  >
+                    {[2026, 2025, 2024, 2023].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {reportType === 'yearly' && (
+              <div className="mb-5">
+                <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1.5">Year</label>
+                <select
+                  value={reportYear}
+                  onChange={e => setReportYear(e.target.value)}
+                  className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
+                >
+                  {[2026, 2025, 2024, 2023].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {reportType === 'custom' && (
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div>
+                  <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={reportStartDate}
+                    onChange={e => setReportStartDate(e.target.value)}
+                    className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-1.5">End Date</label>
+                  <input
+                    type="date"
+                    value={reportEndDate}
+                    onChange={e => setReportEndDate(e.target.value)}
+                    className="w-full bg-[#0D0A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6C2BD9]/50"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Report Sections */}
+            <div className="mb-6">
+              <label className="block text-[10px] font-bold text-[#C4B5FD]/70 uppercase tracking-wider mb-2">Include Sections</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'attendance', label: 'Attendance' },
+                  { key: 'fees', label: 'Fees & Finance' },
+                  { key: 'complaints', label: 'Complaints' },
+                  { key: 'hostel', label: 'Hostel' },
+                  { key: 'events', label: 'Events' },
+                  { key: 'modules', label: 'Module Usage' },
+                ].map(s => {
+                  const active = reportSections.includes(s.key);
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => {
+                        setReportSections(prev =>
+                          active ? prev.filter(x => x !== s.key) : [...prev, s.key]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                        active
+                          ? 'border-[#6C2BD9] bg-[#6C2BD9]/10 text-[#A78BFA]'
+                          : 'border-white/5 bg-white/5 text-[#C4B5FD]/40 hover:bg-white/10'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Preview Summary */}
+            <div className="bg-white/5 border border-white/5 rounded-xl p-3 mb-5 text-[10px] text-[#C4B5FD]/60">
+              {reportType === 'daily' && <span>Report for <strong className="text-white">Today</strong> ({new Date().toLocaleDateString()})</span>}
+              {reportType === 'weekly' && <span>Report for <strong className="text-white">This Week</strong></span>}
+              {reportType === 'monthly' && <span>Report for <strong className="text-white">{new Date(parseInt(reportYear), parseInt(reportMonth) - 1).toLocaleString('default', { month: 'long' })} {reportYear}</strong></span>}
+              {reportType === 'yearly' && <span>Report for <strong className="text-white">Full Year {reportYear}</strong></span>}
+              {reportType === 'custom' && reportStartDate && reportEndDate && (
+                <span>Report from <strong className="text-white">{reportStartDate}</strong> to <strong className="text-white">{reportEndDate}</strong></span>
+              )}
+              {reportType === 'custom' && (!reportStartDate || !reportEndDate) && (
+                <span className="text-amber-400">Please select start and end dates</span>
+              )}
+              <span className="ml-1">• Sections: {reportSections.length} selected</span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDownloadReport}
+                disabled={downloading || (reportType === 'custom' && (!reportStartDate || !reportEndDate))}
+                className="flex-1 py-2.5 bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-all flex justify-center items-center gap-1.5"
+              >
+                {downloading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+                ) : (
+                  <><FileText className="w-4 h-4" /> Generate PDF</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

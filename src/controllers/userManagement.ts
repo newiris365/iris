@@ -17,6 +17,14 @@ const createUserSchema = z.object({
   role: z.enum(ALL_ROLES),
   employee_id: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  roll_number: z.string().optional(),
+  batch_year: z.string().optional(),
+  semester: z.number().int().min(1).optional(),
+  department_id: z.string().uuid().optional(),
+  dob: z.string().optional(),
+  gender: z.string().optional(),
+  guardian_name: z.string().optional(),
+  guardian_phone: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -40,7 +48,7 @@ export async function listUsers(req: Request, res: Response) {
 
     let query = supabaseAdmin
       .from('users')
-      .select('id, name, email, phone, role, employee_id, is_active, last_login, created_at')
+      .select('id, name, email, phone, role, employee_id, is_active, last_login, created_at', { count: 'exact' })
       .eq('institution_id', institution_id);
 
     if (role) query = query.eq('role', role);
@@ -101,7 +109,7 @@ export async function createUser(req: Request, res: Response) {
     const parse = createUserSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ success: false, error: parse.error.errors[0].message });
 
-    const { name, email, phone, role, employee_id, password } = parse.data;
+    const { name, email, phone, role, employee_id, password, roll_number, batch_year, semester, department_id, dob, gender, guardian_name, guardian_phone } = parse.data;
     const institution_id = req.user?.institution_id;
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
@@ -160,6 +168,30 @@ export async function createUser(req: Request, res: Response) {
 
     if (uErr) {
       throw uErr;
+    }
+
+    if (role === 'Student') {
+      const studentRollNumber = roll_number || `AUTO-${userId.substring(0, 8)}`;
+      const studentBatchYear = batch_year || `${new Date().getFullYear()}-${new Date().getFullYear() + 4}`;
+
+      const { error: sErr } = await supabaseAdmin
+        .from('students')
+        .insert({
+          user_id: userId,
+          institution_id,
+          roll_number: studentRollNumber,
+          batch_year: studentBatchYear,
+          semester: semester || 1,
+          department_id: department_id || null,
+          dob: dob || null,
+          gender: gender || null,
+          guardian_name: guardian_name || null,
+          guardian_phone: guardian_phone || null,
+        });
+
+      if (sErr) {
+        console.error('[createUser] Failed to create student record:', sErr);
+      }
     }
 
     return res.json({ success: true, user, message: `User created with role ${role}. Default password: ${password}` });
@@ -333,13 +365,86 @@ export async function getDepartments(req: Request, res: Response) {
 
     const { data, error } = await supabaseAdmin
       .from('departments')
-      .select('id, name')
+      .select('id, name, created_at')
       .eq('institution_id', institution_id)
       .order('name');
 
     if (error) throw error;
 
     return res.json({ success: true, departments: data || [] });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
+}
+
+// ─── CREATE DEPARTMENT ────────────────────────────────────────
+
+export async function createDepartment(req: Request, res: Response) {
+  try {
+    const { name, institution_id } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Department name is required.' });
+
+    const instId = institution_id || req.user?.institution_id;
+    if (!instId) return res.status(400).json({ success: false, error: 'No institution context.' });
+
+    const { data, error } = await supabaseAdmin
+      .from('departments')
+      .insert({ name: name.trim(), institution_id: instId })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.json({ success: true, department: data });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
+}
+
+// ─── UPDATE DEPARTMENT ────────────────────────────────────────
+
+export async function updateDepartment(req: Request, res: Response) {
+  try {
+    const { id, name } = req.body;
+    if (!id) return res.status(400).json({ success: false, error: 'Department ID required.' });
+    if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Department name is required.' });
+
+    const institution_id = req.user?.institution_id;
+
+    const { data, error } = await supabaseAdmin
+      .from('departments')
+      .update({ name: name.trim() })
+      .eq('id', id)
+      .eq('institution_id', institution_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.json({ success: true, department: data });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: errorMsg });
+  }
+}
+
+// ─── DELETE DEPARTMENT ────────────────────────────────────────
+
+export async function deleteDepartment(req: Request, res: Response) {
+  try {
+    const id = req.query.id as string;
+    if (!id) return res.status(400).json({ success: false, error: 'Department ID required.' });
+
+    const institution_id = req.user?.institution_id;
+
+    const { error } = await supabaseAdmin
+      .from('departments')
+      .delete()
+      .eq('id', id)
+      .eq('institution_id', institution_id);
+
+    if (error) throw error;
+    return res.json({ success: true, message: 'Department deleted.' });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     return res.status(500).json({ success: false, error: errorMsg });

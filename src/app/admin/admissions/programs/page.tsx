@@ -47,43 +47,11 @@ export default function AdminProgramsPage() {
       if (res.success && res.programs) {
         setPrograms(res.programs);
       } else {
-        throw new Error(res.error);
+        setPrograms([]);
       }
     } catch {
-      // Mock data fallback
-      const mockPrograms: ProgramRecord[] = [
-        {
-          id: 'p1',
-          name: 'Bachelor of Technology in Computer Science (B.Tech CSE)',
-          code: 'BTECH-CSE',
-          degree_type: 'UG',
-          duration_years: 4,
-          total_seats: 120,
-          application_fee: 1000,
-          eligibility_criteria: { min_12th_pc: 60, required_subjects: ['Physics', 'Mathematics'] }
-        },
-        {
-          id: 'p2',
-          name: 'Bachelor of Technology in Artificial Intelligence (B.Tech AI-DS)',
-          code: 'BTECH-AIDS',
-          degree_type: 'UG',
-          duration_years: 4,
-          total_seats: 60,
-          application_fee: 1200,
-          eligibility_criteria: { min_12th_pc: 65, required_subjects: ['Physics', 'Mathematics'] }
-        },
-        {
-          id: 'p3',
-          name: 'Master of Business Administration (MBA)',
-          code: 'MBA-CORE',
-          degree_type: 'PG',
-          duration_years: 2,
-          total_seats: 60,
-          application_fee: 1500,
-          eligibility_criteria: { min_12th_pc: 50 }
-        }
-      ];
-      setPrograms(mockPrograms);
+      // Backend not reachable — show empty
+      setPrograms([]);
     } finally {
       setLoading(false);
     }

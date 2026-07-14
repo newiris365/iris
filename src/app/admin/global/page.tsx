@@ -56,26 +56,39 @@ interface SuperAdminNotification {
 }
 
 const FEATURE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', admissions: 'Admissions', students: 'Students',
-  attendance: 'Attendance', timetable: 'Timetable', fees: 'Fees & Finance',
-  exams: 'Exams & Results', canteen: 'Canteen', hostel: 'Hostel',
+  dashboard: 'Dashboard', admissions: 'Admissions', new_admission: 'New Admission',
+  students: 'Students', users_roles: 'Users & Roles', permissions: 'Permissions',
+  attendance: 'Attendance', timetable: 'Timetable', timetable_auto: 'Timetable Auto',
+  fees: 'Fees & Finance', fee_escalation: 'Fee Escalation',
+  exams: 'Exams & Results', exam_seating: 'Exam Seating', exam_enrollment: 'Exam Enrollment',
+  calendar: 'Academic Calendar', defaulter_report: 'Defaulter Report',
+  canteen: 'Canteen', hostel: 'Hostel', complaints: 'Complaints',
   library: 'Library', placements: 'Placements', hr: 'HR Management',
   gate: 'Smart Gate', gym: 'FitZone Gym', transit: 'Transit',
-  events: 'Events', notices: 'Notices', idcards: 'ID Cards',
-  ai_concierge: 'AI Concierge', obe: 'OBE Maps', naac: 'NAAC Scorecard',
-  faculty_development: 'Faculty Dev', achievements: 'Achievements',
-  director: 'Director Console', parent_portal: 'Parent Portal'
+  events: 'Events', lost_found: 'Lost & Found', notices: 'Notices',
+  idcards: 'ID Cards', ai_concierge: 'AI Concierge', obe: 'OBE Maps',
+  naac: 'NAAC Scorecard', faculty_development: 'Faculty Dev',
+  faculty_portal: 'Faculty Portal', security_portal: 'Security Portal',
+  driver_portal: 'Driver Portal', vendor_portal: 'Vendor Portal',
+  achievements: 'Achievements', whatsapp: 'WhatsApp API',
+  notifications: 'Notifications', payment_settings: 'Payment Settings',
+  settings: 'Settings', director: 'Director Console',
+  parent_portal: 'Parent Portal', profile: 'Profile'
 };
 
 const FEATURE_ICONS: Record<string, string> = {
-  dashboard: '📊', admissions: '🎓', students: '👤', attendance: '✅',
-  timetable: '📅', fees: '💰', exams: '📝', canteen: '🍽️',
-  hostel: '🏠', library: '📚', placements: '💼', hr: '👥',
-  gate: '🚪', gym: '💪', transit: '🚌', events: '🎉',
-  notices: '📢', idcards: '🪪', ai_concierge: '🤖', obe: '📋',
-  naac: '🏆', faculty_development: '👨‍🏫', achievements: '🏅',
-  director: '🎯', parent_portal: '👨‍👩‍👧', lost_found: '📦',
-  exam_seating: '🪑'
+  dashboard: '📊', admissions: '🎓', new_admission: '📝', students: '👤',
+  users_roles: '👥', permissions: '🔐', attendance: '✅', timetable: '📅',
+  timetable_auto: '⚡', fees: '💰', fee_escalation: '📈', exams: '📝',
+  exam_seating: '🪑', exam_enrollment: '📋', calendar: '📆',
+  defaulter_report: '📊', canteen: '🍽️', hostel: '🏠', complaints: '⚠️',
+  library: '📚', placements: '💼', hr: '👥', gate: '🚪', gym: '💪',
+  transit: '🚌', events: '🎉', lost_found: '📦', notices: '📢',
+  idcards: '🪪', ai_concierge: '🤖', obe: '📋', naac: '🏆',
+  faculty_development: '👨‍🏫', faculty_portal: '👨‍🏫', security_portal: '🛡️',
+  driver_portal: '🚌', vendor_portal: '🛒', achievements: '🏅',
+  whatsapp: '💬', notifications: '🔔', payment_settings: '💳',
+  settings: '⚙️', director: '🎯', parent_portal: '👨‍👩‍👧', profile: '👤'
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -90,6 +103,17 @@ const ROLE_COLORS: Record<string, string> = {
   Vendor: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
   Driver: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   Director: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  Principal: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  'Vice Principal': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  HOD: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  Librarian: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  TPO: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  'IQAC Coordinator': 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+  'Admissions Officer': 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+  'Gym Trainer': 'bg-red-400/10 text-red-300 border-red-400/20',
+  'HR Admin': 'bg-violet-400/10 text-violet-300 border-violet-400/20',
+  'Company HR': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  Applicant: 'bg-gray-400/10 text-gray-300 border-gray-400/20',
 };
 
 const PLAN_PRICING: Record<string, number> = {
@@ -120,7 +144,7 @@ export default function SuperAdminConsole() {
 
   const [stats, setStats] = useState({
     totalInstitutions: 0,
-    totalStudents: 0,
+    totalUsers: 0,
     totalRevenue: 0,
     mrr: 0,
     rlsCompliant: true
@@ -181,14 +205,16 @@ export default function SuperAdminConsole() {
       if (!instRes.ok) throw new Error(instJson.error || 'Failed to load institutions');
       const insts: Institution[] = instJson.institutions || [];
 
-      // Fetch users directly (anon key can read users with existing policy)
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*, institutions(name)');
+      // Fetch users via server API (uses service role key, bypasses RLS)
+      const usersRes = await fetch('/api/superadmin/users/list', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const usersJson = await usersRes.json();
+      const rawUsers = usersJson.users || [];
 
-      const mappedUsers: GlobalUser[] = (usersData || []).map((u: any) => ({
+      const mappedUsers: GlobalUser[] = rawUsers.map((u: any) => ({
         id: u.id, name: u.name, email: u.email, role: u.role,
-        is_active: u.is_active, institution_name: u.institutions?.name || 'Global System'
+        is_active: u.is_active, institution_name: u.institution_name || 'Global System'
       }));
 
       let totalMRR = 0;
@@ -207,7 +233,7 @@ export default function SuperAdminConsole() {
       setGlobalUsers(mappedUsers);
       setStats({
         totalInstitutions: insts.length,
-        totalStudents: mappedUsers.filter((u: any) => u.role === 'Student').length,
+        totalUsers: mappedUsers.length,
         totalRevenue: totalAllTime,
         mrr: totalMRR,
         rlsCompliant: true
@@ -578,20 +604,40 @@ export default function SuperAdminConsole() {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      const { error } = await supabase.from('users').update({ role: newRole }).eq('id', userId);
-      if (error) throw error;
+      const token = localStorage.getItem('iris_jwt_token');
+      const res = await fetch('/api/superadmin/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, updates: { role: newRole } })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update role');
       loadSystemData();
-    } catch {
+    } catch (err) {
+      console.error('Failed to update user role:', err);
       setGlobalUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     }
   };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase.from('users').update({ is_active: !currentStatus }).eq('id', userId);
-      if (error) throw error;
+      const token = localStorage.getItem('iris_jwt_token');
+      const res = await fetch('/api/superadmin/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ userId, updates: { is_active: !currentStatus } })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update status');
       loadSystemData();
-    } catch {
+    } catch (err) {
+      console.error('Failed to toggle user status:', err);
       setGlobalUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: !currentStatus } : u));
     }
   };
@@ -599,10 +645,16 @@ export default function SuperAdminConsole() {
   const deleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      const { error } = await supabase.from('users').delete().eq('id', userId);
-      if (error) throw error;
+      const token = localStorage.getItem('iris_jwt_token');
+      const res = await fetch(`/api/superadmin/users?userId=${userId}`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to delete user');
       loadSystemData();
-    } catch {
+    } catch (err) {
+      console.error('Failed to delete user:', err);
       setGlobalUsers(prev => prev.filter(u => u.id !== userId));
     }
   };
@@ -694,8 +746,8 @@ export default function SuperAdminConsole() {
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] text-[#C4B5FD]/50 uppercase tracking-wider font-semibold block">Global Students</span>
-              <strong className="text-2xl font-bold block mt-1">{stats.totalStudents}</strong>
+              <span className="text-[10px] text-[#C4B5FD]/50 uppercase tracking-wider font-semibold block">Global Users</span>
+              <strong className="text-2xl font-bold block mt-1">{stats.totalUsers}</strong>
             </div>
           </div>
           <div className="glass-panel rounded-2xl p-5 border border-white/5 flex items-center gap-4">
@@ -890,7 +942,7 @@ export default function SuperAdminConsole() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.slice(0, 10).map((user) => (
+                      {filteredUsers.map((user) => (
                         <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
                           <td className="py-3 px-3 font-semibold text-white flex flex-col sm:flex-row sm:items-center gap-1.5">
                             {user.name}

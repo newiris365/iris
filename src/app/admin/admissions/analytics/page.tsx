@@ -40,30 +40,18 @@ export default function AdminAnalyticsPage() {
 
       if (funnelRes.success && funnelRes.funnel) {
         setFunnel(funnelRes.funnel);
+      } else {
+        setFunnel([]);
       }
       if (reportRes.success && reportRes.report) {
         setReport(reportRes.report);
+      } else {
+        setReport(null);
       }
     } catch {
-      // Mock Data Fallbacks
-      setFunnel([
-        { stage: 'Total Enquiries', value: 3450 },
-        { stage: 'Registered Candidates', value: 1245 },
-        { stage: 'Forms Submitted', value: 980 },
-        { stage: 'Shortlisted', value: 450 },
-        { stage: 'Merit Listed', value: 320 },
-        { stage: 'Offers Accepted', value: 180 },
-        { stage: 'Fully Enrolled', value: 155 }
-      ]);
-      setReport({
-        title: 'AISHE Higher Education Admissions Audit Report',
-        academic_year: '2026-27',
-        metrics: [
-          { degree: 'B.Tech CSE', male: 74, female: 20, sc: 15, st: 8, obc: 25, general: 46 },
-          { degree: 'B.Tech AI-DS', male: 35, female: 13, sc: 7, st: 4, obc: 12, general: 25 },
-          { degree: 'MBA Core', male: 8, female: 5, sc: 2, st: 1, obc: 3, general: 7 }
-        ]
-      });
+      // Backend not reachable — show empty states
+      setFunnel([]);
+      setReport(null);
     } finally {
       setLoading(false);
     }

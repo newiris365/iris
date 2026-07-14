@@ -61,12 +61,6 @@ function getAuthHeaders(): Record<string, string> {
     headers['X-Client-Device-ID'] = deviceId;
   }
 
-  // DEBUG: Log what token is being sent (safe — only shows prefix, not full token)
-  console.log('[API getAuthHeaders] isProduction:', isProduction,
-    '| token type:', !token ? 'NONE' : token.startsWith('mock-sandbox') ? 'MOCK' : token.startsWith('eyJ') ? 'REAL_JWT' : 'UNKNOWN',
-    '| token prefix:', token ? token.substring(0, 30) : 'null',
-    '| Authorization present:', !!headers['Authorization']);
-
   return headers;
 }
 
@@ -94,17 +88,7 @@ async function request(url: string, options: RequestInit): Promise<Response> {
   }
   options.headers = headers;
 
-  console.log(`[API Request] Fetching URL: ${url}`, {
-    method: options.method,
-    headers: {
-      ...options.headers,
-      Authorization: options.headers['Authorization'] ? 'Bearer [PRESENT]' : undefined
-    }
-  });
-
   const response = await fetch(url, options);
-
-  console.log(`[API Response] URL: ${url} -> Status: ${response.status}`);
 
   if (response.status === 401) {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('iris_refresh_token') : null;
@@ -112,7 +96,6 @@ async function request(url: string, options: RequestInit): Promise<Response> {
       if (!isRefreshing) {
         isRefreshing = true;
         try {
-          console.log(`[API Token Refresh] Initiating token refresh for URL: ${url}`);
           const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -122,7 +105,6 @@ async function request(url: string, options: RequestInit): Promise<Response> {
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();
             if (data.success && data.token) {
-              console.log('[API Token Refresh] Token refresh succeeded.');
               localStorage.setItem('iris_jwt_token', data.token);
               if (data.refreshToken) {
                 localStorage.setItem('iris_refresh_token', data.refreshToken);
@@ -190,7 +172,6 @@ export async function apiGet<T = any>(endpoint: string, params?: Record<string, 
     });
 
     const json = await response.json();
-    console.log(`[API GET Response JSON] URL: ${url.toString()}`, json);
     return json;
   } catch (err: any) {
     console.error(`apiGet failed for ${endpoint}:`, err);
@@ -209,7 +190,6 @@ export async function apiPost<T = any>(endpoint: string, body: any): Promise<Api
     });
 
     const json = await response.json();
-    console.log(`[API POST Response JSON] URL: ${url}`, json);
     return json;
   } catch (err: any) {
     console.error(`apiPost failed for ${endpoint}:`, err);
