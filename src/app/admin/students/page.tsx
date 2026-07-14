@@ -9,6 +9,7 @@ export default function AdminStudentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any>(null);
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedBatch, setSelectedBatch] = useState('');
   const [instituteType, setInstituteType] = useState('college');
@@ -80,6 +81,45 @@ export default function AdminStudentsPage() {
       }
     } catch (err) {
       alert('Error connecting to enrollment server.');
+    }
+  };
+
+  const openEdit = (student: any) => {
+    setEditingStudent(student);
+    setFormData({
+      name: student.name || '',
+      email: student.users?.email || '',
+      roll_number: student.roll_number || '',
+      department_id: student.department_id || 'a0000000-0000-0000-0000-000000000001',
+      semester: student.semester || 1,
+      batch_year: student.batch_year || '',
+      dob: student.dob || '',
+      gender: student.gender || '',
+      blood_group: student.blood_group || '',
+      guardian_name: student.guardian_name || '',
+      guardian_phone: student.guardian_phone || '',
+      address: student.address || '',
+      fingerprint_id: student.fingerprint_id || '',
+    });
+    setShowAddModal(true);
+  };
+
+  const handleEditStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    try {
+      const submitData = { ...formData };
+      const res = await apiPut(`/core/students/${editingStudent.id}`, submitData);
+      if (res.success) {
+        setShowAddModal(false);
+        setEditingStudent(null);
+        fetchStudents();
+        alert('Student updated successfully!');
+      } else {
+        alert(res.error || 'Failed to update student.');
+      }
+    } catch (err) {
+      alert('Error connecting to server.');
     }
   };
 
@@ -163,7 +203,7 @@ export default function AdminStudentsPage() {
               <Upload className="w-4 h-4" /> Import Students
             </a>
             <button 
-              onClick={() => setShowAddModal(true)}
+              onClick={() => { setEditingStudent(null); setShowAddModal(true); }}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-[#6C2BD9]/25 transition-all"
             >
               <PlusCircle className="w-4 h-4" /> Enroll Student
@@ -243,6 +283,13 @@ export default function AdminStudentsPage() {
                       </td>
                       <td className="p-4 text-center flex items-center justify-center gap-2">
                         <button 
+                          onClick={() => openEdit(student)}
+                          className="w-7 h-7 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 flex items-center justify-center transition-colors"
+                          title="Edit Student"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
                           onClick={() => handleDelete(student.id)}
                           className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors"
                           title="Expel Student"
@@ -260,13 +307,13 @@ export default function AdminStudentsPage() {
 
       </div>
 
-      {/* Add Student Modal */}
+      {/* Add/Edit Student Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-lg bg-[#13102A] border border-[#6C2BD9]/30 rounded-2xl p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
-            <h3 className="font-heading font-bold text-lg text-white mb-4">Enroll New Student</h3>
+            <h3 className="font-heading font-bold text-lg text-white mb-4">{editingStudent ? 'Edit Student' : 'Enroll New Student'}</h3>
             
-            <form onSubmit={handleAddStudent} className="space-y-4 text-xs">
+            <form onSubmit={editingStudent ? handleEditStudent : handleAddStudent} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div className={`flex flex-col gap-1 ${instituteType === 'school' ? 'col-span-2' : ''}`}>
                   <label className="text-[#C4B5FD]">Full Name</label>
@@ -363,7 +410,7 @@ export default function AdminStudentsPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <button 
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); setEditingStudent(null); }}
                   className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold"
                 >
                   Cancel
@@ -372,7 +419,7 @@ export default function AdminStudentsPage() {
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold"
                 >
-                  Enroll Student
+                  {editingStudent ? 'Update Student' : 'Enroll Student'}
                 </button>
               </div>
             </form>

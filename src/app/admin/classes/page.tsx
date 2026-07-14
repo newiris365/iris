@@ -53,21 +53,33 @@ export default function ClassesPage() {
   };
 
   const handleCreate = async () => {
-    const res = await apiPost('school/classes', form);
-    if (res.success) {
-      setShowForm(false);
-      setForm({ grade: 1, section: 'A', class_teacher_id: '', room_number: '', capacity: 40 });
-      fetchData();
+    try {
+      const res = await apiPost('school/classes', form);
+      if (res.success) {
+        setShowForm(false);
+        setForm({ grade: 1, section: 'A', class_teacher_id: '', room_number: '', capacity: 40 });
+        fetchData();
+      } else {
+        alert('Failed: ' + (res.error || 'Unknown error'));
+      }
+    } catch (err: any) {
+      alert('Error: ' + (err.message || 'Unknown error'));
     }
   };
 
   const handleUpdate = async () => {
     if (!editingClass) return;
-    const res = await apiPut(`school/classes/${editingClass.id}`, form);
-    if (res.success) {
-      setEditingClass(null);
-      setShowForm(false);
-      fetchData();
+    try {
+      const res = await apiPut(`school/classes/${editingClass.id}`, form);
+      if (res.success) {
+        setEditingClass(null);
+        setShowForm(false);
+        fetchData();
+      } else {
+        alert('Failed: ' + (res.error || 'Unknown error'));
+      }
+    } catch (err: any) {
+      alert('Error: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -180,7 +192,7 @@ export default function ClassesPage() {
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
                 <option value="">None</option>
                 {teachers.map(t => (
-                  <option key={t.id} value={t.id}>{t.full_name}</option>
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
             </div>

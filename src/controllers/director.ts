@@ -163,9 +163,11 @@ export async function getOverview(req: Request, res: Response) {
 
     try {
       const { count } = await supabaseAdmin
-        .from('staff')
+        .from('users')
         .select('*', { count: 'exact', head: true })
-        .eq('institution_id', institutionId);
+        .eq('institution_id', institutionId)
+        .in('role', ['Teacher', 'Staff', 'HOD', 'Warden', 'Librarian', 'Security', 'Driver', 'Gym Trainer', 'Admissions Officer', 'TPO', 'IQAC Coordinator', 'HR Admin', 'Principal', 'Vice Principal'])
+        .eq('is_active', true);
       if (count !== null) totalStaff = count;
     } catch {}
 

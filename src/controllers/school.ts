@@ -46,6 +46,29 @@ EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 `;
 
+const TIMETABLE_SCHOOL_MIGRATION = `
+ALTER TABLE timetable ALTER COLUMN department_id DROP NOT NULL;
+`;
+
+let timetableSchoolReady = false;
+
+export async function ensureTimetableSchoolReady(): Promise<boolean> {
+  if (timetableSchoolReady) return true;
+  const pool = getDbPool();
+  if (!pool) {
+    logger.error('[SCHOOL] Cannot auto-migrate timetable: DATABASE_URL not configured.');
+    return false;
+  }
+  const result = await runSql(TIMETABLE_SCHOOL_MIGRATION);
+  if (result.success) {
+    timetableSchoolReady = true;
+    logger.info('[SCHOOL] Timetable school migration applied.');
+    return true;
+  }
+  logger.error('[SCHOOL] Timetable school migration failed:', result.error);
+  return false;
+}
+
 export async function ensureClassSectionsTable(): Promise<boolean> {
   // Step 1: Check via Supabase if table already exists
   try {
@@ -105,12 +128,16 @@ export async function listClassSections(req: Request, res: Response) {
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
     if (!classSectionsReady) {
-      return res.status(503).json({
-        success: false,
-        error: 'Class sections table not yet initialized. Please wait or contact admin.',
-        setup_required: true,
-      });
+      const created = await ensureClassSectionsTable();
+      if (!created) {
+        return res.status(503).json({
+          success: false,
+          error: 'Class sections table could not be initialized. Please run the setup schema.',
+          setup_required: true,
+        });
+      }
     }
+    await ensureTimetableSchoolReady();
 
     const { data, error } = await supabaseAdmin
       .from('class_sections')
@@ -135,6 +162,23 @@ export async function listClassSections(req: Request, res: Response) {
       student_count: 0,
     }));
 
+    // Count actual students per grade from students table (semester = grade for schools)
+    const { data: studentCounts } = await supabaseAdmin
+      .from('students')
+      .select('semester')
+      .eq('institution_id', institution_id);
+
+    if (studentCounts) {
+      const countMap: Record<number, number> = {};
+      studentCounts.forEach((s: any) => {
+        const g = s.semester || 0;
+        countMap[g] = (countMap[g] || 0) + 1;
+      });
+      classes.forEach((c: any) => {
+        c.student_count = countMap[c.grade] || 0;
+      });
+    }
+
     return res.json({ success: true, classes });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -150,7 +194,10 @@ export async function createClassSection(req: Request, res: Response) {
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
     if (!classSectionsReady) {
-      return res.status(503).json({ success: false, error: 'Class sections table not yet initialized.' });
+      const created = await ensureClassSectionsTable();
+      if (!created) {
+        return res.status(503).json({ success: false, error: 'Class sections table could not be initialized. Please run the setup schema.' });
+      }
     }
 
     const { grade, section, class_teacher_id, room_number, capacity } = req.body;
@@ -194,8 +241,12 @@ export async function updateClassSection(req: Request, res: Response) {
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
     if (!classSectionsReady) {
-      return res.status(503).json({ success: false, error: 'Class sections table not yet initialized.' });
+      const created = await ensureClassSectionsTable();
+      if (!created) {
+        return res.status(503).json({ success: false, error: 'Class sections table could not be initialized.' });
+      }
     }
+    await ensureTimetableSchoolReady();
 
     const { grade, section, class_teacher_id, room_number, capacity } = req.body;
 
@@ -231,7 +282,10 @@ export async function deleteClassSection(req: Request, res: Response) {
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
     if (!classSectionsReady) {
-      return res.status(503).json({ success: false, error: 'Class sections table not yet initialized.' });
+      const created = await ensureClassSectionsTable();
+      if (!created) {
+        return res.status(503).json({ success: false, error: 'Class sections table could not be initialized.' });
+      }
     }
 
     const { error } = await supabaseAdmin

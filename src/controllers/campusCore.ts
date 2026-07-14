@@ -255,7 +255,7 @@ const studentSchema = z.object({
 });
 
 const timetableBlockSchema = z.object({
-  department_id: z.string().uuid(),
+  department_id: z.string().uuid().nullable().optional(),
   day_of_week: z.string(),
   time_slot: z.string(),
   subject: z.string(),
@@ -1769,12 +1769,19 @@ export async function addTimetableBlock(req: Request, res: Response) {
 
     if (teacherConflict) return res.status(409).json({ success: false, error: `Clash: Lecturer is already assigned to ${teacherConflict.subject} during this time.` });
 
+    const insertData: Record<string, any> = {
+      institution_id: req.user?.institution_id,
+      day_of_week: block.day_of_week,
+      time_slot: block.time_slot,
+      subject: block.subject,
+      teacher_id: block.teacher_id,
+      room: block.room,
+    };
+    if (block.department_id) insertData.department_id = block.department_id;
+
     const { data, error } = await supabaseAdmin
       .from('timetable')
-      .insert({
-        institution_id: req.user?.institution_id,
-        ...block
-      })
+      .insert(insertData)
       .select()
       .single();
 

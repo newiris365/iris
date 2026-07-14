@@ -64,7 +64,6 @@ const schoolAdminLinks: SidebarLink[] = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Students', href: '/admin/students', icon: GraduationCap },
   { label: 'Teachers & Staff', href: '/admin/users', icon: Users },
-  { label: 'Departments', href: '/admin/departments', icon: Building2 },
   { label: 'Classes & Sections', href: '/admin/classes', icon: School },
   { label: 'Attendance', href: '/admin/attendance', icon: CalendarDays },
   { label: 'Timetable', href: '/admin/timetable', icon: ClipboardList },
