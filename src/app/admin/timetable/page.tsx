@@ -10,8 +10,8 @@ interface ClassSection {
   section: string;
 }
 
-function generateSlots(count: number, startHour: number, startMin: number, durationMin: number, breakMin: number): string[] {
-  const slots: string[] = [];
+function generateSlots(count: number, startHour: number, startMin: number, durationMin: number, breakMin: number, lunchAfterPeriod: number, lunchDuration: number): (string | { type: 'lunch'; label: string })[] {
+  const slots: (string | { type: 'lunch'; label: string })[] = [];
   let min = startHour * 60 + startMin;
   for (let i = 0; i < count; i++) {
     const sH = Math.floor(min / 60);
@@ -26,6 +26,16 @@ function generateSlots(count: number, startHour: number, startMin: number, durat
     };
     slots.push(`${fmt(sH, sM)} - ${fmt(eH, eM)}`);
     min += breakMin;
+
+    if (lunchAfterPeriod > 0 && i + 1 === lunchAfterPeriod) {
+      const lH1 = Math.floor(min / 60);
+      const lM1 = min % 60;
+      min += lunchDuration;
+      const lH2 = Math.floor(min / 60);
+      const lM2 = min % 60;
+      slots.push({ type: 'lunch', label: `Lunch Break (${fmt(lH1, lM1)} - ${fmt(lH2, lM2)})` });
+      min += breakMin;
+    }
   }
   return slots;
 }
@@ -46,12 +56,16 @@ export default function AdminTimetablePage() {
   const [startMin, setStartMin] = useState(0);
   const [durationMin, setDurationMin] = useState(45);
   const [breakMin, setBreakMin] = useState(10);
+  const [lunchAfterPeriod, setLunchAfterPeriod] = useState(4);
+  const [lunchDuration, setLunchDuration] = useState(60);
 
   const [showSettings, setShowSettings] = useState(false);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  const slots = generateSlots(periodCount, startHour, startMin, durationMin, breakMin);
+  const slots = generateSlots(periodCount, startHour, startMin, durationMin, breakMin, lunchAfterPeriod, lunchDuration);
+  const timeSlots = slots.filter(s => typeof s === 'string') as string[];
+  const lunchIdx = slots.findIndex(s => typeof s === 'object' && s.type === 'lunch');
 
   const [formData, setFormData] = useState({
     day_of_week: 'Monday',
@@ -76,6 +90,8 @@ export default function AdminTimetablePage() {
         if (c.startMin !== undefined) setStartMin(c.startMin);
         if (c.durationMin) setDurationMin(c.durationMin);
         if (c.breakMin !== undefined) setBreakMin(c.breakMin);
+        if (c.lunchAfterPeriod !== undefined) setLunchAfterPeriod(c.lunchAfterPeriod);
+        if (c.lunchDuration !== undefined) setLunchDuration(c.lunchDuration);
       }
     }
   }, []);
@@ -92,7 +108,7 @@ export default function AdminTimetablePage() {
   }, [selectedDept, selectedClassSection]);
 
   const saveConfig = () => {
-    localStorage.setItem('iris_timetable_config', JSON.stringify({ periodCount, startHour, startMin, durationMin, breakMin }));
+    localStorage.setItem('iris_timetable_config', JSON.stringify({ periodCount, startHour, startMin, durationMin, breakMin, lunchAfterPeriod, lunchDuration }));
     setShowSettings(false);
   };
 
@@ -153,7 +169,7 @@ export default function AdminTimetablePage() {
       const res = await apiPost('/core/timetable', payload);
       if (res.success) {
         setShowAddForm(false);
-        setFormData({ day_of_week: 'Monday', time_slot: slots[0] || '', subject: '', teacher_id: '', room: '' });
+        setFormData({ day_of_week: 'Monday', time_slot: timeSlots[0] || '', subject: '', teacher_id: '', room: '' });
         fetchTimetable();
         alert(isSchool ? 'Class block scheduled!' : 'Lecture block scheduled!');
       } else {
@@ -256,7 +272,7 @@ export default function AdminTimetablePage() {
               <Cpu className="w-4 h-4" /> Auto-Schedule
             </button>
             <button 
-              onClick={() => { setFormData({ day_of_week: 'Monday', time_slot: slots[0] || '', subject: '', teacher_id: '', room: '' }); setShowAddForm(true); }}
+              onClick={() => { setFormData({ day_of_week: 'Monday', time_slot: timeSlots[0] || '', subject: '', teacher_id: '', room: '' }); setShowAddForm(true); }}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6C2BD9] to-[#8B5CF6] hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-[#6C2BD9]/25 transition-all"
             >
               <Plus className="w-4 h-4" /> Schedule Block
@@ -278,43 +294,62 @@ export default function AdminTimetablePage() {
                 </div>
               ))}
 
-              {slots.map((slot, idx) => (
-                <React.Fragment key={slot}>
-                  <div className="p-3 font-mono font-bold text-[#C4B5FD] flex flex-col justify-center">
-                    <span className="text-[10px] text-[#C4B5FD]/50">Period {idx + 1}</span>
-                    <span>{slot}</span>
-                  </div>
-                  
-                  {days.map(day => {
-                    const block = getBlock(day, slot);
-                    return (
-                      <div key={`${day}-${slot}`} className="p-3 rounded-xl min-h-[80px] border flex flex-col justify-between transition-all bg-white/5 border-white/5 hover:border-[#6C2BD9]/40 relative group">
-                        {block ? (
-                          <>
-                            <div>
-                              <h4 className="font-bold text-white text-[11px]">{block.subject}</h4>
-                              <p className="text-[9px] text-[#C4B5FD]/70 mt-0.5">Rm: {block.room}</p>
-                            </div>
-                            <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-white/5 text-[8px] text-[#C4B5FD]/50">
-                              <span>{isSchool ? 'Teacher' : 'Lecturer'}</span>
-                              <button 
-                                onClick={() => handleDeleteBlock(block.id)}
-                                className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-[#C4B5FD]/20 italic text-[10px]">
-                            Empty
-                          </div>
-                        )}
+              {slots.map((slot, idx) => {
+                if (typeof slot === 'object' && slot.type === 'lunch') {
+                  return (
+                    <React.Fragment key={`lunch-${idx}`}>
+                      <div className="p-3 flex flex-col justify-center">
+                        <span className="text-[10px] text-amber-400/70 font-bold">Lunch</span>
+                        <span className="text-[9px] text-amber-400/50 font-mono">{slot.label}</span>
                       </div>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
+                      {days.map(day => (
+                        <div key={`${day}-lunch-${idx}`} className="p-3 rounded-xl min-h-[60px] border flex items-center justify-center bg-amber-500/5 border-amber-500/10">
+                          <span className="text-[10px] text-amber-400/40 font-bold">🍽 Lunch Break</span>
+                        </div>
+                      ))}
+                    </React.Fragment>
+                  );
+                }
+                const timeSlot = slot as string;
+                const periodNum = slots.slice(0, idx + 1).filter(s => typeof s === 'string').length;
+                return (
+                  <React.Fragment key={timeSlot}>
+                    <div className="p-3 font-mono font-bold text-[#C4B5FD] flex flex-col justify-center">
+                      <span className="text-[10px] text-[#C4B5FD]/50">Period {periodNum}</span>
+                      <span>{timeSlot}</span>
+                    </div>
+                    
+                    {days.map(day => {
+                      const block = getBlock(day, timeSlot);
+                      return (
+                        <div key={`${day}-${timeSlot}`} className="p-3 rounded-xl min-h-[80px] border flex flex-col justify-between transition-all bg-white/5 border-white/5 hover:border-[#6C2BD9]/40 relative group">
+                          {block ? (
+                            <>
+                              <div>
+                                <h4 className="font-bold text-white text-[11px]">{block.subject}</h4>
+                                <p className="text-[9px] text-[#C4B5FD]/70 mt-0.5">Rm: {block.room}</p>
+                              </div>
+                              <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-white/5 text-[8px] text-[#C4B5FD]/50">
+                                <span>{isSchool ? 'Teacher' : 'Lecturer'}</span>
+                                <button 
+                                  onClick={() => handleDeleteBlock(block.id)}
+                                  className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-[#C4B5FD]/20 italic text-[10px]">
+                              Empty
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
 
             </div>
           )}
@@ -362,10 +397,27 @@ export default function AdminTimetablePage() {
                     className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]" />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD]">Lunch After Period</label>
+                  <input type="number" min={0} max={periodCount} value={lunchAfterPeriod}
+                    onChange={(e) => setLunchAfterPeriod(Number(e.target.value))}
+                    className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD]">Lunch Duration (min)</label>
+                  <input type="number" min={0} max={120} value={lunchDuration}
+                    onChange={(e) => setLunchDuration(Number(e.target.value))}
+                    className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]" />
+                </div>
+              </div>
+              <p className="text-[9px] text-[#C4B5FD]/40">Set Lunch After Period to 0 to disable lunch break.</p>
               <div className="mt-2 p-3 rounded-lg bg-white/5 border border-white/5">
                 <p className="text-[10px] text-[#C4B5FD]/60 mb-1">Preview:</p>
                 {generateSlots(periodCount, startHour, startMin, durationMin, breakMin).map((s, i) => (
-                  <p key={i} className="text-[10px] text-white/70">Period {i + 1}: {s}</p>
+                  <p key={i} className="text-[10px] text-white/70">
+                  {typeof s === 'string' ? `Period ${i + 1}: ${s}` : <span className="text-amber-400/70">{s.label}</span>}
+                </p>
                 ))}
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
@@ -443,7 +495,7 @@ export default function AdminTimetablePage() {
                     onChange={(e) => setFormData({...formData, time_slot: e.target.value})}
                     className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                   >
-                    {slots.map((s, i) => <option key={s} value={s}>Period {i + 1}: {s}</option>)}
+                    {timeSlots.map((s, i) => <option key={s} value={s}>Period {i + 1}: {s}</option>)}
                   </select>
                 </div>
               </div>

@@ -48,6 +48,7 @@ END $$;
 
 const TIMETABLE_SCHOOL_MIGRATION = `
 ALTER TABLE timetable ALTER COLUMN department_id DROP NOT NULL;
+ALTER TABLE timetable DROP CONSTRAINT IF EXISTS timetable_teacher_id_fkey;
 `;
 
 let timetableSchoolReady = false;
