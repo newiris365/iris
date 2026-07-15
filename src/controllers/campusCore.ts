@@ -4765,85 +4765,123 @@ export async function detectTimetableConflicts(req: Request, res: Response) {
 
 export async function autoGenerateTimetable(req: Request, res: Response) {
   try {
-    const { department_id, semester, batch_year, subjects } = req.body;
-    
-    let targetDeptId = department_id;
-    if (!targetDeptId && req.user?.id) {
-      const { data: staff } = await supabaseAdmin
-        .from('staff')
-        .select('department_id')
-        .eq('user_id', req.user.id)
-        .maybeSingle();
-      if (staff) {
-        targetDeptId = staff.department_id;
-      }
-    }
+    const { department_id, subjects, time_slots, days: inputDays, rooms: inputRooms } = req.body;
+    const institution_id = req.user?.institution_id;
+    if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
-    if (!targetDeptId) {
-      return res.status(400).json({ success: false, error: 'department_id is required or could not be resolved.' });
-    }
-
-    if (!subjects || !Array.isArray(subjects)) {
+    if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
       return res.status(400).json({ success: false, error: 'subjects array is required.' });
     }
 
-    // Process and sanitize subjects array
-    const processedSubjects = [];
+    const v_days = inputDays && Array.isArray(inputDays) && inputDays.length > 0
+      ? inputDays
+      : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const v_slots = time_slots && Array.isArray(time_slots) && time_slots.length > 0
+      ? time_slots
+      : ['09:00 - 10:00 AM', '10:15 - 11:15 AM', '11:30 - 12:30 PM', '02:00 - 03:00 PM'];
+
+    const defaultRooms = inputRooms && Array.isArray(inputRooms) && inputRooms.length > 0
+      ? inputRooms
+      : ['Room 1', 'Room 2', 'Room 3'];
+
+    // Process subjects
+    const processedSubjects: any[] = [];
     for (const sub of subjects) {
       const name = sub.name || sub.subject_name || sub.subject || 'Unknown Subject';
-      
-      const classesVal = Number(sub.classes_per_week || 3);
-      const periodsVal = Number(sub.periods_per_class || 1);
-      const hours_per_week = Number(sub.hours_per_week || (classesVal * periodsVal) || 3);
-      
+      const hours_per_week = Number(sub.hours_per_week || sub.classes_per_week || 3);
       let teacherId = sub.teacher_id;
-      if (!teacherId && sub.teacher_name) {
-        const { data: teacherUser } = await supabaseAdmin
-          .from('users')
-          .select('id')
+      if (!teacherId) {
+        // Try to find a random teacher for this institution
+        const { data: t } = await supabaseAdmin
+          .from('users').select('id')
+          .eq('institution_id', institution_id)
           .eq('role', 'Teacher')
-          .ilike('name', `%${sub.teacher_name}%`)
-          .limit(1)
-          .maybeSingle();
-        
-        if (teacherUser) {
-          teacherId = teacherUser.id;
-        } else {
-          // Search in employee_profiles
-          const { data: emp } = await supabaseAdmin
-            .from('employee_profiles')
-            .select('user_id')
-            .or(`first_name.ilike.%${sub.teacher_name}%,last_name.ilike.%${sub.teacher_name}%`)
-            .limit(1)
-            .maybeSingle();
-          if (emp && emp.user_id) {
-            teacherId = emp.user_id;
-          }
-        }
+          .eq('is_active', true)
+          .limit(1).maybeSingle();
+        if (t) teacherId = t.id;
       }
-
       if (!teacherId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teacherId)) {
-        teacherId = 'b0000000-0000-0000-0000-000000000005'; // Default mock teacher
+        continue; // Skip subjects without valid teacher
       }
-
-      processedSubjects.push({
-        name,
-        hours_per_week,
-        teacher_id: teacherId,
-        room: sub.room || 'Room 101'
-      });
+      processedSubjects.push({ name, hours_per_week, teacher_id: teacherId, room: sub.room || defaultRooms[0] });
     }
 
-    const { data, error } = await supabaseAdmin.rpc('auto_generate_timetable', {
-      p_institution_id: req.user?.institution_id,
-      p_department_id: targetDeptId,
-      p_semester: Number(semester) || 1,
-      p_batch_year: batch_year || '2026',
-      p_subjects: JSON.stringify(processedSubjects),
+    if (processedSubjects.length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid subjects with teachers found.' });
+    }
+
+    // Fetch existing timetable to check conflicts
+    const { data: existing } = await supabaseAdmin
+      .from('timetable').select('day_of_week, time_slot, teacher_id, room')
+      .eq('institution_id', institution_id);
+
+    const occupied = new Set<string>();
+    (existing || []).forEach((e: any) => {
+      occupied.add(`${e.day_of_week}|${e.time_slot}|${e.teacher_id}`);
+      if (e.room) occupied.add(`${e.day_of_week}|${e.time_slot}|ROOM:${e.room}`);
     });
 
-    if (error) throw error;
-    return res.status(200).json(data?.[0] || { success: false, error: 'Auto-generation failed' });
+    // Round-robin allocation
+    let inserted = 0;
+    const conflicts: any[] = [];
+    let dayIdx = 0;
+    let slotIdx = 0;
+
+    for (const sub of processedSubjects) {
+      let remaining = sub.hours_per_week;
+      let attempts = 0;
+      const maxAttempts = v_days.length * v_slots.length;
+
+      while (remaining > 0 && attempts < maxAttempts) {
+        const day = v_days[dayIdx % v_days.length];
+        const slot = v_slots[slotIdx % v_slots.length];
+        const teacherKey = `${day}|${slot}|${sub.teacher_id}`;
+        const roomKey = `${day}|${slot}|ROOM:${sub.room}`;
+
+        if (!occupied.has(teacherKey) && !occupied.has(roomKey)) {
+          const insertData: Record<string, any> = {
+            institution_id,
+            day_of_week: day,
+            time_slot: slot,
+            subject: sub.name,
+            teacher_id: sub.teacher_id,
+            room: sub.room,
+          };
+          if (department_id) insertData.department_id = department_id;
+
+          const { error } = await supabaseAdmin.from('timetable').insert(insertData);
+          if (!error) {
+            inserted++;
+            remaining--;
+            occupied.add(teacherKey);
+            occupied.add(roomKey);
+          } else {
+            conflicts.push({ subject: sub.name, day, slot, reason: error.message });
+          }
+        } else {
+          conflicts.push({ subject: sub.name, day, slot, reason: 'teacher_or_room_unavailable' });
+        }
+
+        slotIdx++;
+        if (slotIdx >= v_slots.length) { slotIdx = 0; dayIdx++; }
+        attempts++;
+      }
+
+      if (remaining > 0) {
+        conflicts.push({ subject: sub.name, reason: `Could not place ${remaining} periods — no available slots` });
+      }
+      dayIdx = 0;
+      slotIdx = 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: inserted,
+      conflicts,
+      conflict_count: conflicts.length,
+      message: `Scheduled ${inserted} ${processedSubjects.length > 0 ? 'class' : ''} blocks. ${conflicts.length > 0 ? `${conflicts.length} conflicts encountered.` : 'No conflicts.'}`,
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -196,22 +196,42 @@ export default function AdminTimetablePage() {
   const handleAutoSchedule = async () => {
     if (!confirm('Run auto-scheduler? This will auto-populate free slots.')) return;
     try {
-      const target = isSchool ? selectedClassSection : selectedDept;
+      const schoolSubjects = [
+        'Mathematics', 'Science', 'English', 'Hindi', 'Social Studies', 'Computer Science',
+        'Physical Education', 'Art & Craft', 'General Knowledge', 'Moral Science'
+      ];
+
       const subjects = isSchool
-        ? ['Mathematics', 'Science', 'English', 'Hindi', 'Social Studies', 'Computer Science']
-        : ['Compiler Design', 'Data Networks', 'AI Ethics', 'Cloud Systems'];
-      const res = await apiPost('/core/timetable/auto-generate', {
-        department_id: isSchool ? undefined : target,
+        ? schoolSubjects.map((name, i) => ({
+            name,
+            hours_per_week: 5,
+            teacher_id: teachers[i % teachers.length]?.id || undefined,
+            room: `Room ${i + 1}`,
+          }))
+        : ['Compiler Design', 'Data Networks', 'AI Ethics', 'Cloud Systems'].map(name => ({
+            name,
+            hours_per_week: 3,
+            room: 'Block B R204',
+          }));
+
+      const payload: any = {
         subjects,
-        teachers: teachers.length > 0 ? teachers.map(t => t.id) : ['b0000000-0000-0000-0000-000000000002'],
-        rooms: isSchool ? Array.from({ length: 3 }, (_, i) => `Room ${i + 1}`) : ['Block B R204', 'Block B R205', 'Seminar Hall']
-      });
+        time_slots: timeSlots,
+        days,
+      };
+      if (!isSchool) {
+        payload.department_id = selectedDept;
+      }
+
+      const res = await apiPost('/core/timetable/auto-generate', payload);
       if (res.success) {
         fetchTimetable();
-        alert(`Scheduler finished: Scheduled ${res.count} clash-free ${isSchool ? 'classes' : 'lectures'}!`);
+        alert(`Scheduler finished: Scheduled ${res.count} blocks. ${res.conflict_count > 0 ? `${res.conflict_count} conflicts.` : 'No conflicts!'}`);
+      } else {
+        alert(res.error || 'Scheduler failed.');
       }
-    } catch (err) {
-      alert('Scheduler failed.');
+    } catch (err: any) {
+      alert('Scheduler failed: ' + (err?.message || 'Unknown error'));
     }
   };
 

@@ -10427,11 +10427,7 @@ CREATE INDEX IF NOT EXISTS idx_class_sections_grade ON class_sections(institutio
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE timetable ALTER COLUMN department_id DROP NOT NULL;
-DO $$ BEGIN
-ALTER TABLE timetable ADD COLUMN class_section_id UUID REFERENCES class_sections(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
-CREATE INDEX IF NOT EXISTS idx_timetable_class_section ON timetable(class_section_id);
+ALTER TABLE timetable DROP CONSTRAINT IF EXISTS timetable_teacher_id_fkey;
 INSERT INTO public.institutions (id, name, type, plan_tier, is_active, created_at)
 VALUES ('a0000000-0000-0000-0000-000000000002', 'SIET School', 'school', 'Campus', true, now())
 ON CONFLICT (id) DO NOTHING;
