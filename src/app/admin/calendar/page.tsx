@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, Plus, Trash2, ChevronLeft, ChevronRight, Clock,
-  GraduationCap, PartyPopper, BookOpen, AlertTriangle, Filter
+  GraduationCap, PartyPopper, BookOpen, AlertTriangle, Filter,
+  Users, MapPin, X
 } from 'lucide-react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../lib/api';
 
@@ -25,6 +26,18 @@ interface Holiday {
   name: string;
   date: string;
   is_optional: boolean;
+}
+
+interface TimetableClass {
+  id: string;
+  subject: string;
+  time_slot: string;
+  room: string;
+  teacher_name: string | null;
+  department_id: string;
+  has_session: boolean;
+  session_id: string | null;
+  session_active: boolean;
 }
 
 const EVENT_TYPES = [
@@ -64,6 +77,13 @@ export default function AcademicCalendarPage() {
   const [showHolidayForm, setShowHolidayForm] = useState(false);
   const [holidayForm, setHolidayForm] = useState({ name: '', date: '', is_optional: false });
 
+  // Selected date for showing classes
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDateClasses, setSelectedDateClasses] = useState<TimetableClass[]>([]);
+  const [isHolidaySelected, setIsHolidaySelected] = useState(false);
+  const [selectedHolidayName, setSelectedHolidayName] = useState<string | null>(null);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false);
+
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
@@ -84,11 +104,18 @@ export default function AcademicCalendarPage() {
 
   const handleCreateEvent = async () => {
     if (!eventForm.title || !eventForm.start_date) return;
-    const res = await apiPost('campusCore/calendar', eventForm);
+    const payload = {
+      ...eventForm,
+      semester: eventForm.semester ? Number(eventForm.semester) : null,
+      end_date: eventForm.end_date || null,
+    };
+    const res = await apiPost('campusCore/calendar', payload);
     if (res.success) {
       setShowEventForm(false);
       setEventForm({ title: '', event_type: 'semester_start', description: '', start_date: '', end_date: '', semester: '', batch_year: '', color: '#6C2BD9' });
       fetchData();
+    } else {
+      alert(res.error || 'Failed to create event.');
     }
   };
 
@@ -104,7 +131,52 @@ export default function AcademicCalendarPage() {
       setShowHolidayForm(false);
       setHolidayForm({ name: '', date: '', is_optional: false });
       fetchData();
+    } else {
+      alert(res.error || 'Failed to add holiday.');
     }
+  };
+
+  const handleDateClick = async (day: number) => {
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setSelectedDate(dateStr);
+    setIsLoadingClasses(true);
+
+    // Check if it's a holiday
+    const holiday = holidays.find(h => h.date === dateStr);
+    if (holiday) {
+      setIsHolidaySelected(true);
+      setSelectedHolidayName(holiday.name);
+      setSelectedDateClasses([]);
+      setIsLoadingClasses(false);
+      return;
+    }
+
+    setIsHolidaySelected(false);
+    setSelectedHolidayName(null);
+
+    // Fetch timetable for this date
+    try {
+      const res = await apiGet('campusCore/timetable/date', { date: dateStr });
+      if (res.success) {
+        setSelectedDateClasses(res.classes || []);
+        if (res.is_holiday) {
+          setIsHolidaySelected(true);
+          setSelectedHolidayName(res.holiday_name);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setSelectedDateClasses([]);
+    } finally {
+      setIsLoadingClasses(false);
+    }
+  };
+
+  const closeDateDetails = () => {
+    setSelectedDate(null);
+    setSelectedDateClasses([]);
+    setIsHolidaySelected(false);
+    setSelectedHolidayName(null);
   };
 
   // Calendar grid
@@ -172,13 +244,19 @@ export default function AcademicCalendarPage() {
               const dayEvents = getEventsForDate(day);
               const holiday = isHoliday(day);
               const isToday = today.getDate() === day && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
+              const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isSelected = selectedDate === dateStr;
 
               return (
-                <div key={day} className={`h-16 rounded-lg border p-1 overflow-hidden ${
-                  isToday ? 'border-violet-500 bg-violet-500/10' :
-                  holiday ? 'border-amber-500/30 bg-amber-500/10' :
-                  'border-white/5 bg-white/5'
-                }`}>
+                <div 
+                  key={day} 
+                  onClick={() => handleDateClick(day)}
+                  className={`h-16 rounded-lg border p-1 overflow-hidden cursor-pointer transition-all hover:scale-105 ${
+                    isSelected ? 'border-violet-400 bg-violet-500/20 ring-2 ring-violet-400/50' :
+                    isToday ? 'border-violet-500 bg-violet-500/10' :
+                    holiday ? 'border-amber-500/30 bg-amber-500/10' :
+                    'border-white/5 bg-white/5 hover:border-white/20'
+                  }`}>
                   <p className={`text-xs font-medium ${isToday ? 'text-violet-400' : 'text-slate-300'}`}>{day}</p>
                   {holiday && (
                     <p className="text-[9px] text-amber-400 truncate">{holiday.name}</p>
@@ -196,6 +274,76 @@ export default function AcademicCalendarPage() {
             })}
           </div>
         </div>
+
+        {/* Selected Date Classes Panel */}
+        {selectedDate && (
+          <div className="lg:col-span-2 bg-white/5 backdrop-blur-sm rounded-xl border border-violet-500/30 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Users size={18} className="text-violet-400" />
+                Classes for {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </h2>
+              <button onClick={closeDateDetails} className="text-slate-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            {isLoadingClasses ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-400 mx-auto"></div>
+                <p className="text-slate-400 text-sm mt-2">Loading classes...</p>
+              </div>
+            ) : isHolidaySelected ? (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-center">
+                <PartyPopper className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+                <p className="text-amber-400 font-semibold">Holiday: {selectedHolidayName}</p>
+                <p className="text-amber-300/70 text-sm mt-1">No classes scheduled for this day.</p>
+              </div>
+            ) : selectedDateClasses.length === 0 ? (
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-center">
+                <Calendar className="w-10 h-10 text-slate-500 mx-auto mb-2" />
+                <p className="text-slate-400">No classes scheduled for this day.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {selectedDateClasses.map((cls) => (
+                  <div key={cls.id} className={`bg-white/5 rounded-lg p-4 border ${
+                    cls.has_session && cls.session_active ? 'border-emerald-500/30' :
+                    cls.has_session ? 'border-slate-500/30' :
+                    'border-white/10'
+                  }`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-white">{cls.subject}</h3>
+                          {cls.has_session && cls.session_active && (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">ACTIVE</span>
+                          )}
+                          {cls.has_session && !cls.session_active && (
+                            <span className="text-[10px] bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded font-bold">CLOSED</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} /> {cls.time_slot}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin size={12} /> {cls.room}
+                          </span>
+                          {cls.teacher_name && (
+                            <span className="flex items-center gap-1">
+                              <GraduationCap size={12} /> {cls.teacher_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Upcoming Events Sidebar */}
         <div className="space-y-4">

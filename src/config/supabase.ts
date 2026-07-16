@@ -410,6 +410,74 @@ function getMockDataForTable(tableName: string) {
           departments: {
             name: 'Computer Science'
           }
+        },
+        {
+          id: 'school-student-1',
+          roll_number: 'SCH1001',
+          user_id: 'b0000000-0000-0000-0000-000000000010',
+          institution_id: 'a0000000-0000-0000-0000-000000000002',
+          department_id: 'd-school-1',
+          semester: null,
+          users: {
+            name: 'Aarav Patel',
+            full_name: 'Aarav Patel',
+            phone: '+919876543210',
+            email: 'aarav@school.internal'
+          },
+          departments: {
+            name: 'Class 10'
+          }
+        },
+        {
+          id: 'school-student-2',
+          roll_number: 'SCH1002',
+          user_id: 'b0000000-0000-0000-0000-000000000011',
+          institution_id: 'a0000000-0000-0000-0000-000000000002',
+          department_id: 'd-school-1',
+          semester: null,
+          users: {
+            name: 'Diya Sharma',
+            full_name: 'Diya Sharma',
+            phone: '+919876543211',
+            email: 'diya@school.internal'
+          },
+          departments: {
+            name: 'Class 10'
+          }
+        },
+        {
+          id: 'school-student-3',
+          roll_number: 'SCH1003',
+          user_id: 'b0000000-0000-0000-0000-000000000012',
+          institution_id: 'a0000000-0000-0000-0000-000000000002',
+          department_id: 'd-school-2',
+          semester: null,
+          users: {
+            name: 'Rohan Gupta',
+            full_name: 'Rohan Gupta',
+            phone: '+919876543212',
+            email: 'rohan@school.internal'
+          },
+          departments: {
+            name: 'Class 8'
+          }
+        },
+        {
+          id: 'school-student-4',
+          roll_number: 'SCH1004',
+          user_id: 'b0000000-0000-0000-0000-000000000013',
+          institution_id: 'a0000000-0000-0000-0000-000000000002',
+          department_id: 'd-school-2',
+          semester: null,
+          users: {
+            name: 'Sneha Verma',
+            full_name: 'Sneha Verma',
+            phone: '+919876543213',
+            email: 'sneha@school.internal'
+          },
+          departments: {
+            name: 'Class 8'
+          }
         }
       ];
     case 'director_alerts':

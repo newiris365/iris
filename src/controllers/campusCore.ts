@@ -65,6 +65,222 @@ async function getMethodConfig(institutionId: string, method: string): Promise<R
   }
 }
 
+// Check if a date is an academic holiday for the institution
+async function isDateHoliday(institutionId: string, date: string): Promise<{ isHoliday: boolean; holidayName?: string }> {
+  try {
+    // Check academic_calendar_holidays table
+    const { data: holiday } = await supabaseAdmin
+      .from('academic_calendar_holidays')
+      .select('name')
+      .eq('institution_id', institutionId)
+      .eq('date', date)
+      .maybeSingle();
+
+    if (holiday) {
+      return { isHoliday: true, holidayName: holiday.name };
+    }
+
+    // Check academic_calendar table for holiday OR vacation events spanning this date
+    const { data: calendarEvent } = await supabaseAdmin
+      .from('academic_calendar')
+      .select('title, event_type')
+      .eq('institution_id', institutionId)
+      .in('event_type', ['holiday', 'vacation'])
+      .lte('start_date', date)
+      .gte('end_date', date)
+      .maybeSingle();
+
+    if (calendarEvent) {
+      return { isHoliday: true, holidayName: calendarEvent.title };
+    }
+
+    return { isHoliday: false };
+  } catch {
+    return { isHoliday: false };
+  }
+}
+
+// Auto-create attendance sessions based on timetable for the current time
+export async function autoStartSessions(req: Request, res: Response) {
+  try {
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+
+    const today = new Date();
+    const dayName = today.toLocaleDateString('en-US', { weekday: 'long' }); // Monday, Tuesday, etc.
+    const currentTime = today.toTimeString().slice(0, 5); // HH:MM format
+    const dateStr = today.toISOString().split('T')[0];
+
+    // Check if today is a holiday
+    const holidayCheck = await isDateHoliday(institutionId, dateStr);
+    if (holidayCheck.isHoliday) {
+      return res.status(200).json({ 
+        success: true, 
+        message: `Today is a holiday (${holidayCheck.holidayName}). No sessions created.`,
+        sessionsCreated: 0 
+      });
+    }
+
+    // Fetch timetable entries for today
+    const { data: timetableEntries, error: ttError } = await supabaseAdmin
+      .from('timetable')
+      .select('*')
+      .eq('institution_id', institutionId)
+      .eq('day_of_week', dayName);
+
+    if (ttError || !timetableEntries || timetableEntries.length === 0) {
+      return res.status(200).json({ 
+        success: true, 
+        message: 'No timetable entries found for today.',
+        sessionsCreated: 0 
+      });
+    }
+
+    // Parse time slot and check if it's currently active (within 15 minutes of start)
+    const parseTime = (timeStr: string) => {
+      // Handle formats like "09:00 - 10:00 AM" or "09:00-10:00"
+      const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+      if (!match) return null;
+      let hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      // Check for PM
+      if (timeStr.toUpperCase().includes('PM') && hours !== 12) hours += 12;
+      if (timeStr.toUpperCase().includes('AM') && hours === 12) hours = 0;
+      return hours * 60 + minutes; // Return minutes since midnight
+    };
+
+    const currentMinutes = today.getHours() * 60 + today.getMinutes();
+    const createdSessions: any[] = [];
+
+    for (const entry of timetableEntries) {
+      const slotStart = parseTime(entry.time_slot);
+      if (slotStart === null) continue;
+
+      // Create session if current time is within 15 minutes before to 45 minutes after slot start
+      // This allows auto-creation during the class period
+      if (currentMinutes >= slotStart - 15 && currentMinutes <= slotStart + 45) {
+        // Check if session already exists for this time slot today
+        const { data: existingSession } = await supabaseAdmin
+          .from('attendance_sessions')
+          .select('id')
+          .eq('institution_id', institutionId)
+          .eq('date', dateStr)
+          .eq('time_slot', entry.time_slot)
+          .eq('subject', entry.subject)
+          .maybeSingle();
+
+        if (existingSession) continue; // Skip if already created
+
+        // Get QR config
+        const qrConfig = await getMethodConfig(institutionId, 'qr');
+        const rotateInterval = qrConfig.rotate_interval_minutes || 5;
+        const geoLat = qrConfig.geo_lat || DEFAULT_CAMPUS_LAT;
+        const geoLng = qrConfig.geo_lng || DEFAULT_CAMPUS_LNG;
+        const geoRadius = qrConfig.geo_radius || DEFAULT_MAX_RADIUS_METERS;
+
+        // Create attendance session
+        const { data: session, error: sessionError } = await supabaseAdmin
+          .from('attendance_sessions')
+          .insert({
+            institution_id: institutionId,
+            department_id: entry.department_id,
+            subject: entry.subject,
+            date: dateStr,
+            time_slot: entry.time_slot,
+            marked_by: entry.teacher_id,
+            is_active: true,
+            qr_rotate_interval: rotateInterval,
+            geo_lat: geoLat,
+            geo_lng: geoLng,
+            geo_radius: geoRadius
+          })
+          .select()
+          .single();
+
+        if (!sessionError && session) {
+          // Generate QR token for the session
+          await generateRotatingQrToken(session.id, institutionId, rotateInterval);
+          createdSessions.push({
+            id: session.id,
+            subject: entry.subject,
+            time_slot: entry.time_slot,
+            department_id: entry.department_id
+          });
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: createdSessions.length > 0 
+        ? `Auto-created ${createdSessions.length} attendance session(s) for today.` 
+        : 'No new sessions to create at this time.',
+      sessionsCreated: createdSessions.length,
+      sessions: createdSessions
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to auto-start sessions.' });
+  }
+}
+
+// Get timetable entries for a specific date (used by calendar)
+export async function getTimetableForDate(req: Request, res: Response) {
+  try {
+    const { date } = req.query;
+    const institutionId = req.user?.institution_id;
+    if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+    if (!date) return res.status(400).json({ success: false, error: 'date query parameter required.' });
+
+    const targetDate = new Date(date as string);
+    const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const dateStr = targetDate.toISOString().split('T')[0];
+
+    // Check if it's a holiday
+    const holidayCheck = await isDateHoliday(institutionId, dateStr);
+
+    // Fetch timetable entries for this day
+    const { data: timetableEntries, error: ttError } = await supabaseAdmin
+      .from('timetable')
+      .select('*, staff(id, users(name))')
+      .eq('institution_id', institutionId)
+      .eq('day_of_week', dayName);
+
+    if (ttError) return res.status(500).json({ success: false, error: ttError.message });
+
+    // Fetch existing attendance sessions for this date
+    const { data: sessions } = await supabaseAdmin
+      .from('attendance_sessions')
+      .select('id, subject, time_slot, is_active')
+      .eq('institution_id', institutionId)
+      .eq('date', dateStr);
+
+    // Merge timetable with session status
+    const classesWithStatus = (timetableEntries || []).map(entry => {
+      const session = sessions?.find(s => 
+        s.subject === entry.subject && s.time_slot === entry.time_slot
+      );
+      return {
+        ...entry,
+        teacher_name: entry.staff?.users?.name || null,
+        has_session: !!session,
+        session_id: session?.id || null,
+        session_active: session?.is_active || false
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      date: dateStr,
+      day_of_week: dayName,
+      is_holiday: holidayCheck.isHoliday,
+      holiday_name: holidayCheck.holidayName || null,
+      classes: classesWithStatus
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch timetable for date.' });
+  }
+}
+
 // =========================================================================
 // PARENT NOTIFICATION HELPERS
 // =========================================================================
@@ -345,6 +561,16 @@ export async function startSession(req: Request, res: Response) {
     const institutionId = req.user?.institution_id;
     if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
 
+    // Check if today is a holiday
+    const today = new Date().toISOString().split('T')[0];
+    const holidayCheck = await isDateHoliday(institutionId, today);
+    if (holidayCheck.isHoliday) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Cannot start attendance session on a holiday (${holidayCheck.holidayName}). Today is ${today}.` 
+      });
+    }
+
     // Check if QR method is enabled
     if (!(await isMethodEnabled(institutionId, 'qr'))) {
       return res.status(403).json({ success: false, error: 'QR attendance is not enabled for your institution.' });
@@ -442,6 +668,16 @@ export async function markAttendanceQr(req: Request, res: Response) {
     const { token, latitude, longitude, device_id } = parse.data;
     const institutionId = req.user?.institution_id;
     if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
+
+    // Check if today is a holiday
+    const today = new Date().toISOString().split('T')[0];
+    const holidayCheck = await isDateHoliday(institutionId, today);
+    if (holidayCheck.isHoliday) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${today}.` 
+      });
+    }
 
     // Check if QR method is enabled
     if (!(await isMethodEnabled(institutionId, 'qr'))) {
@@ -542,6 +778,16 @@ export async function markAttendanceBiometric(req: Request, res: Response) {
 
     const institutionId = student.institution_id;
 
+    // Check if today is a holiday
+    const today = new Date().toISOString().split('T')[0];
+    const holidayCheck = await isDateHoliday(institutionId, today);
+    if (holidayCheck.isHoliday) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${today}.` 
+      });
+    }
+
     // Check if biometric method is enabled
     if (!(await isMethodEnabled(institutionId, 'biometric'))) {
       return res.status(403).json({ success: false, error: 'Biometric attendance is not enabled for your institution.' });
@@ -614,6 +860,15 @@ export async function markAttendanceBulk(req: Request, res: Response) {
     if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
     const date = new Date().toISOString().split('T')[0];
 
+    // Check if today is a holiday
+    const holidayCheck = await isDateHoliday(institutionId, date);
+    if (holidayCheck.isHoliday) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Today is ${date}.` 
+      });
+    }
+
     // Check if manual method is enabled
     if (!(await isMethodEnabled(institutionId, 'manual'))) {
       return res.status(403).json({ success: false, error: 'Manual attendance is not enabled for your institution.' });
@@ -678,6 +933,15 @@ export async function markSchoolAttendanceBulk(req: Request, res: Response) {
     if (!institutionId) return res.status(400).json({ success: false, error: 'Institution context required.' });
     if (!date || !academic_year || !Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ success: false, error: 'date, academic_year, and records are required.' });
+    }
+
+    // Check if the date is a holiday
+    const holidayCheck = await isDateHoliday(institutionId, date);
+    if (holidayCheck.isHoliday) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Cannot mark attendance on a holiday (${holidayCheck.holidayName}). Date: ${date}` 
+      });
     }
 
     const dbRecords = records.map((r: any) => ({
@@ -1729,13 +1993,58 @@ export async function importStudents(req: Request, res: Response) {
 export async function getTimetable(req: Request, res: Response) {
   try {
     const { departmentId } = req.params;
-    const { data, error } = await supabaseAdmin
-      .from('timetable')
-      .select('*, staff(*, users(*))')
-      .eq('department_id', departmentId);
+    const institution_id = req.user?.institution_id;
+    if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(departmentId);
+
+    // Try class_section_id first (school student view)
+    if (isUUID) {
+      const { data: asClassSection } = await supabaseAdmin
+        .from('timetable').select('*')
+        .eq('institution_id', institution_id)
+        .eq('class_section_id', departmentId)
+        .order('day_of_week').order('time_slot');
+      if (asClassSection && asClassSection.length > 0) {
+        return res.status(200).json({ success: true, timetable: asClassSection });
+      }
+
+      // Try teacher_id (teacher view)
+      const { data: asTeacher } = await supabaseAdmin
+        .from('timetable').select('*')
+        .eq('institution_id', institution_id)
+        .eq('teacher_id', departmentId)
+        .order('day_of_week').order('time_slot');
+      if (asTeacher && asTeacher.length > 0) {
+        return res.status(200).json({ success: true, timetable: asTeacher });
+      }
+
+      // Try department_id
+      const { data: asDept } = await supabaseAdmin
+        .from('timetable').select('*')
+        .eq('institution_id', institution_id)
+        .eq('department_id', departmentId)
+        .order('day_of_week').order('time_slot');
+      if (asDept && asDept.length > 0) {
+        return res.status(200).json({ success: true, timetable: asDept });
+      }
+
+      // Fallback: return ALL timetable entries for this institution
+      // (useful when class_section_id column doesn't exist yet)
+      const { data: allEntries } = await supabaseAdmin
+        .from('timetable').select('*')
+        .eq('institution_id', institution_id)
+        .order('day_of_week').order('time_slot');
+      return res.status(200).json({ success: true, timetable: allEntries || [] });
+    }
+
+    // Non-UUID: return all entries
+    const { data, error } = await supabaseAdmin
+      .from('timetable').select('*')
+      .eq('institution_id', institution_id)
+      .order('day_of_week').order('time_slot');
     if (error) return res.status(500).json({ success: false, error: error.message });
-    return res.status(200).json({ success: true, timetable: data });
+    return res.status(200).json({ success: true, timetable: data || [] });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Failed to fetch timetable.' });
   }
@@ -3218,26 +3527,29 @@ export async function importStudentProfiles(req: Request, res: Response) {
       const rec = records[i];
       try {
         let email = rec.email;
-        if (isSchool && (!email || email.trim() === '')) {
-          email = `${rec.roll_number.toLowerCase()}@school.internal`;
-        }
 
         // Validate required fields
-        if (!rec.name || !email || !rec.roll_number) {
-          errors.push({ row: i + 1, error: 'Missing required fields (name, email, roll_number)' });
+        if (!rec.name || !rec.roll_number) {
+          errors.push({ row: i + 1, error: 'Missing required fields (name, roll_number)' });
+          continue;
+        }
+        if (!isSchool && !email) {
+          errors.push({ row: i + 1, error: 'Missing required field: email' });
           continue;
         }
 
-        // Check if email already exists
-        const { data: existingUser } = await supabaseAdmin
-          .from('users')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
+        // Check if email already exists (only if email is provided)
+        if (email) {
+          const { data: existingUser } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
 
-        if (existingUser) {
-          errors.push({ row: i + 1, error: `Email already exists: ${email}` });
-          continue;
+          if (existingUser) {
+            errors.push({ row: i + 1, error: `Email already exists: ${email}` });
+            continue;
+          }
         }
 
         // Check if roll number already exists in this institution
@@ -4770,109 +5082,199 @@ export async function autoGenerateTimetable(req: Request, res: Response) {
     if (!institution_id) return res.status(400).json({ success: false, error: 'No institution context.' });
 
     if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
-      return res.status(400).json({ success: false, error: 'subjects array is required.' });
+      return res.status(400).json({ success: false, error: 'subjects array with teacher assignments is required.' });
     }
 
-    const v_days = inputDays && Array.isArray(inputDays) && inputDays.length > 0
-      ? inputDays
-      : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const v_days = inputDays?.length ? inputDays : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const v_slots = time_slots?.length ? time_slots : ['09:00 - 10:00 AM', '10:15 - 11:15 AM', '11:30 - 12:30 PM', '02:00 - 03:00 PM'];
+    const v_rooms = inputRooms?.length ? inputRooms : ['Room 1', 'Room 2', 'Room 3'];
 
-    const v_slots = time_slots && Array.isArray(time_slots) && time_slots.length > 0
-      ? time_slots
-      : ['09:00 - 10:00 AM', '10:15 - 11:15 AM', '11:30 - 12:30 PM', '02:00 - 03:00 PM'];
+    // ─── STEP 0: Pre-assign Period 1 to class teachers ──────────
+    // Fetch class sections with their class_teacher_id
+    const { data: classSections } = await supabaseAdmin
+      .from('class_sections')
+      .select('id, grade, section, class_teacher_id')
+      .eq('institution_id', institution_id);
 
-    const defaultRooms = inputRooms && Array.isArray(inputRooms) && inputRooms.length > 0
-      ? inputRooms
-      : ['Room 1', 'Room 2', 'Room 3'];
+    const firstSlot = v_slots[0]; // Period 1
+    const classTeacherLessons: any[] = [];
 
-    // Process subjects
-    const processedSubjects: any[] = [];
+    if (classSections && classSections.length > 0 && firstSlot) {
+      for (const cs of classSections) {
+        if (!cs.class_teacher_id) continue;
+        // Only assign if not already occupied
+        const teacherKey0 = `${v_days[0]}|${firstSlot}|${cs.class_teacher_id}`;
+        const existingTeacherSlots = new Set<string>();
+        (existing || []).forEach((e: any) => {
+          if (e.teacher_id === cs.class_teacher_id) existingTeacherSlots.add(`${e.day_of_week}|${e.time_slot}`);
+        });
+
+        for (const day of v_days) {
+          const daySlotKey = `${day}|${firstSlot}`;
+          if (!existingTeacherSlots.has(daySlotKey)) {
+            classTeacherLessons.push({
+              subject: 'Class Teacher Period',
+              teacher_id: cs.class_teacher_id,
+              class_section_id: cs.id,
+              room: `Grade ${cs.grade}-${cs.section}`,
+              isClassTeacherPeriod: true,
+            });
+            existingTeacherSlots.add(daySlotKey); // prevent same teacher double-booked
+          }
+        }
+      }
+    }
+
+    // ─── STEP 1: Build lesson list ──────────────────────────────
+    // Each lesson = { subject, teacher_id, class_section_id?, room, day, slot }
+    // subjects format: [{ name, teacher_id, classes_per_week, class_sections: [id1, id2] }]
+    const lessons: any[] = [];
     for (const sub of subjects) {
-      const name = sub.name || sub.subject_name || sub.subject || 'Unknown Subject';
-      const hours_per_week = Number(sub.hours_per_week || sub.classes_per_week || 3);
-      let teacherId = sub.teacher_id;
-      if (!teacherId) {
-        // Try to find a random teacher for this institution
-        const { data: t } = await supabaseAdmin
-          .from('users').select('id')
-          .eq('institution_id', institution_id)
-          .eq('role', 'Teacher')
-          .eq('is_active', true)
-          .limit(1).maybeSingle();
-        if (t) teacherId = t.id;
+      const name = sub.name || sub.subject || 'Unknown';
+      const teacherId = sub.teacher_id;
+      const classesPerWeek = Number(sub.classes_per_week || sub.hours_per_week || 3);
+      const classSections = sub.class_sections || []; // optional: which class sections get this subject
+      const room = sub.room || v_rooms[0];
+
+      if (!teacherId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teacherId)) continue;
+
+      if (classSections.length > 0) {
+        for (const csId of classSections) {
+          for (let i = 0; i < classesPerWeek; i++) {
+            lessons.push({ subject: name, teacher_id: teacherId, class_section_id: csId, room, priority: 0 });
+          }
+        }
+      } else {
+        for (let i = 0; i < classesPerWeek; i++) {
+          lessons.push({ subject: name, teacher_id: teacherId, room, priority: 0 });
+        }
       }
-      if (!teacherId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teacherId)) {
-        continue; // Skip subjects without valid teacher
-      }
-      processedSubjects.push({ name, hours_per_week, teacher_id: teacherId, room: sub.room || defaultRooms[0] });
     }
 
-    if (processedSubjects.length === 0) {
-      return res.status(400).json({ success: false, error: 'No valid subjects with teachers found.' });
+    if (lessons.length === 0 && classTeacherLessons.length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid lessons to schedule. Ensure each subject has a valid teacher_id.' });
     }
 
-    // Fetch existing timetable to check conflicts
+    // Prepend class teacher lessons — they get priority for Period 1
+    const allLessons = [...classTeacherLessons, ...lessons];
+
+    // ─── STEP 2: Fetch existing timetable for conflict detection ──
     const { data: existing } = await supabaseAdmin
       .from('timetable').select('day_of_week, time_slot, teacher_id, room')
       .eq('institution_id', institution_id);
 
-    const occupied = new Set<string>();
+    // Build conflict maps: teacher conflicts, room conflicts, class_section conflicts
+    const teacherOccupied = new Set<string>();   // "day|slot|teacher_id"
+    const roomOccupied = new Set<string>();      // "day|slot|room"
+    const classOccupied = new Set<string>();     // "day|slot|class_section_id"
+
     (existing || []).forEach((e: any) => {
-      occupied.add(`${e.day_of_week}|${e.time_slot}|${e.teacher_id}`);
-      if (e.room) occupied.add(`${e.day_of_week}|${e.time_slot}|ROOM:${e.room}`);
+      teacherOccupied.add(`${e.day_of_week}|${e.time_slot}|${e.teacher_id}`);
+      if (e.room) roomOccupied.add(`${e.day_of_week}|${e.time_slot}|${e.room}`);
     });
 
-    // Round-robin allocation
+    // ─── STEP 3: Sort lessons — most constrained first ──────────
+    // Teachers with fewer free slots go first (most constrained)
+    const totalSlots = v_days.length * v_slots.length;
+    const teacherFreeCount: Record<string, number> = {};
+    lessons.forEach(l => {
+      if (!teacherFreeCount[l.teacher_id]) teacherFreeCount[l.teacher_id] = 0;
+    });
+    // Count free slots per teacher
+    for (const tid of Object.keys(teacherFreeCount)) {
+      let free = 0;
+      for (const day of v_days) {
+        for (const slot of v_slots) {
+          if (!teacherOccupied.has(`${day}|${slot}|${tid}`)) free++;
+        }
+      }
+      teacherFreeCount[tid] = free;
+    }
+    // Sort: teachers with fewer free slots first (most constrained = scheduled first)
+    lessons.sort((a, b) => (teacherFreeCount[a.teacher_id] || totalSlots) - (teacherFreeCount[b.teacher_id] || totalSlots));
+
+    // ─── STEP 4: Greedy assignment with backtracking-free first-fit ──
     let inserted = 0;
     const conflicts: any[] = [];
-    let dayIdx = 0;
-    let slotIdx = 0;
+    const teacherTimetables: Record<string, any[]> = {};  // teacher_id -> [{day, slot, subject, room, class_section}]
+    const classTimetables: Record<string, any[]> = {};    // class_section_id -> [{day, slot, subject, teacher, room}]
 
-    for (const sub of processedSubjects) {
-      let remaining = sub.hours_per_week;
-      let attempts = 0;
-      const maxAttempts = v_days.length * v_slots.length;
+    for (const lesson of lessons) {
+      let placed = false;
 
-      while (remaining > 0 && attempts < maxAttempts) {
-        const day = v_days[dayIdx % v_days.length];
-        const slot = v_slots[slotIdx % v_slots.length];
-        const teacherKey = `${day}|${slot}|${sub.teacher_id}`;
-        const roomKey = `${day}|${slot}|ROOM:${sub.room}`;
+      for (const day of v_days) {
+        for (const slot of v_slots) {
+          const teacherKey = `${day}|${slot}|${lesson.teacher_id}`;
+          const roomKey = `${day}|${slot}|${lesson.room}`;
+          const classKey = lesson.class_section_id ? `${day}|${slot}|${lesson.class_section_id}` : null;
 
-        if (!occupied.has(teacherKey) && !occupied.has(roomKey)) {
-          const insertData: Record<string, any> = {
-            institution_id,
-            day_of_week: day,
-            time_slot: slot,
-            subject: sub.name,
-            teacher_id: sub.teacher_id,
-            room: sub.room,
-          };
-          if (department_id) insertData.department_id = department_id;
+          const teacherFree = !teacherOccupied.has(teacherKey);
+          const roomFree = !roomOccupied.has(roomKey);
+          const classFree = classKey ? !classOccupied.has(classKey) : true;
 
-          const { error } = await supabaseAdmin.from('timetable').insert(insertData);
-          if (!error) {
-            inserted++;
-            remaining--;
-            occupied.add(teacherKey);
-            occupied.add(roomKey);
-          } else {
-            conflicts.push({ subject: sub.name, day, slot, reason: error.message });
+          if (teacherFree && roomFree && classFree) {
+            // Place the lesson
+            const insertData: Record<string, any> = {
+              institution_id,
+              day_of_week: day,
+              time_slot: slot,
+              subject: lesson.subject,
+              teacher_id: lesson.teacher_id,
+              room: lesson.room,
+            };
+            if (department_id) insertData.department_id = department_id;
+            if (lesson.class_section_id) insertData.class_section_id = lesson.class_section_id;
+
+            let { error } = await supabaseAdmin.from('timetable').insert(insertData);
+            // If class_section_id column doesn't exist, retry without it
+            if (error && error.message?.includes('class_section_id')) {
+              delete insertData.class_section_id;
+              ({ error } = await supabaseAdmin.from('timetable').insert(insertData));
+            }
+            if (!error) {
+              inserted++;
+              placed = true;
+              teacherOccupied.add(teacherKey);
+              roomOccupied.add(roomKey);
+              if (classKey) classOccupied.add(classKey);
+
+              // Track in memory for response
+              if (!teacherTimetables[lesson.teacher_id]) teacherTimetables[lesson.teacher_id] = [];
+              teacherTimetables[lesson.teacher_id].push({
+                day, slot, subject: lesson.subject, room: lesson.room,
+                class_section_id: lesson.class_section_id || null,
+              });
+              if (lesson.class_section_id) {
+                if (!classTimetables[lesson.class_section_id]) classTimetables[lesson.class_section_id] = [];
+                classTimetables[lesson.class_section_id].push({
+                  day, slot, subject: lesson.subject, teacher_id: lesson.teacher_id, room: lesson.room,
+                });
+              }
+              break;
+            }
           }
-        } else {
-          conflicts.push({ subject: sub.name, day, slot, reason: 'teacher_or_room_unavailable' });
         }
-
-        slotIdx++;
-        if (slotIdx >= v_slots.length) { slotIdx = 0; dayIdx++; }
-        attempts++;
+        if (placed) break;
       }
 
-      if (remaining > 0) {
-        conflicts.push({ subject: sub.name, reason: `Could not place ${remaining} periods — no available slots` });
+      if (!placed) {
+        conflicts.push({
+          subject: lesson.subject,
+          teacher_id: lesson.teacher_id,
+          class_section_id: lesson.class_section_id || null,
+          reason: 'No available slot (teacher/room/class all occupied)',
+        });
       }
-      dayIdx = 0;
-      slotIdx = 0;
+    }
+
+    // ─── STEP 5: Balance teacher workloads across days ──────────
+    // Count per-day distribution and report imbalances
+    const teacherDailyLoad: Record<string, Record<string, number>> = {};
+    for (const [tid, entries] of Object.entries(teacherTimetables)) {
+      teacherDailyLoad[tid] = {};
+      entries.forEach(e => {
+        teacherDailyLoad[tid][e.day] = (teacherDailyLoad[tid][e.day] || 0) + 1;
+      });
     }
 
     return res.status(200).json({
@@ -4880,7 +5282,10 @@ export async function autoGenerateTimetable(req: Request, res: Response) {
       count: inserted,
       conflicts,
       conflict_count: conflicts.length,
-      message: `Scheduled ${inserted} ${processedSubjects.length > 0 ? 'class' : ''} blocks. ${conflicts.length > 0 ? `${conflicts.length} conflicts encountered.` : 'No conflicts.'}`,
+      teacher_timetables: teacherTimetables,
+      student_timetables: classTimetables,
+      teacher_daily_load: teacherDailyLoad,
+      message: `Scheduled ${inserted} lessons. ${conflicts.length > 0 ? `${conflicts.length} conflicts.` : 'No conflicts!'}`,
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });

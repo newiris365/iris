@@ -137,6 +137,8 @@ import {
   deleteCalendarEvent,
   getHolidays,
   createHoliday,
+  autoStartSessions,
+  getTimetableForDate,
   approveVisitor,
   getUnallocatedStudents,
   checkoutRoom,
@@ -305,6 +307,8 @@ router.put('/timetable/:id', requireRole(['Admin', 'SuperAdmin']), updateTimetab
 router.delete('/timetable/:id', requireRole(['Admin', 'SuperAdmin']), deleteTimetableBlock);
 router.get('/timetable/student/:studentId', getStudentTimetable);
 router.post('/timetable/substitute', requireRole(['Admin', 'SuperAdmin']), assignSubstitute);
+router.get('/timetable/date', requireRole(['Admin', 'SuperAdmin', 'Teacher', 'Staff', 'Student']), getTimetableForDate);
+router.post('/attendance/auto-start', requireRole(['Admin', 'SuperAdmin']), autoStartSessions);
 
 // Alias: /classes -> timetable lookup by department (supports ?department= query)
 router.get('/classes', getTimetable);

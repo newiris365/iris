@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Upload, FileSpreadsheet, AlertCircle, CheckCircle2, 
@@ -15,14 +15,23 @@ interface ImportError {
   error: string;
 }
 
-const REQUIRED_COLUMNS = ['name', 'email', 'roll_number'];
-const OPTIONAL_COLUMNS = ['department_id', 'semester', 'batch_year', 'dob', 'gender', 'phone', 'guardian_name', 'guardian_phone', 'fingerprint_id'];
-const SAMPLE_CSV = `name,email,roll_number,semester,batch_year,dob,gender,phone,guardian_name,guardian_phone
+const REQUIRED_COLUMNS_SCHOOL = ['name', 'roll_number'];
+const REQUIRED_COLUMNS_COLLEGE = ['name', 'email', 'roll_number'];
+const OPTIONAL_COLUMNS_SCHOOL = ['email', 'semester', 'batch_year', 'dob', 'gender', 'phone', 'guardian_name', 'guardian_phone', 'fingerprint_id'];
+const OPTIONAL_COLUMNS_COLLEGE = ['department_id', 'semester', 'batch_year', 'dob', 'gender', 'phone', 'guardian_name', 'guardian_phone', 'fingerprint_id'];
+
+const SAMPLE_CSV_SCHOOL = `name,roll_number,email,semester,batch_year,dob,gender,phone,guardian_name,guardian_phone
+Aarav Sharma,SCH24001,,5,2024,2010-05-15,Male,9876543210,Rajesh Sharma,9876543211
+Priya Patel,SCH24002,,5,2024,2010-08-22,Female,9876543220,Sunita Patel,9876543221
+Rohan Gupta,SCH24003,,5,2024,2010-01-10,Male,9876543230,Amit Gupta,9876543231`;
+
+const SAMPLE_CSV_COLLEGE = `name,email,roll_number,semester,batch_year,dob,gender,phone,guardian_name,guardian_phone
 Aarav Sharma,aarav.sharma@college.edu,CS23B1001,3,2023,2004-05-15,Male,9876543210,Rajesh Sharma,9876543211
 Priya Patel,priya.patel@college.edu,CS23B1002,3,2023,2004-08-22,Female,9876543220,Sunita Patel,9876543221
 Rohan Gupta,rohan.gupta@college.edu,CS23B1003,3,2023,2004-01-10,Male,9876543230,Amit Gupta,9876543231`;
 
 export default function StudentImportPage() {
+  const [instituteType, setInstituteType] = useState('college');
   const [importResult, setImportResult] = useState<{ imported: number; errors: number; error_details: ImportError[]; imported_students: any[] } | null>(null);
   const [importing, setImporting] = useState(false);
   const [errors, setErrors] = useState<{ row: number; error: string }[]>([]);
@@ -31,6 +40,23 @@ export default function StudentImportPage() {
   const [rawData, setRawData] = useState<any[]>([]);
   const [step, setStep] = useState<'upload' | 'map' | 'preview' | 'result'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const isSchool = instituteType === 'school';
+  const REQUIRED_COLUMNS = isSchool ? REQUIRED_COLUMNS_SCHOOL : REQUIRED_COLUMNS_COLLEGE;
+  const OPTIONAL_COLUMNS = isSchool ? OPTIONAL_COLUMNS_SCHOOL : OPTIONAL_COLUMNS_COLLEGE;
+  const SAMPLE_CSV = isSchool ? SAMPLE_CSV_SCHOOL : SAMPLE_CSV_COLLEGE;
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setInstituteType(parsed.institute_type || 'college');
+        } catch (e) {}
+      }
+    }
+  }, []);
 
   const processFile = useCallback((file: File) => {
     setErrors([]);
@@ -115,7 +141,7 @@ export default function StudentImportPage() {
         }
       });
     }
-  }, []);
+  }, [REQUIRED_COLUMNS, OPTIONAL_COLUMNS]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -144,13 +170,13 @@ export default function StudentImportPage() {
   const validationErrors: { row: number; error: string }[] = [];
   mappedData.forEach((row, i) => {
     if (!row.name) validationErrors.push({ row: i + 1, error: 'Missing name' });
-    if (!row.email) validationErrors.push({ row: i + 1, error: 'Missing email' });
+    if (!isSchool && !row.email) validationErrors.push({ row: i + 1, error: 'Missing email' });
     if (!row.roll_number) validationErrors.push({ row: i + 1, error: 'Missing roll_number' });
-    if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+    if (!isSchool && row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
       validationErrors.push({ row: i + 1, error: `Invalid email: ${row.email}` });
     }
     if (row.semester && (isNaN(Number(row.semester)) || Number(row.semester) < 1 || Number(row.semester) > 12)) {
-      validationErrors.push({ row: i + 1, error: `Invalid semester: ${row.semester}` });
+      validationErrors.push({ row: i + 1, error: `Invalid ${isSchool ? 'grade' : 'semester'}: ${row.semester}` });
     }
   });
 
@@ -160,9 +186,9 @@ export default function StudentImportPage() {
     try {
       const records = mappedData.map(row => ({
         name: row.name,
-        email: row.email,
+        email: row.email || undefined,
         roll_number: row.roll_number,
-        department_id: row.department_id || undefined,
+        department_id: isSchool ? undefined : (row.department_id || undefined),
         semester: row.semester ? Number(row.semester) : undefined,
         batch_year: row.batch_year || undefined,
         dob: row.dob || undefined,
@@ -270,7 +296,7 @@ export default function StudentImportPage() {
                 Download sample CSV
               </button>
               <div className="text-xs text-gray-500">
-                Required: {REQUIRED_COLUMNS.join(', ')} | Optional: {OPTIONAL_COLUMNS.join(', ')}
+                Required: {REQUIRED_COLUMNS.join(', ')} | Optional: {OPTIONAL_COLUMNS.map(c => c === 'semester' && isSchool ? 'grade' : c).join(', ')}
               </div>
             </div>
           </motion.div>
@@ -314,7 +340,7 @@ export default function StudentImportPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {OPTIONAL_COLUMNS.map(opt => (
                   <div key={opt} className="flex items-center gap-3">
-                    <label className="w-28 text-sm text-gray-400 font-medium">{opt.replace(/_/g, ' ')}:</label>
+                    <label className="w-28 text-sm text-gray-400 font-medium">{opt === 'semester' && isSchool ? 'grade' : opt.replace(/_/g, ' ')}:</label>
                     <select
                       value={columnMapping[opt] || ''}
                       onChange={(e) => setColumnMapping(prev => ({ ...prev, [opt]: e.target.value || undefined }))}
@@ -351,7 +377,7 @@ export default function StudentImportPage() {
               </button>
               <button
                 onClick={() => setStep('preview')}
-                disabled={!columnMapping.name || !columnMapping.email || !columnMapping.roll_number}
+                disabled={!columnMapping.name || !columnMapping.roll_number || (!isSchool && !columnMapping.email)}
                 className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
               >
                 Preview Data ({rawData.length} rows)
@@ -378,9 +404,9 @@ export default function StudentImportPage() {
                   <tr className="bg-white/[0.03]">
                     <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">#</th>
                     <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">Name</th>
-                    <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">Email</th>
+                    {!isSchool && <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">Email</th>}
                     <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">Roll Number</th>
-                    <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">Semester</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">{isSchool ? 'Grade / Standard' : 'Semester'}</th>
                     <th className="px-4 py-3 text-left text-xs text-gray-400 font-medium">Gender</th>
                   </tr>
                 </thead>
@@ -391,7 +417,7 @@ export default function StudentImportPage() {
                       <tr key={i} className={hasError ? 'bg-red-500/5' : 'hover:bg-white/[0.02]'}>
                         <td className="px-4 py-2.5 text-gray-500 text-xs">{i + 1}</td>
                         <td className="px-4 py-2.5 text-white text-xs">{row.name}</td>
-                        <td className="px-4 py-2.5 text-gray-300 text-xs font-mono">{row.email}</td>
+                        {!isSchool && <td className="px-4 py-2.5 text-gray-300 text-xs font-mono">{row.email}</td>}
                         <td className="px-4 py-2.5 text-gray-300 text-xs font-mono">{row.roll_number}</td>
                         <td className="px-4 py-2.5 text-gray-400 text-xs">{row.semester || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-400 text-xs">{row.gender || '-'}</td>

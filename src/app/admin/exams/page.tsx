@@ -10,6 +10,9 @@ export default function AdminExamsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [activeExamForGrades, setActiveExamForGrades] = useState<any | null>(null);
+  const [instituteType, setInstituteType] = useState('college');
+
+  const isSchool = instituteType === 'school';
 
   // Scheduling Form
   const [formData, setFormData] = useState({
@@ -25,6 +28,15 @@ export default function AdminExamsPage() {
   const [gradesSheet, setGradesSheet] = useState<any[]>([]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProfile = localStorage.getItem('iris_user_profile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setInstituteType(parsed.institute_type || 'college');
+        } catch (e) {}
+      }
+    }
     fetchExams();
   }, []);
 
@@ -256,7 +268,7 @@ export default function AdminExamsPage() {
       {showAddForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-[#13102A] border border-[#6C2BD9]/30 rounded-2xl p-6 shadow-2xl relative">
-            <h3 className="font-heading font-bold text-lg text-white mb-4">Schedule Exam Assessment</h3>
+            <h3 className="font-heading font-bold text-lg text-white mb-4">Schedule {isSchool ? 'Exam' : 'Exam Assessment'}</h3>
             
             <form onSubmit={handleCreateExam} className="space-y-4 text-xs">
               <div className="flex flex-col gap-1">
@@ -265,7 +277,7 @@ export default function AdminExamsPage() {
                   type="text" required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="Odd Semester Mid-Term Exam"
+                  placeholder={isSchool ? 'Term 1 Mid-Term Exam' : 'Odd Semester Mid-Term Exam'}
                   className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                 />
               </div>
@@ -298,9 +310,21 @@ export default function AdminExamsPage() {
                   onChange={(e) => setFormData({...formData, type: e.target.value})}
                   className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                 >
-                  <option value="Finals">Term Finals Examination</option>
-                  <option value="Mid-Term">Mid-Term Assessment</option>
-                  <option value="Practical">Lab & Practical</option>
+                  {isSchool ? (
+                    <>
+                      <option value="Finals">Term Final Exam</option>
+                      <option value="Mid-Term">Term Mid-Term Exam</option>
+                      <option value="Quarterly">Quarterly Exam</option>
+                      <option value="Annual">Annual Exam</option>
+                      <option value="Unit Test">Unit Test</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Finals">Term Finals Examination</option>
+                      <option value="Mid-Term">Mid-Term Assessment</option>
+                      <option value="Practical">Lab & Practical</option>
+                    </>
+                  )}
                 </select>
               </div>
 

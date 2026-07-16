@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Check, X, FileText, BarChart2, ShieldAlert, Settings, Upload } from 'lucide-react';
-import { apiGet, apiPut } from '../../../lib/api';
+import { Calendar, Check, X, FileText, BarChart2, ShieldAlert, Settings, Upload, AlertTriangle } from 'lucide-react';
+import { apiGet, apiPut, apiPost } from '../../../lib/api';
 import Link from 'next/link';
 
 interface ClassSection {
@@ -10,6 +10,13 @@ interface ClassSection {
   grade: number;
   section: string;
   class_teacher_name: string | null;
+}
+
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  is_optional: boolean;
 }
 
 export default function AdminAttendancePage() {
@@ -20,6 +27,8 @@ export default function AdminAttendancePage() {
   const [classSections, setClassSections] = useState<ClassSection[]>([]);
   const [selectedClassSection, setSelectedClassSection] = useState<string>('');
   const [selectedDept, setSelectedDept] = useState('a0000000-0000-0000-0000-000000000001');
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [todayHoliday, setTodayHoliday] = useState<Holiday | null>(null);
   const isSchool = instituteType === 'school';
 
   useEffect(() => {
@@ -31,6 +40,20 @@ export default function AdminAttendancePage() {
   }, []);
 
   useEffect(() => {
+    fetchHolidays();
+    // Auto-start attendance sessions based on timetable
+    triggerAutoStart();
+  }, []);
+
+  const triggerAutoStart = async () => {
+    try {
+      await apiPost('/core/attendance/auto-start');
+    } catch (err) {
+      // Silent fail - auto-start is best-effort
+    }
+  };
+
+  useEffect(() => {
     if (isSchool) {
       fetchClassSections();
     }
@@ -39,6 +62,23 @@ export default function AdminAttendancePage() {
   useEffect(() => {
     fetchLogs();
   }, [selectedDept, selectedClassSection]);
+
+  const fetchHolidays = async () => {
+    try {
+      const res = await apiGet('/core/calendar/holidays');
+      if (res.success) {
+        const holidayList = res.holidays || [];
+        setHolidays(holidayList);
+        
+        // Check if today is a holiday
+        const today = new Date().toISOString().split('T')[0];
+        const todayIsHoliday = holidayList.find((h: Holiday) => h.date === today);
+        setTodayHoliday(todayIsHoliday || null);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchClassSections = async () => {
     try {
@@ -147,6 +187,38 @@ export default function AdminAttendancePage() {
             <Upload className="w-4 h-4" /> Import Attendance
           </Link>
         </div>
+
+        {/* Holiday Alert Banner */}
+        {todayHoliday && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-amber-400">Today is a Holiday</h3>
+              <p className="text-xs text-amber-300/70">{todayHoliday.name} - Attendance marking is disabled for today.</p>
+            </div>
+            {todayHoliday.is_optional && (
+              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-1 rounded font-bold">OPTIONAL</span>
+            )}
+          </div>
+        )}
+
+        {/* Upcoming Holidays */}
+        {holidays.length > 0 && !todayHoliday && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+            <h3 className="font-bold text-sm text-white mb-2 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#A78BFA]" /> Upcoming Holidays
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {holidays.slice(0, 5).map((h) => (
+                <span key={h.id} className="text-[10px] bg-[#6C2BD9]/20 text-[#A78BFA] px-2 py-1 rounded">
+                  {h.name} ({h.date})
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Regularization Approvals Queue */}
         <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col gap-4">

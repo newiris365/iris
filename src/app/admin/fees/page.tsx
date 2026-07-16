@@ -6,13 +6,23 @@ import { apiGet, apiPost } from '../../../lib/api';
 
 export default function AdminFeesPage() {
   const [structures, setStructures] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [totalCollected, setTotalCollected] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [instituteType, setInstituteType] = useState<string>('college');
+
+  useEffect(() => {
+    try {
+      const profile = JSON.parse(localStorage.getItem('iris_user_profile') || '{}');
+      setInstituteType(profile.institute_type || 'college');
+    } catch {}
+  }, []);
 
   const [formData, setFormData] = useState({
     name: '',
+    semester: 'odd',
     amount: '',
     due_date: '2026-06-30',
     applicable_to: 'All'
@@ -41,6 +51,11 @@ export default function AdminFeesPage() {
         }
       }
 
+      const stdRes = await apiGet('/core/students');
+      if (stdRes.success) {
+        setStudents(stdRes.students || []);
+      }
+
       const reportRes = await apiGet('/core/fees/report');
       if (reportRes.success) {
         setTotalCollected(reportRes.totalCollected || 0);
@@ -56,10 +71,16 @@ export default function AdminFeesPage() {
   const handleCreateStructure = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await apiPost('/core/fees/structures', {
-        ...formData,
-        amount: Number(formData.amount)
-      });
+      const payload: any = {
+        name: formData.name,
+        amount: Number(formData.amount),
+        due_date: formData.due_date,
+        applicable_to: formData.applicable_to
+      };
+      if (instituteType === 'college') {
+        payload.semester = formData.semester;
+      }
+      const res = await apiPost('/core/fees/structures', payload);
       if (res.success) {
         setShowAddForm(false);
         fetchFees();
@@ -149,7 +170,10 @@ export default function AdminFeesPage() {
                   <div key={st.id} className="p-4 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center text-xs">
                     <div>
                       <h4 className="font-bold text-white">{st.name}</h4>
-                      <span className="text-[10px] text-[#C4B5FD]/70">Applicable: {st.applicable_to} | Due: {st.due_date}</span>
+                      <span className="text-[10px] text-[#C4B5FD]/70">
+                        {instituteType === 'college' && st.semester && (st.semester === 'odd' ? 'Odd Sem (1,3,5) | ' : st.semester === 'even' ? 'Even Sem (2,4,6) | ' : '')}
+                        Applicable: {st.applicable_to} | Due: {st.due_date}
+                      </span>
                     </div>
                     <strong className="font-heading font-extrabold text-sm text-white">₹{Number(st.amount).toLocaleString()}</strong>
                   </div>
@@ -162,6 +186,12 @@ export default function AdminFeesPage() {
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col gap-4">
             <h3 className="font-heading font-bold text-lg text-white">Allocate Scholarship Waiver</h3>
             
+            {structures.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-xs text-[#C4B5FD]/50 mb-3">No billing categories available yet.</p>
+                <p className="text-[10px] text-[#C4B5FD]/40">Create a fee structure first using the "Initialize Structure" button above.</p>
+              </div>
+            ) : (
             <form onSubmit={handleApplyConcession} className="space-y-4 text-xs">
               <div className="flex flex-col gap-1">
                 <label className="text-[#C4B5FD]">Target Billing Category</label>
@@ -171,6 +201,19 @@ export default function AdminFeesPage() {
                   className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                 >
                   {structures.map(s => <option key={s.id} value={s.id}>{s.name} (₹{s.amount})</option>)}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD]">Select Student</label>
+                <select 
+                  value={concessionData.student_id}
+                  onChange={(e) => setConcessionData({...concessionData, student_id: e.target.value})}
+                  required
+                  className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
+                >
+                  <option value="">Choose a student...</option>
+                  {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.email || s.id})</option>)}
                 </select>
               </div>
 
@@ -217,6 +260,7 @@ export default function AdminFeesPage() {
                 Apply Concession Discount
               </button>
             </form>
+            )}
           </div>
 
         </div>
@@ -230,13 +274,31 @@ export default function AdminFeesPage() {
             <h3 className="font-heading font-bold text-lg text-white mb-4">Initialize Billing Structure</h3>
             
             <form onSubmit={handleCreateStructure} className="space-y-4 text-xs">
+              {instituteType === 'college' && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[#C4B5FD]">Semester</label>
+                  <select 
+                    value={formData.semester}
+                    onChange={(e) => {
+                      const sem = e.target.value;
+                      const label = sem === 'odd' ? 'Odd Semester (1,3,5)' : 'Even Semester (2,4,6)';
+                      setFormData({...formData, semester: sem, name: label + ' Tuition Fee'});
+                    }}
+                    className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
+                  >
+                    <option value="odd">Odd Semester (1,3,5)</option>
+                    <option value="even">Even Semester (2,4,6)</option>
+                  </select>
+                </div>
+              )}
+
               <div className="flex flex-col gap-1">
                 <label className="text-[#C4B5FD]">Structure Name</label>
                 <input 
                   type="text" required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="Odd Semester Tuition Fee"
+                  placeholder={instituteType === 'school' ? 'Annual Tuition Fee' : 'Tuition Fee'}
                   className="bg-black/40 border border-[#6C2BD9]/30 p-2.5 rounded-xl text-white outline-none focus:border-[#8B5CF6]"
                 />
               </div>
