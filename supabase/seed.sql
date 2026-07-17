@@ -257,6 +257,19 @@ VALUES (
     TRUE
 );
 
+-- Sandbox Applicant
+INSERT INTO users (id, institution_id, role, name, email, phone, is_active)
+VALUES (
+    'b0000000-0000-0000-0000-000000000029',
+    'a0000000-0000-0000-0000-000000000001',
+    'Applicant',
+    'Applicant User',
+    'applicant@sin.education',
+    '+919876543210',
+    TRUE
+);
+
+
 -- 3. DEPARTMENTS
 INSERT INTO departments (id, institution_id, name, head_id)
 VALUES (
