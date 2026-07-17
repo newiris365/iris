@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { supabaseAdmin, isSupabaseOffline } from '../config/supabase';
 import logger from '../config/logger';
+import { getFingerprintHash } from '../lib/auth-helpers';
 
 // ============================================================
 // ZOD VALIDATION SCHEMAS
@@ -228,11 +230,23 @@ export async function registerApplicant(req: Request, res: Response) {
     // Send Welcome SMS/WhatsApp mock trigger
     logger.info(`[SMS/WhatsApp Welcome] Sent to ${phone} with Application ID: ${applicationNumber}`);
 
+    const tokenClaims = {
+      id: userRecord.id,
+      institution_id: targetInstId,
+      role: 'applicant',
+      email: email,
+      fingerprint: getFingerprintHash(req),
+      institute_type: 'college'
+    };
+    
+    const token = jwt.sign(tokenClaims, process.env.JWT_SECRET as string, { expiresIn: '7d' });
+
     return res.status(201).json({
       success: true,
       message: 'Registration successful. Verify mobile OTP to activate your dashboard credentials.',
       application_number: applicationNumber,
-      applicant
+      applicant,
+      token
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
