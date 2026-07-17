@@ -576,7 +576,10 @@ export async function initiatePayment(req: Request, res: Response) {
     const { applicant_id, fee_type, amount } = parse.data;
 
     // Create a mock Razorpay Order
-    const randomOrderId = `order_${Math.random().toString(36).substring(2, 11)}`;
+    const isMock = process.env.NODE_ENV !== 'production' && req.user?.id === 'b0000000-0000-0000-0000-000000000029';
+    const randomOrderId = isMock 
+      ? `order_mock_${Math.random().toString(36).substring(2, 11)}`
+      : `order_${Math.random().toString(36).substring(2, 11)}`;
 
     const { data, error } = await supabaseAdmin
       .from('admission_fees')
