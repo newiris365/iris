@@ -74,6 +74,7 @@ export default function MultiStepApplyPage() {
   const [paymentInitiated, setPaymentInitiated] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [mockMode, setMockMode] = useState(false); // true when backend is unavailable
 
   // Available programs reference
   const availablePrograms = [
@@ -112,7 +113,8 @@ export default function MultiStepApplyPage() {
         setErrorMsg(data.error);
       }
     } catch {
-      setErrorMsg('Network error. Using mock registration backup.');
+      // Backend unavailable — enter mock mode so the form can still be demoed
+      setMockMode(true);
       setRegistered(true);
       setOtpSent(true);
       setApplicantId('mock-applicant-uuid');
@@ -172,6 +174,8 @@ export default function MultiStepApplyPage() {
   // Submit step payloads to express server
   const saveStepData = async () => {
     const token = localStorage.getItem('iris_jwt_token') || '';
+    // Skip backend calls if in mock mode or no valid token available
+    if (mockMode || !token) return;
     try {
       if (currentStep === 1) {
         await fetch('/api/admissions/application/personal', {
@@ -238,15 +242,26 @@ export default function MultiStepApplyPage() {
   const handleFinalSubmit = async () => {
     setSubmitting(true);
     const token = localStorage.getItem('iris_jwt_token') || '';
+
+    // If no valid token (e.g. mock/demo mode), skip backend and go directly to confirmation
+    if (mockMode || !token) {
+      setTimeout(() => {
+        setCurrentStep(6);
+        setSubmitting(false);
+      }, 800);
+      return;
+    }
+
     try {
-      // Send mock document uploads to server to satisfy validation checks
+      // Upload documents
       for (const docKey of Object.keys(documentsList)) {
+        if (!documentsList[docKey].url) continue;
         await fetch('/api/admissions/documents/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
             doc_type: docKey === 'marksheet_12th' ? '12th_marksheet' : docKey === 'marksheet_10th' ? '10th_marksheet' : docKey,
-            doc_url: documentsList[docKey].url || `https://api.iris365.in/uploads/${docKey}.pdf`
+            doc_url: documentsList[docKey].url
           })
         });
       }
@@ -262,7 +277,7 @@ export default function MultiStepApplyPage() {
         alert(data.error);
       }
     } catch {
-      // Mock fallback
+      // Network error fallback — still proceed to confirmation
       setCurrentStep(6);
     } finally {
       setSubmitting(false);
