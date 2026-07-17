@@ -76,16 +76,20 @@ async function logPermissionDenial(req: Request, logType: 'feature' | 'module', 
 // Feature toggle check: blocks access if a module is disabled for the institution
 export function requireFeature(featureKey: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({ success: false, error: 'Authentication required.' });
-    }
-
-    // SuperAdmin bypasses feature checks
-    if (req.user.role === 'SuperAdmin') {
+    const institutionId = req.user?.institution_id || req.body?.institution_id || req.query?.institution_id;
+    
+    if (!institutionId) {
+      // If we cannot determine the institution and there is no user, allow it to pass.
+      // This allows public routes (like /register) to function if they don't have institution_id.
       return next();
     }
 
-    const cacheKey = `${req.user.institution_id}:${featureKey}`;
+    // SuperAdmin bypasses feature checks
+    if (req.user?.role === 'SuperAdmin') {
+      return next();
+    }
+
+    const cacheKey = `${institutionId}:${featureKey}`;
     const cached = featureCache.get(cacheKey);
     if (cached !== null) {
       if (!cached) {
@@ -101,7 +105,7 @@ export function requireFeature(featureKey: string) {
       const { data, error } = await supabaseServiceRole
         .from('institution_features')
         .select('enabled')
-        .eq('institution_id', req.user.institution_id)
+        .eq('institution_id', institutionId)
         .eq('feature_key', featureKey)
         .single();
 
@@ -114,7 +118,9 @@ export function requireFeature(featureKey: string) {
       featureCache.set(cacheKey, data.enabled, FEATURE_CACHE_TTL_MS);
 
       if (!data.enabled) {
-        await logPermissionDenial(req, 'feature', featureKey, 'read');
+        if (req.user) {
+          await logPermissionDenial(req, 'feature', featureKey, 'read');
+        }
         return res.status(403).json({
           success: false,
           error: `The '${featureKey}' module is not enabled for your institution.`
@@ -124,7 +130,6 @@ export function requireFeature(featureKey: string) {
       next();
     } catch (err) {
       console.error('Feature check error:', err);
-      // Fail-closed in production
       return res.status(500).json({ success: false, error: 'Internal server error performing feature enablement check.' });
     }
   };
