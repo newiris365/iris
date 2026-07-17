@@ -182,11 +182,26 @@ export async function registerApplicant(req: Request, res: Response) {
     const targetInstId = institution_id || 'a0000000-0000-0000-0000-000000000001';
     const targetCycleId = cycle_id || 'c1111111-1111-1111-1111-111111111111';
 
-    // 1. Generate unique Application Number: SIET-2026-XXXXXX
+    // 1. Check if this email is already registered for this institution
+    const { data: existing } = await supabaseAdmin
+      .from('users')
+      .select('id, email')
+      .eq('email', email)
+      .eq('institution_id', targetInstId)
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        error: 'An account with this email address already exists for this institution. Please log in instead, or use a different email to register.'
+      });
+    }
+
+    // 2. Generate unique Application Number: SIET-2026-XXXXXX
     const randomSerial = Math.floor(100000 + Math.random() * 900000);
     const applicationNumber = `SIET-2026-${randomSerial}`;
 
-    // 2. Create User account inside auth and users DB
+    // 3. Create User account inside auth and users DB
     const { data: userRecord, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
@@ -201,6 +216,13 @@ export async function registerApplicant(req: Request, res: Response) {
       .single();
 
     if (userError) {
+      // Friendly message for any remaining duplicate key violation
+      if (userError.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          error: 'An account with this email or phone number already exists. Please log in or use different contact details.'
+        });
+      }
       return res.status(409).json({ success: false, error: `Account registration failed: ${userError.message}` });
     }
 
@@ -222,8 +244,14 @@ export async function registerApplicant(req: Request, res: Response) {
       .single();
 
     if (applicantError) {
-      // Cleanup user if applicant insert fails
+      // Cleanup user record if applicant insert fails to avoid orphaned users
       await supabaseAdmin.from('users').delete().eq('id', userRecord.id);
+      if (applicantError.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          error: 'An application already exists with this email for the current admission cycle. Please log in to continue your existing application.'
+        });
+      }
       return res.status(500).json({ success: false, error: applicantError.message });
     }
 
