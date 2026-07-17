@@ -82,17 +82,6 @@ export default function MultiStepApplyPage() {
     { id: 'a1111111-1111-1111-1111-111111111113', name: 'Master of Business Administration (MBA)', fee: 1500, min_pc: 50 }
   ];
 
-  // Mock document uploading
-  const triggerMockUpload = (key: string) => {
-    setDocumentsList(prev => ({
-      ...prev,
-      [key]: {
-        url: `https://supabase.storage/admissions/${key}_mock.pdf`,
-        file_name: `${key}_marksheet_scanned_copy.pdf`
-      }
-    }));
-  };
-
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -775,7 +764,7 @@ export default function MultiStepApplyPage() {
                 <h3 className="text-xl font-bold flex items-center gap-2 text-[#A78BFA]">
                   <FileText className="w-5 h-5" /> Step 4 — Document upload
                 </h3>
-                <p className="text-xs text-[#A78BFA]/60">Upload required scanned copies (PDF/PNG, under 2MB). Use the buttons to simulate document capture.</p>
+                <p className="text-xs text-[#A78BFA]/60">Upload required scanned copies (PDF/PNG, under 2MB). Use the buttons below to select and upload your documents.</p>
 
                 <div className="space-y-3">
                   {[
@@ -794,17 +783,33 @@ export default function MultiStepApplyPage() {
                             {isUploaded ? documentsList[doc.key].file_name : 'No file uploaded'}
                           </span>
                         </div>
-                        <button
-                          onClick={() => triggerMockUpload(doc.key)}
-                          className={`text-xs px-3.5 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
+                        <label
+                          className={`cursor-pointer text-xs px-3.5 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
                             isUploaded 
                               ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25' 
                               : 'bg-[#6C2BD9]/10 border-[#6C2BD9]/30 text-[#A78BFA] hover:bg-[#6C2BD9]/20 hover:text-white'
                           }`}
                         >
                           <Upload className="w-3.5 h-3.5" />
-                          {isUploaded ? 'Replace' : 'Upload Mock File'}
-                        </button>
+                          {isUploaded ? 'Replace' : 'Upload File'}
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setDocumentsList(prev => ({
+                                  ...prev,
+                                  [doc.key]: {
+                                    url: `https://storage.googleapis.com/iris-mock/${doc.key}_${Date.now()}`,
+                                    file_name: file.name
+                                  }
+                                }));
+                              }
+                            }}
+                          />
+                        </label>
                       </div>
                     );
                   })}
