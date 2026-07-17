@@ -24,6 +24,8 @@ interface Institution {
   plan_tier: string;
   plan_price_monthly: number;
   is_active: boolean;
+  /** Controls visibility on the public /home applicant discovery page */
+  is_visible_on_homepage?: boolean;
   email?: string;
   phone?: string;
   created_at: string;
@@ -510,6 +512,25 @@ export default function SuperAdminConsole() {
     }
   };
 
+  /** Toggle whether this institution appears on the public /home applicant page */
+  const toggleHomepageVisibility = async (id: string, currentVisible: boolean) => {
+    try {
+      const res = await fetch('/api/superadmin/institutions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_visible_on_homepage: !currentVisible }),
+      });
+      if (!res.ok) throw new Error('Failed to update homepage visibility');
+      setInstitutions(prev =>
+        prev.map(inst =>
+          inst.id === id ? { ...inst, is_visible_on_homepage: !currentVisible } : inst
+        )
+      );
+    } catch (e: any) {
+      alert('Error: ' + (e.message || 'Failed to toggle homepage visibility'));
+    }
+  };
+
   const updatePlanTier = async (id: string, newTier: string) => {
     try {
       const newPrice = planPrices[newTier] || PLAN_PRICING[newTier] || 0;
@@ -560,6 +581,7 @@ export default function SuperAdminConsole() {
           openai_api_key: editingInst.openai_api_key || null,
           claude_api_key: editingInst.claude_api_key || null,
           institute_type: editingInst.institute_type || 'college',
+          is_visible_on_homepage: editingInst.is_visible_on_homepage ?? false,
         }),
       });
       const json = await res.json();
@@ -903,6 +925,18 @@ export default function SuperAdminConsole() {
                                 : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
                             }`}>
                             {inst.is_active ? 'Suspend' : 'Activate'}
+                          </button>
+                          {/* Homepage visibility quick-toggle */}
+                          <button
+                            title={inst.is_visible_on_homepage ? 'Hide from public /home page' : 'Show on public /home page'}
+                            onClick={() => toggleHomepageVisibility(inst.id, !!inst.is_visible_on_homepage)}
+                            className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
+                              inst.is_visible_on_homepage
+                                ? 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
+                                : 'bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/20'
+                            }`}
+                          >
+                            {inst.is_visible_on_homepage ? '🌐 Listed' : '🔒 Hidden'}
                           </button>
                           <button
                             onClick={() => handleDeleteInstitution(inst.id)}
@@ -1525,6 +1559,31 @@ export default function SuperAdminConsole() {
                 <p className="text-[10px] text-yellow-500 mt-0.5 italic">
                   * Changing type updates your session automatically. Other users of this institute must re-login for changes to take effect.
                 </p>
+              </div>
+              {/* Public homepage visibility toggle */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[#C4B5FD] font-semibold">Public Applicant Home Page</label>
+                <div className="flex items-center justify-between p-2.5 bg-black/40 border border-white/10 rounded-xl">
+                  <div>
+                    <p className="text-white text-[11px] font-semibold">
+                      {editingInst?.is_visible_on_homepage ? '🌐 Visible on /home' : '🔒 Hidden from /home'}
+                    </p>
+                    <p className="text-[#C4B5FD]/50 text-[10px] mt-0.5">
+                      When enabled, this institution appears on the public applicant discovery page.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => editingInst && setEditingInst({ ...editingInst, is_visible_on_homepage: !editingInst.is_visible_on_homepage })}
+                    className={`relative w-10 h-5 rounded-full transition-all shrink-0 ${
+                      editingInst?.is_visible_on_homepage ? 'bg-cyan-500' : 'bg-white/10'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                      editingInst?.is_visible_on_homepage ? 'left-5' : 'left-0.5'
+                    }`} />
+                  </button>
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[#C4B5FD] font-semibold">Monthly Price (₹)</label>
