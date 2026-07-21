@@ -20,7 +20,8 @@ import {
   Activity,
   Terminal,
   Zap,
-  Globe
+  Globe,
+  GraduationCap
 } from 'lucide-react';
 
 const MODULES = [
@@ -186,6 +187,9 @@ export default function LandingPage() {
           <a href="#features" className="hover:text-white transition-colors">Features</a>
           <a href="#simulator" className="hover:text-white transition-colors">Console</a>
           <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+          <Link href="/home" className="flex items-center gap-1.5 text-[#06B6D4] hover:text-white transition-colors font-semibold">
+            <GraduationCap className="w-4 h-4" /> Apply Now
+          </Link>
           <span className="text-white/10">|</span>
           <span className="text-[10px] font-mono bg-[#6C2BD9]/10 border border-[#6C2BD9]/30 text-[#C4B5FD] px-2.5 py-1 rounded-full uppercase tracking-wider">SIET Jodhpur</span>
         </nav>
@@ -216,13 +220,42 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 mt-10">
-          <Link href="/login?fresh=1" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] text-white font-bold text-sm shadow-xl shadow-[#06B6D4]/10 hover:scale-[1.02] transition-all">
-            Enter Management Console
+          <Link href="/home" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] text-white font-bold text-sm shadow-xl shadow-[#06B6D4]/10 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+            <GraduationCap className="w-4 h-4" /> Apply for Admissions
           </Link>
-          <a href="#features" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-sm transition-all">
-            Explore 10 Modules
+          <Link href="/login?fresh=1" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-sm transition-all">
+            Management Console →
+          </Link>
+          <a href="#features" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/3 border border-white/5 hover:bg-white/8 text-[#C4B5FD]/70 font-medium text-sm transition-all">
+            Explore Modules
           </a>
         </div>
+      </section>
+
+      {/* Admissions Banner */}
+      <section className="relative z-10 px-6 py-6 max-w-6xl mx-auto w-full">
+        <Link href="/home" className="block group">
+          <div className="relative overflow-hidden rounded-2xl border border-[#06B6D4]/30 bg-gradient-to-r from-[#06B6D4]/10 via-[#8B5CF6]/10 to-[#EC4899]/10 px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-4 hover:border-[#06B6D4]/60 transition-all duration-300">
+            {/* Background glow */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#06B6D4]/5 to-[#8B5CF6]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#06B6D4] to-[#8B5CF6] flex items-center justify-center shadow-lg shadow-[#06B6D4]/20 shrink-0">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold uppercase tracking-wider">Admissions Open</span>
+                  <span className="text-[9px] font-mono text-[#C4B5FD]/40 uppercase tracking-wider">2026–27 Cycle</span>
+                </div>
+                <h3 className="font-heading font-bold text-white text-lg group-hover:text-[#06B6D4] transition-colors">Apply for Admissions at SIET Jodhpur</h3>
+                <p className="text-xs text-[#C4B5FD]/60 mt-0.5">Register, choose programs, upload documents and pay fees — all in one place.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 px-6 py-3 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8B5CF6] text-white font-bold text-sm shadow-lg shadow-[#06B6D4]/20 group-hover:brightness-110 transition-all">
+              Start Application <ChevronRight className="w-4 h-4" />
+            </div>
+          </div>
+        </Link>
       </section>
 
       {/* Features Showcase Section */}
